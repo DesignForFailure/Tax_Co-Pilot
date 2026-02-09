@@ -1,0 +1,52 @@
+{% extends "layouts/base.html" %}
+{% block title %}What-If Comparison{% endblock %}
+{% block content %}
+<h1 style="font-size: 24px; margin-bottom: 8px;">What-If: Filing Status Comparison</h1>
+<p class="text-dim text-sm mb-4">Side-by-side comparison of tax outcomes under different elections.</p>
+
+{% if comparison %}
+<div class="card" style="border-color: var(--green); background: rgba(74,222,128,0.05);">
+    <h2 style="color: var(--green);">✅ Recommendation: {{ comparison.recommendation }}</h2>
+    <p>Choosing <strong>{{ comparison.recommendation }}</strong> saves <strong>${{ "{:,.0f}".format(comparison.savings) }}</strong> in total tax.</p>
+</div>
+
+<div class="card">
+    <h2>Side-by-Side Comparison</h2>
+    <table style="width:100%; border-collapse:collapse;">
+        <tr style="border-bottom:2px solid var(--border);">
+            <th style="padding:10px 12px; text-align:left; font-size:12px; color:var(--text-dim);">FIELD</th>
+            <th style="padding:10px 12px; text-align:right; font-size:12px; color:var(--text-dim);">{{ comparison.scenario_a.scenario_name }}</th>
+            <th style="padding:10px 12px; text-align:right; font-size:12px; color:var(--text-dim);">{{ comparison.scenario_b.scenario_name }}</th>
+            <th style="padding:10px 12px; text-align:right; font-size:12px; color:var(--text-dim);">DIFF</th>
+        </tr>
+        {% for diff in comparison.diffs %}
+        <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px 12px;">{{ diff.field }}</td>
+            <td style="padding:8px 12px; text-align:right; font-variant-numeric:tabular-nums;">
+                {% if diff.scenario_a_value != 'N/A' %}${{ diff.scenario_a_value }}{% else %}—{% endif %}
+            </td>
+            <td style="padding:8px 12px; text-align:right; font-variant-numeric:tabular-nums;">
+                {% if diff.scenario_b_value != 'N/A' %}${{ diff.scenario_b_value }}{% else %}—{% endif %}
+            </td>
+            <td style="padding:8px 12px; text-align:right; font-variant-numeric:tabular-nums; color:var(--text-dim);">
+                {{ diff.difference }}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+
+<div class="card">
+    <h2>Scenario Details</h2>
+    <div class="flex gap-3">
+        <a href="/runs/{{ comparison.scenario_a.id }}" class="btn btn-secondary" style="font-size:13px;">View {{ comparison.scenario_a.scenario_name }} Details</a>
+        <a href="/runs/{{ comparison.scenario_b.id }}" class="btn btn-secondary" style="font-size:13px;">View {{ comparison.scenario_b.scenario_name }} Details</a>
+    </div>
+</div>
+
+{% else %}
+<div class="card">
+    <p class="text-dim">No comparison run yet. Go to <a href="/calculate" style="color:var(--accent);">Calculate</a>, enter your data, and click <strong>"Compare MFJ vs MFS"</strong>.</p>
+</div>
+{% endif %}
+{% endblock %}

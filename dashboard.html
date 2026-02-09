@@ -2,49 +2,76 @@
 {% block title %}Dashboard{% endblock %}
 {% block content %}
 <h1 style="font-size: 24px; margin-bottom: 8px;">Tax Year 2024</h1>
-<p class="text-dim text-sm mb-4">Federal Return — MVP Vertical Slice</p>
+<p class="text-dim text-sm mb-4">Federal + State Return</p>
+
+{% if comparison %}
+<div class="card" style="border-color: var(--green); background: rgba(74,222,128,0.05);">
+    <h2 style="color: var(--green);">💡 What-If Result</h2>
+    <p>Recommended: <strong>{{ comparison.recommendation }}</strong> — saves <strong>${{ "{:,.0f}".format(comparison.savings) }}</strong></p>
+    <a href="/whatif" class="btn" style="margin-top: 8px; padding: 6px 16px; font-size: 13px;">View Full Comparison</a>
+</div>
+{% endif %}
 
 {% if run %}
 <div class="summary-grid">
+    {% for label, val in [
+        ("Gross Income", run.output.gross_income),
+        ("AGI", run.output.agi),
+        ("Standard Deduction", run.output.standard_deduction),
+        ("Taxable Income", run.output.taxable_income),
+        ("Federal Tax", run.output.federal_tax),
+        ("Withholding", run.output.total_withholding),
+    ] %}
     <div class="summary-item">
-        <div class="label">Gross Income</div>
-        <div class="value">${{ "{:,.0f}".format(run.output.gross_income) }}</div>
+        <div class="label">{{ label }}</div>
+        <div class="value">${{ "{:,.0f}".format(val) }}</div>
     </div>
+    {% endfor %}
     <div class="summary-item">
-        <div class="label">AGI</div>
-        <div class="value">${{ "{:,.0f}".format(run.output.agi) }}</div>
-    </div>
-    <div class="summary-item">
-        <div class="label">Standard Deduction</div>
-        <div class="value">${{ "{:,.0f}".format(run.output.standard_deduction) }}</div>
-    </div>
-    <div class="summary-item">
-        <div class="label">Taxable Income</div>
-        <div class="value">${{ "{:,.0f}".format(run.output.taxable_income) }}</div>
-    </div>
-    <div class="summary-item">
-        <div class="label">Federal Tax</div>
-        <div class="value">${{ "{:,.0f}".format(run.output.federal_tax) }}</div>
-    </div>
-    <div class="summary-item">
-        <div class="label">Total Withholding</div>
-        <div class="value">${{ "{:,.0f}".format(run.output.total_withholding) }}</div>
-    </div>
-    <div class="summary-item">
-        <div class="label">{% if run.output.refund_or_owed >= 0 %}Refund{% else %}Amount Owed{% endif %}</div>
+        <div class="label">{% if run.output.refund_or_owed >= 0 %}Federal Refund{% else %}Federal Owed{% endif %}</div>
         <div class="value {% if run.output.refund_or_owed >= 0 %}positive{% else %}negative{% endif %}">
-            {% if run.output.refund_or_owed >= 0 %}
-                ${{ "{:,.0f}".format(run.output.refund_or_owed) }}
-            {% else %}
-                -${{ "{:,.0f}".format(run.output.refund_or_owed | abs) }}
-            {% endif %}
+            {% if run.output.refund_or_owed >= 0 %}${{ "{:,.0f}".format(run.output.refund_or_owed) }}{% else %}-${{ "{:,.0f}".format(run.output.refund_or_owed|abs) }}{% endif %}
         </div>
     </div>
 </div>
 
+{% if run.state_outputs %}
+{% for so in run.state_outputs %}
 <div class="card">
-    <h2>📋 Calculation Trace</h2>
-    <p class="text-dim text-sm mb-4">Every number is fully traceable. Click to expand details.</p>
+    <h2>🏛️ {{ so.state }} State Return</h2>
+    <div class="summary-grid">
+        <div class="summary-item"><div class="label">State AGI</div><div class="value">${{ "{:,.0f}".format(so.state_agi) }}</div></div>
+        <div class="summary-item"><div class="label">State Deduction</div><div class="value">${{ "{:,.0f}".format(so.state_standard_deduction) }}</div></div>
+        <div class="summary-item"><div class="label">State Taxable</div><div class="value">${{ "{:,.0f}".format(so.state_taxable_income) }}</div></div>
+        <div class="summary-item"><div class="label">State Tax</div><div class="value">${{ "{:,.0f}".format(so.state_tax) }}</div></div>
+        <div class="summary-item"><div class="label">State Withheld</div><div class="value">${{ "{:,.0f}".format(so.state_withholding) }}</div></div>
+        <div class="summary-item">
+            <div class="label">{% if so.state_refund_or_owed >= 0 %}State Refund{% else %}State Owed{% endif %}</div>
+            <div class="value {% if so.state_refund_or_owed >= 0 %}positive{% else %}negative{% endif %}">
+                {% if so.state_refund_or_owed >= 0 %}${{ "{:,.0f}".format(so.state_refund_or_owed) }}{% else %}-${{ "{:,.0f}".format(so.state_refund_or_owed|abs) }}{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<div class="card" style="border-color: var(--accent);">
+    <h2>📊 Combined Total</h2>
+    <div class="summary-grid">
+        <div class="summary-item"><div class="label">Total All Tax</div><div class="value">${{ "{:,.0f}".format(run.total_tax) }}</div></div>
+        <div class="summary-item">
+            <div class="label">{% if run.total_refund_or_owed >= 0 %}Total Refund{% else %}Total Owed{% endif %}</div>
+            <div class="value {% if run.total_refund_or_owed >= 0 %}positive{% else %}negative{% endif %}">
+                {% if run.total_refund_or_owed >= 0 %}${{ "{:,.0f}".format(run.total_refund_or_owed) }}{% else %}-${{ "{:,.0f}".format(run.total_refund_or_owed|abs) }}{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <h2>📋 Federal Calculation Trace</h2>
+    <p class="text-dim text-sm mb-4">Every number is fully traceable.</p>
     <ul class="trace-list">
         {% for node in run.trace %}
         <li class="trace-item">
@@ -53,31 +80,50 @@
             <div class="explanation">{{ node.explanation }}</div>
             <div class="result-val">${{ node.result.value }}</div>
             {% if node.intermediates %}
-            <div class="intermediates">
-                {% for inter in node.intermediates %}
-                {% for k, v in inter.items() %}{{ k }}: {{ v }}  {% endfor %}<br>
-                {% endfor %}
-            </div>
+            <div class="intermediates">{% for inter in node.intermediates %}{% for k, v in inter.items() %}{{ k }}: {{ v }}  {% endfor %}<br>{% endfor %}</div>
             {% endif %}
         </li>
         {% endfor %}
     </ul>
 </div>
 
+{% for so in run.state_outputs %}
+{% if so.trace %}
 <div class="card">
-    <h2>🔍 Run Metadata</h2>
+    <h2>📋 {{ so.state }} Calculation Trace</h2>
+    <ul class="trace-list">
+        {% for node in so.trace %}
+        <li class="trace-item">
+            <div class="rule-id">{{ node.rule_id }} (v{{ node.rule_pack_version }})</div>
+            <div class="desc">{{ node.description }}</div>
+            <div class="explanation">{{ node.explanation }}</div>
+            <div class="result-val">${{ node.result.value }}</div>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endfor %}
+
+<div class="card">
+    <h2>🔍 Run Metadata & Export</h2>
     <p class="text-sm text-dim">
-        Run ID: <code>{{ run.id[:12] }}…</code><br>
+        Run ID: <code>{{ run.id }}</code><br>
         Rule Pack: {{ run.rule_pack_version }} · Checksum: <code>{{ run.rule_pack_checksum[:16] }}…</code><br>
-        Filing Status: {{ run.filing_status.value | upper }}<br>
+        Filing: {{ run.filing_status.value|upper }} · Scenario: {{ run.scenario_name }}<br>
         Created: {{ run.created_at }}
     </p>
+    <div class="flex gap-3 mt-4">
+        <a href="/export/json/{{ run.id }}" class="btn btn-secondary" style="font-size: 13px;">⬇ JSON Export</a>
+        <a href="/export/html/{{ run.id }}" class="btn btn-secondary" style="font-size: 13px;">⬇ Audit Report (HTML)</a>
+        <a href="/audit/{{ run.id }}" class="btn btn-secondary" style="font-size: 13px;" target="_blank">👁 View Audit Report</a>
+    </div>
 </div>
 
 {% else %}
 <div class="card">
     <h2>No calculation yet</h2>
-    <p class="text-dim">Go to <a href="/calculate" style="color: var(--accent);">Calculate</a> to enter income data and run your first calculation.</p>
+    <p class="text-dim">Go to <a href="/calculate" style="color: var(--accent);">Calculate</a> to enter income data.</p>
 </div>
 {% endif %}
 {% endblock %}

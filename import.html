@@ -1,0 +1,39 @@
+{% extends "layouts/base.html" %}
+{% block title %}CSV Import{% endblock %}
+{% block content %}
+<h1 style="font-size: 24px; margin-bottom: 8px;">Import from CSV</h1>
+<p class="text-dim text-sm mb-4">Upload a CSV file to bulk-import income data.</p>
+
+<div class="card">
+    <h2>Upload CSV</h2>
+    <form method="POST" action="/import" enctype="multipart/form-data">
+        <div class="form-row">
+            <div>
+                <label>Form Type</label>
+                <select name="form_type">
+                    <option value="W2">W-2</option>
+                    <option value="1099-INT">1099-INT</option>
+                    <option value="1099-DIV">1099-DIV</option>
+                    <option value="1099-B">1099-B</option>
+                </select>
+            </div>
+            <div>
+                <label>CSV File</label>
+                <input type="file" name="csv_file" accept=".csv" required>
+            </div>
+        </div>
+        <button type="submit" class="mt-4">📤 Import</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Download Templates</h2>
+    <p class="text-dim text-sm mb-4">Download blank CSV templates with the correct column headers.</p>
+    <div class="flex gap-3">
+        <a href="/import/template/W2" class="btn btn-secondary" style="font-size:13px;">W-2 Template</a>
+        <a href="/import/template/1099-INT" class="btn btn-secondary" style="font-size:13px;">1099-INT Template</a>
+        <a href="/import/template/1099-DIV" class="btn btn-secondary" style="font-size:13px;">1099-DIV Template</a>
+        <a href="/import/template/1099-B" class="btn btn-secondary" style="font-size:13px;">1099-B Template</a>
+    </div>
+</div>
+{% endblock %}

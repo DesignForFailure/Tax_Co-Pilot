@@ -1,136 +1,78 @@
-# Federal 2024 Tax Rules — MVP
-# Sources: IRS Rev. Proc. 2023-34, 2024 Form 1040 Instructions
+# Georgia 2024 Income Tax Rules
+# Source: Georgia Department of Revenue, HB 1015 transition rates
+# Note: Georgia is transitioning to a flat rate. For 2024, the rate is 5.39% flat
+# on Georgia taxable income (after GA standard deduction and personal exemptions).
+# GA standard deduction differs from federal.
 
 constants:
   standard_deduction:
-    single: "14600"
-    mfj: "29200"
-    mfs: "14600"
-    hoh: "21900"
+    single: "5400"
+    mfj: "7100"
+    mfs: "3550"
+    hoh: "5400"
+  personal_exemption:
+    single: "2700"
+    mfj: "7400"     # $2700 each + $3000 each dependent (0 deps in MVP)
+    mfs: "2700"
+    hoh: "2700"
 
 rules:
-  # ─── GROSS INCOME ───────────────────────────────────────────
-  - id: "fed.2024.gross_income.wages"
-    description: "Total wages, salaries, tips (Form 1040 Line 1a)"
-    type: "sum"
-    inputs:
-      items: { ref: "input.w2.wages" }
-    rounding: "ROUND_HALF_UP"
-    rounding_precision: 2
-
-  - id: "fed.2024.gross_income.interest"
-    description: "Taxable interest income (Line 2b)"
-    type: "sum"
-    inputs:
-      items: { ref: "input.1099int.amount" }
-    rounding: "ROUND_HALF_UP"
-    rounding_precision: 2
-
-  - id: "fed.2024.gross_income.dividends"
-    description: "Ordinary dividends (Line 3b)"
-    type: "sum"
-    inputs:
-      items: { ref: "input.1099div.ordinary" }
-    rounding: "ROUND_HALF_UP"
-    rounding_precision: 2
-
-  - id: "fed.2024.gross_income.capital_gains"
-    description: "Net short-term + long-term capital gains (simplified)"
-    type: "sum"
-    inputs:
-      items: { ref: "input.1099b.net_gain" }
-    rounding: "ROUND_HALF_UP"
-    rounding_precision: 2
-
-  - id: "fed.2024.gross_income.total"
-    description: "Total income (Line 9)"
-    type: "sum"
-    inputs:
-      items:
-        - { ref: "fed.2024.gross_income.wages" }
-        - { ref: "fed.2024.gross_income.interest" }
-        - { ref: "fed.2024.gross_income.dividends" }
-        - { ref: "fed.2024.gross_income.capital_gains" }
-    rounding: "ROUND_HALF_UP"
-    rounding_precision: 2
-
-  # ─── AGI ────────────────────────────────────────────────────
-  - id: "fed.2024.agi.total"
-    description: "Adjusted Gross Income (Line 11). MVP: no above-the-line deductions."
+  - id: "ga.2024.agi"
+    description: "Georgia AGI (starts from federal AGI)"
     type: "formula"
-    expression: "gross_income"
+    expression: "federal_agi"
     inputs:
-      gross_income: { ref: "fed.2024.gross_income.total" }
+      federal_agi: { ref: "input.state.ga.agi" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
-  # ─── DEDUCTIONS ─────────────────────────────────────────────
-  - id: "fed.2024.standard_deduction"
-    description: "Standard deduction based on filing status"
+  - id: "ga.2024.standard_deduction"
+    description: "Georgia standard deduction"
     type: "lookup"
     table: "constants.standard_deduction"
     key: { ref: "input.filing_status" }
 
-  # ─── TAXABLE INCOME ─────────────────────────────────────────
-  - id: "fed.2024.taxable_income"
-    description: "Taxable income (Line 15) = AGI - deduction, min 0"
-    type: "formula"
-    expression: "max(agi - deduction, 0)"
-    inputs:
-      agi: { ref: "fed.2024.agi.total" }
-      deduction: { ref: "fed.2024.standard_deduction" }
-    rounding: "ROUND_HALF_UP"
-    rounding_precision: 0
-
-  # ─── TAX BRACKETS ───────────────────────────────────────────
-  - id: "fed.2024.tax.brackets"
-    description: "2024 Federal income tax from brackets (Line 16)"
-    type: "bracket_table"
-    input: { ref: "fed.2024.taxable_income" }
+  - id: "ga.2024.personal_exemption"
+    description: "Georgia personal exemption"
+    type: "lookup"
+    table: "constants.personal_exemption"
     key: { ref: "input.filing_status" }
+
+  - id: "ga.2024.taxable_income"
+    description: "Georgia taxable income = AGI - standard deduction - personal exemption"
+    type: "formula"
+    expression: "max(agi - deduction - exemption, 0)"
+    inputs:
+      agi: { ref: "ga.2024.agi" }
+      deduction: { ref: "ga.2024.standard_deduction" }
+      exemption: { ref: "ga.2024.personal_exemption" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
-    tables:
-      mfj:
-        - { lower: 0,       upper: 23200,   rate: "0.10" }
-        - { lower: 23200,   upper: 94300,   rate: "0.12" }
-        - { lower: 94300,   upper: 201050,  rate: "0.22" }
-        - { lower: 201050,  upper: 383900,  rate: "0.24" }
-        - { lower: 383900,  upper: 487450,  rate: "0.32" }
-        - { lower: 487450,  upper: 731200,  rate: "0.35" }
-        - { lower: 731200,  upper: null,    rate: "0.37" }
-      single:
-        - { lower: 0,       upper: 11600,   rate: "0.10" }
-        - { lower: 11600,   upper: 47150,   rate: "0.12" }
-        - { lower: 47150,   upper: 100525,  rate: "0.22" }
-        - { lower: 100525,  upper: 191950,  rate: "0.24" }
-        - { lower: 191950,  upper: 243725,  rate: "0.32" }
-        - { lower: 243725,  upper: 609350,  rate: "0.35" }
-        - { lower: 609350,  upper: null,    rate: "0.37" }
-      mfs:
-        - { lower: 0,       upper: 11600,   rate: "0.10" }
-        - { lower: 11600,   upper: 47150,   rate: "0.12" }
-        - { lower: 47150,   upper: 100525,  rate: "0.22" }
-        - { lower: 100525,  upper: 191950,  rate: "0.24" }
-        - { lower: 191950,  upper: 243725,  rate: "0.32" }
-        - { lower: 243725,  upper: 365600,  rate: "0.35" }
-        - { lower: 365600,  upper: null,    rate: "0.37" }
 
-  # ─── WITHHOLDING & RESULT ───────────────────────────────────
-  - id: "fed.2024.total_withholding"
-    description: "Total federal tax withheld"
+  - id: "ga.2024.tax"
+    description: "Georgia income tax (2024 flat rate 5.39%)"
+    type: "formula"
+    expression: "taxable_income * rate"
+    inputs:
+      taxable_income: { ref: "ga.2024.taxable_income" }
+      rate: { literal: "0.0539" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ga.2024.withholding"
+    description: "Total Georgia tax withheld"
     type: "sum"
     inputs:
-      items: { ref: "input.withholding.federal" }
+      items: { ref: "input.state.ga.withholding" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
-  - id: "fed.2024.refund_or_owed"
-    description: "Refund (positive) or amount owed (negative)"
+  - id: "ga.2024.refund_or_owed"
+    description: "Georgia refund (positive) or amount owed (negative)"
     type: "formula"
     expression: "withholding - tax"
     inputs:
-      withholding: { ref: "fed.2024.total_withholding" }
-      tax: { ref: "fed.2024.tax.brackets" }
+      withholding: { ref: "ga.2024.withholding" }
+      tax: { ref: "ga.2024.tax" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0

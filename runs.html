@@ -1,0 +1,58 @@
+{% extends "layouts/base.html" %}
+{% block title %}Past Runs{% endblock %}
+{% block content %}
+<h1 style="font-size: 24px; margin-bottom: 8px;">Past Calculation Runs</h1>
+<p class="text-dim text-sm mb-4">Immutable records of every calculation.</p>
+
+{% if runs %}
+{% for run in runs %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <span class="text-dim text-sm">{{ run.created_at }}</span> ·
+            <strong>{{ run.filing_status|upper }}</strong> ·
+            <span>{{ run.scenario_name }}</span>
+        </div>
+        <div class="flex gap-3">
+            <a href="/runs/{{ run.id }}" class="btn btn-secondary" style="padding:6px 12px;font-size:12px;">View</a>
+            <a href="/audit/{{ run.id }}" class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" target="_blank">Audit</a>
+            <a href="/export/json/{{ run.id }}" class="btn btn-secondary" style="padding:6px 12px;font-size:12px;">JSON</a>
+        </div>
+    </div>
+    <p class="text-sm text-dim mt-4">v{{ run.rule_pack_version }} · <code>{{ run.id[:12] }}…</code></p>
+</div>
+{% endfor %}
+
+{% if runs|length >= 2 %}
+<div class="card">
+    <h2>Compare Two Runs</h2>
+    <p class="text-dim text-sm mb-4">Select two run IDs to diff.</p>
+    <form method="GET" action="" id="diffForm">
+        <div class="form-row">
+            <div><label>Run A</label>
+                <select id="runA"><option value="">Select…</option>
+                    {% for run in runs %}<option value="{{ run.id }}">{{ run.created_at[:16] }} — {{ run.scenario_name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div><label>Run B</label>
+                <select id="runB"><option value="">Select…</option>
+                    {% for run in runs %}<option value="{{ run.id }}">{{ run.created_at[:16] }} — {{ run.scenario_name }}</option>{% endfor %}
+                </select>
+            </div>
+        </div>
+        <button type="button" class="btn mt-4" onclick="
+            var a=document.getElementById('runA').value;
+            var b=document.getElementById('runB').value;
+            if(a && b && a!==b) window.location='/diff/'+a+'/'+b;
+            else alert('Select two different runs');
+        ">🔀 Compare</button>
+    </form>
+</div>
+{% endif %}
+
+{% else %}
+<div class="card">
+    <p class="text-dim">No runs yet. <a href="/calculate" style="color: var(--accent);">Run your first calculation →</a></p>
+</div>
+{% endif %}
+{% endblock %}
