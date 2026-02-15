@@ -1,1 +1,0 @@
-"""Tax Copilot application package."""
