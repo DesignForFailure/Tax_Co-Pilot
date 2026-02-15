@@ -104,19 +104,43 @@ The initial MVP focuses on proving the architecture:
 ## Repository Structure (Planned)
 
 ```text
-tax_co_pilot/
+tax-copilot/
+├── main.py
+├── pyproject.toml
+├── requirements.txt
+├── test_golden.py
+├── test_golden2.py
+├── ARCHITECTURE.md
+├── Tax_Filing_System_Overview
 ├── app/
-│   ├── api/
-│   ├── core/
+│   ├── __init__.py
 │   ├── engine/
-│   ├── rules/
-│   ├── storage/
-│   ├── security/
-│   └── ui/
-├── rule_packs/
-│   ├── federal/
-│   │   └── 2024/
-│   └── states/
-├── tests/
-├── docs/
-└── README.md
+│   │   ├── __init__.py
+│   │   ├── calculator.py
+│   │   ├── rule_loader.py
+│   │   └── whatif.py
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── domain.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── audit_export.py
+│   │   ├── csv_import.py
+│   │   └── database.py
+│   └── templates/
+│       ├── layouts/
+│       │   └── base.html
+│       └── pages/
+│           ├── calculate.html
+│           ├── dashboard.html
+│           └── runs.html
+└── rule_packs/
+    ├── federal/
+    │   └── 2024/
+    │       ├── manifest.yaml
+    │       └── rules.yaml
+    └── state/
+        └── GA/
+            └── 2024/
+                ├── manifest.yaml
+                └── rules.yaml
