@@ -1,0 +1,51 @@
+{% extends "layouts/base.html" %}
+{% block title %}Calculate{% endblock %}
+{% block content %}
+
+<h1 style="font-size: 24px; margin-bottom: 8px;">Enter Tax Data</h1>
+<p class="text-dim text-sm mb-4">All fields except names are optional. MVP supports one taxpayer, W-2, and one 1099-B gain.</p>
+
+<form method="POST" action="/calculate">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+
+    <div class="card">
+        <h2>Filing Information</h2>
+        <div class="form-row">
+            <div><label>Tax Year</label><input type="number" name="tax_year" value="2024" readonly></div>
+            <div>
+                <label>Filing Status</label>
+                <select name="filing_status">
+                    <option value="single">Single</option>
+                    <option value="mfj" selected>Married Filing Jointly</option>
+                    <option value="mfs">Married Filing Separately</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>ðŸ‘¤ Primary Taxpayer</h2>
+        <div class="form-row">
+            <div><label>First Name</label><input type="text" name="p_first" required></div>
+            <div><label>Last Name</label><input type="text" name="p_last" required></div>
+        </div>
+
+        <h3>W-2</h3>
+        <div><label>Employer</label><input type="text" name="p_employer" placeholder="Employer name"></div>
+        <div class="form-row">
+            <div><label>Wages (Box 1)</label><input type="text" name="p_wages" placeholder="85000"></div>
+            <div><label>Federal Withheld (Box 2)</label><input type="text" name="p_withheld" placeholder="12000"></div>
+        </div>
+
+        <h3>1099-B (Optional)</h3>
+        <div><label>Description</label><input type="text" name="cg_desc" placeholder="BTC sale"></div>
+        <div class="form-row">
+            <div><label>Proceeds</label><input type="text" name="cg_proceeds" placeholder="900"></div>
+            <div><label>Cost Basis</label><input type="text" name="cg_basis" placeholder="200"></div>
+        </div>
+    </div>
+
+    <button class="btn" type="submit">Calculate</button>
+</form>
+
+{% endblock %}
