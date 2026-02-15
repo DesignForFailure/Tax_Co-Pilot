@@ -1,4 +1,4 @@
-# Tax Copilot — Architecture & Design Document
+# Tax Copilot â€” Architecture & Design Document
 
 ## Assumptions
 
@@ -8,7 +8,7 @@
 4. **MVP income types**: W-2, 1099-INT, 1099-DIV, 1099-B (short/long-term capital gains). Tips via W-2 Box 7.
 5. **MVP state**: Georgia module stub. Texas = no state return needed (modeled as zero-rate state).
 6. **Military modeling**: Domicile/residency fields on taxpayer, SCRA flag, combat zone exclusion flag. Rule application deferred to rule packs.
-7. **Rule engine choice**: **Option A — YAML rule packs compiled to constrained AST**. Rationale: YAML is human-readable/editable, compiles to a safe evaluator with no arbitrary code execution, and versioning is trivial via file checksums.
+7. **Rule engine choice**: **Option A â€” YAML rule packs compiled to constrained AST**. Rationale: YAML is human-readable/editable, compiles to a safe evaluator with no arbitrary code execution, and versioning is trivial via file checksums.
 8. **Numeric strategy**: Python `Decimal` with explicit rounding policies per rule (ROUND_HALF_UP default, matching IRS rounding).
 9. **Stack**: Python 3.12 + FastAPI + SQLite + Jinja2 server-rendered UI (HTMX for interactivity). No JS framework needed in MVP.
 10. **Encryption**: SQLCipher for encrypted SQLite at rest. Master key derived from user passphrase via Argon2id.
@@ -18,7 +18,7 @@
 ## A) MVP Definition
 
 ### In Scope
-- Federal simplified 1040: gross income → AGI → taxable income → tax → credits → refund/owed
+- Federal simplified 1040: gross income â†’ AGI â†’ taxable income â†’ tax â†’ credits â†’ refund/owed
 - W-2 input (multiple per person), 1099-INT, 1099-DIV, 1099-B
 - Standard deduction (MFJ/MFS/Single for 2024)
 - Tax bracket computation (2024 rates)
@@ -38,44 +38,44 @@
 ## B) Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        LOCAL MACHINE                            │
-│                                                                 │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                   Web UI (Jinja2 + HTMX)                 │   │
-│  │  ┌─────────┐ ┌──────────┐ ┌──────────┐ ┌─────────────┐  │   │
-│  │  │Dashboard │ │  Data    │ │  Return  │ │  Audit &    │  │   │
-│  │  │& Summary│ │  Entry   │ │  Review  │ │  Explain    │  │   │
-│  │  └─────────┘ └──────────┘ └──────────┘ └─────────────┘  │   │
-│  └──────────────────────┬───────────────────────────────────┘   │
-│                         │ HTTP (localhost only)                  │
-│  ┌──────────────────────▼───────────────────────────────────┐   │
-│  │                  FastAPI Application                      │   │
-│  │                                                           │   │
-│  │  ┌─────────────┐  ┌──────────────┐  ┌────────────────┐   │   │
-│  │  │  Input       │  │  Calculation │  │  What-If /     │   │   │
-│  │  │  Service     │  │  Engine      │  │  Suggestion    │   │   │
-│  │  │  (CRUD,CSV)  │  │  (AST Eval)  │  │  Engine        │   │   │
-│  │  └──────┬──────┘  └──────┬───────┘  └───────┬────────┘   │   │
-│  │         │                │                   │            │   │
-│  │  ┌──────▼────────────────▼───────────────────▼────────┐   │   │
-│  │  │              Core Domain Layer                      │   │   │
-│  │  │  ┌───────────┐ ┌────────────┐ ┌─────────────────┐  │   │   │
-│  │  │  │ Taxpayer  │ │ Ledger     │ │ ReturnRun       │  │   │   │
-│  │  │  │ Model     │ │ (inputs)   │ │ (immutable      │  │   │   │
-│  │  │  │           │ │            │ │  snapshots)     │  │   │   │
-│  │  │  └───────────┘ └────────────┘ └─────────────────┘  │   │   │
-│  │  └────────────────────────┬───────────────────────────┘   │   │
-│  │                           │                               │   │
-│  │  ┌────────────────────────▼───────────────────────────┐   │   │
-│  │  │           Storage Layer (SQLCipher + Files)         │   │   │
-│  │  │  ┌──────────────┐  ┌────────────┐  ┌───────────┐   │   │   │
-│  │  │  │ tax_copilot  │  │ rule_packs/│  │attachments│   │   │   │
-│  │  │  │ .db          │  │ (YAML)     │  │/ (files)  │   │   │   │
-│  │  │  └──────────────┘  └────────────┘  └───────────┘   │   │   │
-│  │  └────────────────────────────────────────────────────┘   │   │
-│  └───────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚                        LOCAL MACHINE                            â”‚
+â”‚                                                                 â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   â”‚
+â”‚  â”‚                   Web UI (Jinja2 + HTMX)                 â”‚   â”‚
+â”‚  â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â” â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â” â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â” â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚   â”‚
+â”‚  â”‚  â”‚Dashboard â”‚ â”‚  Data    â”‚ â”‚  Return  â”‚ â”‚  Audit &    â”‚  â”‚   â”‚
+â”‚  â”‚  â”‚& Summaryâ”‚ â”‚  Entry   â”‚ â”‚  Review  â”‚ â”‚  Explain    â”‚  â”‚   â”‚
+â”‚  â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚   â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜   â”‚
+â”‚                         â”‚ HTTP (localhost only)                  â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   â”‚
+â”‚  â”‚                  FastAPI Application                      â”‚   â”‚
+â”‚  â”‚                                                           â”‚   â”‚
+â”‚  â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   â”‚   â”‚
+â”‚  â”‚  â”‚  Input       â”‚  â”‚  Calculation â”‚  â”‚  What-If /     â”‚   â”‚   â”‚
+â”‚  â”‚  â”‚  Service     â”‚  â”‚  Engine      â”‚  â”‚  Suggestion    â”‚   â”‚   â”‚
+â”‚  â”‚  â”‚  (CRUD,CSV)  â”‚  â”‚  (AST Eval)  â”‚  â”‚  Engine        â”‚   â”‚   â”‚
+â”‚  â”‚  â””â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”˜  â””â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”˜  â””â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”˜   â”‚   â”‚
+â”‚  â”‚         â”‚                â”‚                   â”‚            â”‚   â”‚
+â”‚  â”‚  â”Œâ”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”   â”‚   â”‚
+â”‚  â”‚  â”‚              Core Domain Layer                      â”‚   â”‚   â”‚
+â”‚  â”‚  â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â” â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â” â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚   â”‚   â”‚
+â”‚  â”‚  â”‚  â”‚ Taxpayer  â”‚ â”‚ Ledger     â”‚ â”‚ ReturnRun       â”‚  â”‚   â”‚   â”‚
+â”‚  â”‚  â”‚  â”‚ Model     â”‚ â”‚ (inputs)   â”‚ â”‚ (immutable      â”‚  â”‚   â”‚   â”‚
+â”‚  â”‚  â”‚  â”‚           â”‚ â”‚            â”‚ â”‚  snapshots)     â”‚  â”‚   â”‚   â”‚
+â”‚  â”‚  â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚   â”‚   â”‚
+â”‚  â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜   â”‚   â”‚
+â”‚  â”‚                           â”‚                               â”‚   â”‚
+â”‚  â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   â”‚   â”‚
+â”‚  â”‚  â”‚           Storage Layer (SQLCipher + Files)         â”‚   â”‚   â”‚
+â”‚  â”‚  â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   â”‚   â”‚   â”‚
+â”‚  â”‚  â”‚  â”‚ tax_copilot  â”‚  â”‚ rule_packs/â”‚  â”‚attachmentsâ”‚   â”‚   â”‚   â”‚
+â”‚  â”‚  â”‚  â”‚ .db          â”‚  â”‚ (YAML)     â”‚  â”‚/ (files)  â”‚   â”‚   â”‚   â”‚
+â”‚  â”‚  â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜   â”‚   â”‚   â”‚
+â”‚  â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜   â”‚   â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜   â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 ### Component Boundaries
@@ -84,9 +84,9 @@
 |-----------|---------------|----------|
 | **Web UI** | Rendering, user interaction, HTMX partial updates | No business logic |
 | **Input Service** | CRUD for taxpayers, income records, deductions, CSV import | Validates schema, not tax rules |
-| **Calculation Engine** | Loads rule pack, evaluates AST, produces traced results | Pure function: (inputs, rules) → (outputs, trace). No DB writes. |
+| **Calculation Engine** | Loads rule pack, evaluates AST, produces traced results | Pure function: (inputs, rules) â†’ (outputs, trace). No DB writes. |
 | **What-If Engine** | Runs calc engine N times with varied elections, ranks results | Orchestration only |
-| **Suggestion Engine** | Pattern matching on inputs → eligible suggestions | Read-only, never mutates |
+| **Suggestion Engine** | Pattern matching on inputs â†’ eligible suggestions | Read-only, never mutates |
 | **Core Domain** | Data models, ledger, return runs | Owns schema, immutability contracts |
 | **Storage** | SQLCipher DB, file storage for attachments & rule packs | Encryption, backup/restore |
 
@@ -97,18 +97,18 @@
 ### Entity Relationship (simplified)
 
 ```
-Household 1──* Taxpayer
-Taxpayer  1──* IncomeRecord
-Taxpayer  1──* DeductionRecord
-Taxpayer  1──* WithholdingRecord
-Taxpayer  1──* StateResidency
+Household 1â”€â”€* Taxpayer
+Taxpayer  1â”€â”€* IncomeRecord
+Taxpayer  1â”€â”€* DeductionRecord
+Taxpayer  1â”€â”€* WithholdingRecord
+Taxpayer  1â”€â”€* StateResidency
 
-Household 1──* TaxYear
-TaxYear   1──* ReturnRun
-ReturnRun 1──1 InputSnapshot    (JSON blob, immutable)
-ReturnRun 1──1 RulePackSnapshot (hash + version, immutable)
-ReturnRun 1──* CalculationNode  (the trace tree)
-ReturnRun 1──1 ReturnOutput     (final numbers)
+Household 1â”€â”€* TaxYear
+TaxYear   1â”€â”€* ReturnRun
+ReturnRun 1â”€â”€1 InputSnapshot    (JSON blob, immutable)
+ReturnRun 1â”€â”€1 RulePackSnapshot (hash + version, immutable)
+ReturnRun 1â”€â”€* CalculationNode  (the trace tree)
+ReturnRun 1â”€â”€1 ReturnOutput     (final numbers)
 ```
 
 ### Key Tables
@@ -218,7 +218,7 @@ CREATE TABLE attachment (
 
 ### Immutability Strategy
 - `return_run` rows are **INSERT-only**. No UPDATE/DELETE.
-- `input_snapshot_json` is a deep copy at run time — input changes don't affect past runs.
+- `input_snapshot_json` is a deep copy at run time â€” input changes don't affect past runs.
 - Rule pack checksum ensures reproducibility: same inputs + same rules = same output.
 - Soft deletes on mutable tables (`income_record`, etc.) via `deleted_at` column.
 
@@ -230,24 +230,24 @@ CREATE TABLE attachment (
 
 ```
 rule_packs/
-├── federal/
-│   └── 2024/
-│       ├── manifest.yaml          # version, checksum, changelog
-│       ├── constants.yaml         # standard deduction, exemption amounts
-│       ├── filing_status.yaml     # rules for status determination
-│       ├── income.yaml            # gross income computation
-│       ├── agi.yaml               # adjustments to income
-│       ├── deductions.yaml        # standard/itemized
-│       ├── taxable_income.yaml    # AGI - deductions
-│       ├── tax_brackets.yaml      # progressive bracket tables
-│       ├── credits.yaml           # CTC, etc.
-│       └── withholding.yaml       # refund/owed computation
-└── state/
-    └── GA/
-        └── 2024/
-            ├── manifest.yaml
-            ├── constants.yaml
-            └── income_tax.yaml
+â”œâ”€â”€ federal/
+â”‚   â””â”€â”€ 2024/
+â”‚       â”œâ”€â”€ manifest.yaml          # version, checksum, changelog
+â”‚       â”œâ”€â”€ constants.yaml         # standard deduction, exemption amounts
+â”‚       â”œâ”€â”€ filing_status.yaml     # rules for status determination
+â”‚       â”œâ”€â”€ income.yaml            # gross income computation
+â”‚       â”œâ”€â”€ agi.yaml               # adjustments to income
+â”‚       â”œâ”€â”€ deductions.yaml        # standard/itemized
+â”‚       â”œâ”€â”€ taxable_income.yaml    # AGI - deductions
+â”‚       â”œâ”€â”€ tax_brackets.yaml      # progressive bracket tables
+â”‚       â”œâ”€â”€ credits.yaml           # CTC, etc.
+â”‚       â””â”€â”€ withholding.yaml       # refund/owed computation
+â””â”€â”€ state/
+    â””â”€â”€ GA/
+        â””â”€â”€ 2024/
+            â”œâ”€â”€ manifest.yaml
+            â”œâ”€â”€ constants.yaml
+            â””â”€â”€ income_tax.yaml
 ```
 
 ### Manifest Example
@@ -329,9 +329,9 @@ rules:
 
 ### Evaluation Plan
 
-1. **Load** rule pack YAML → parse into internal `RuleNode` AST.
-2. **Resolve** dependencies: rules reference other rules → build DAG.
-3. **Topological sort** → evaluate in dependency order.
+1. **Load** rule pack YAML â†’ parse into internal `RuleNode` AST.
+2. **Resolve** dependencies: rules reference other rules â†’ build DAG.
+3. **Topological sort** â†’ evaluate in dependency order.
 4. **Each evaluation** produces a `TraceNode`:
 
 ```json
@@ -351,8 +351,8 @@ rules:
     }
   },
   "intermediates": [
-    { "bracket": "10%", "range": "0–23200", "tax": "2320.00" },
-    { "bracket": "12%", "range": "23200–85000", "tax": "7416.00" }
+    { "bracket": "10%", "range": "0â€“23200", "tax": "2320.00" },
+    { "bracket": "12%", "range": "23200â€“85000", "tax": "7416.00" }
   ],
   "result": {
     "value": "9736.00",
@@ -385,9 +385,9 @@ rules:
 | **Setup** | Create household, add taxpayers, set tax year & filing status |
 | **Income Entry** | Add W-2s, 1099s per person. CSV import. |
 | **Withholding** | Auto-populated from W-2s, manual adjustments |
-| **Review & Calculate** | Run calculation, see summary: income → AGI → tax → refund |
+| **Review & Calculate** | Run calculation, see summary: income â†’ AGI â†’ tax â†’ refund |
 | **What-If Comparison** | Side-by-side: MFJ vs MFS, standard vs itemized |
-| **Explain This Number** | Click any value → trace tree with rule IDs, inputs, intermediates |
+| **Explain This Number** | Click any value â†’ trace tree with rule IDs, inputs, intermediates |
 | **Audit Report** | Export full ReturnRun as JSON or formatted PDF |
 | **Settings** | Backup/restore, change passphrase, manage rule packs |
 
@@ -410,7 +410,7 @@ Every computed value in the UI is a clickable link. Clicking opens a panel showi
 | **SSN handling** | Encrypted at application level (Fernet) before DB storage. Displayed masked (XXX-XX-1234) in UI. |
 | **Local auth** | Passphrase required on app start. Session timeout after 15 min inactivity. |
 | **No network** | App binds to `127.0.0.1` only. No outbound calls. |
-| **Backup** | Encrypted `.db` file + `rule_packs/` + `attachments/` → single encrypted ZIP. |
+| **Backup** | Encrypted `.db` file + `rule_packs/` + `attachments/` â†’ single encrypted ZIP. |
 | **Threat model** | Primary threat: local device compromise. Mitigations: encryption at rest, passphrase, session timeout. Not designed to resist nation-state actors with physical access + unlimited time. |
 
 ---
@@ -431,7 +431,7 @@ Every computed value in the UI is a clickable link. Clicking opens a panel showi
 
 ### First Vertical Slice (Milestone 1)
 - Single taxpayer enters one W-2
-- App computes: gross income → standard deduction → taxable income → bracket tax → withholding → refund/owed
+- App computes: gross income â†’ standard deduction â†’ taxable income â†’ bracket tax â†’ withholding â†’ refund/owed
 - Full trace JSON stored and viewable in UI
 - Rule pack: `federal/2024/` with brackets and standard deduction
 
@@ -441,9 +441,9 @@ Every computed value in the UI is a clickable link. Clicking opens a panel showi
 
 | Risk | Severity | Mitigation |
 |------|----------|------------|
-| **Rule incorrectness** | High | Golden return tests: known inputs → known outputs from IRS publications. Checksummed rule packs. |
+| **Rule incorrectness** | High | Golden return tests: known inputs â†’ known outputs from IRS publications. Checksummed rule packs. |
 | **State tax variability** | Medium | Each state is a separate rule pack. Only model states you need. Start with GA. |
 | **Tax law updates** | Medium | Versioned rule packs. New year = new pack. Old packs frozen. |
 | **Rounding edge cases** | Medium | Explicit rounding policy per rule. Golden tests include rounding scenarios. |
-| **Audit exposure** | Low | App doesn't file — it computes and explains. User reviews before using numbers. Disclaimer on every output. |
+| **Audit exposure** | Low | App doesn't file â€” it computes and explains. User reviews before using numbers. Disclaimer on every output. |
 | **Scope creep** | Medium | Strict MVP. Each new form/schedule is a separate milestone. |

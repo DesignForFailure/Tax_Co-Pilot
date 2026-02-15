@@ -1,0 +1,72 @@
+constants:
+  standard_deduction:
+    single: "5400"
+    mfj: "7100"
+    mfs: "3550"
+    hoh: "5400"
+  personal_exemption:
+    single: "2700"
+    mfj: "7400"
+    mfs: "2700"
+    hoh: "2700"
+
+rules:
+  - id: "ga.2024.agi"
+    description: "Georgia AGI (MVP: starts from federal AGI)"
+    type: "formula"
+    expression: "federal_agi"
+    inputs:
+      federal_agi: { ref: "fed.2024.agi.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "ga.2024.standard_deduction"
+    description: "Georgia standard deduction"
+    type: "lookup"
+    table: "constants.standard_deduction"
+    key: { ref: "input.filing_status" }
+
+  - id: "ga.2024.personal_exemption"
+    description: "Georgia personal exemption"
+    type: "lookup"
+    table: "constants.personal_exemption"
+    key: { ref: "input.filing_status" }
+
+  - id: "ga.2024.taxable_income"
+    description: "Georgia taxable income = max(AGI - standard deduction - personal exemption, 0)"
+    type: "formula"
+    expression: "max(agi - deduction - exemption, 0)"
+    inputs:
+      agi: { ref: "ga.2024.agi" }
+      deduction: { ref: "ga.2024.standard_deduction" }
+      exemption: { ref: "ga.2024.personal_exemption" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ga.2024.tax"
+    description: "Georgia income tax (2024 flat rate 5.39%)"
+    type: "formula"
+    expression: "taxable_income * rate"
+    inputs:
+      taxable_income: { ref: "ga.2024.taxable_income" }
+      rate: { literal: "0.0539" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ga.2024.withholding"
+    description: "Total Georgia tax withheld"
+    type: "sum"
+    inputs:
+      items: { ref: "input.withholding.state.GA" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "ga.2024.refund_or_owed"
+    description: "Georgia refund (positive) or amount owed (negative)"
+    type: "formula"
+    expression: "withholding - tax"
+    inputs:
+      withholding: { ref: "ga.2024.withholding" }
+      tax: { ref: "ga.2024.tax" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0

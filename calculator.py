@@ -1,18 +1,29 @@
 """Deterministic tax calculation engine with full audit trace.
 
-This engine evaluates rules from a loaded RulePack against a TaxReturnInput,
-producing a ReturnOutput and a list of TraceNodes. No arbitrary code execution.
-All math uses Decimal. Every step is traced.
+How it works (MVP):
+- Inputs are aggregated into normalized `resolved[...]` values (e.g., total wages).
+- Rules from RulePack are evaluated in dependency-safe topological order.
+- Each rule evaluation writes:
+  - `resolved[rule_id] = Decimal(result)`
+  - a TraceNode with inputs, intermediates, result, and human-readable explanation.
+
+Security/QA properties:
+- No arbitrary code execution: expressions use a small parser (not eval()).
+- All math uses Decimal for audit-friendly, deterministic computation.
+- Division-by-zero is explicitly blocked.
+
+Future improvements:
+- Add additional expression operators/functions if needed (keep allowlist).
+- Add caps/constraints on numeric magnitudes to prevent pathological inputs.
 """
+
 from __future__ import annotations
 
-from decimal import Decimal, ROUND_HALF_UP, ROUND_DOWN, ROUND_UP
+from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP, ROUND_UP
 from typing import Any
 
-from app.engine.rule_loader import RulePack
-from app.models.domain import (
-    TaxReturnInput, ReturnOutput, ReturnRun, TraceNode,
-)
+from app.engine.rule_loader import RulePack, RulePackError
+from app.models.domain import ReturnOutput, ReturnRun, StateReturnOutput, TaxReturnInput, TraceNode
 
 ROUNDING_MODES = {
     "ROUND_HALF_UP": ROUND_HALF_UP,
@@ -41,20 +52,26 @@ def _format_usd(val: Decimal) -> str:
 class CalculationEngine:
     """Evaluate a rule pack against inputs, producing traced results."""
 
-    def __init__(self, rule_pack: RulePack, inputs: TaxReturnInput):
+    def __init__(
+        self,
+        rule_pack: RulePack,
+        inputs: TaxReturnInput,
+        state_packs: dict[str, RulePack] | None = None,
+    ):
         self.rp = rule_pack
         self.inputs = inputs
+        self.state_packs = state_packs or {}
         self.resolved: dict[str, Decimal] = {}
         self.traces: list[TraceNode] = []
+        self._filing_status: str = inputs.filing_status.value
 
     def run(self) -> ReturnRun:
-        """Execute all rules in dependency order and return immutable ReturnRun."""
-        # Resolve input refs first
+        # 1) Normalize inputs into resolved values (engine inputs are also traceable).
         self._resolve_inputs()
 
-        # Evaluate rules in defined order (YAML list order = dependency order for MVP)
-        for rule_id, rule in self.rp.rules.items():
-            self._evaluate_rule(rule)
+        # 2) Evaluate rules in dependency-safe order.
+        for rule_id in self.rp.rule_order:
+            self._evaluate_rule(self.rp.rules[rule_id])
 
         output = ReturnOutput(
             gross_income=self.resolved.get("fed.2024.gross_income.total", Decimal("0")),
@@ -66,6 +83,8 @@ class CalculationEngine:
             refund_or_owed=self.resolved.get("fed.2024.refund_or_owed", Decimal("0")),
         )
 
+        state_outputs = self._run_states()
+
         return ReturnRun(
             tax_year=self.inputs.tax_year,
             filing_status=self.inputs.filing_status,
@@ -73,31 +92,78 @@ class CalculationEngine:
             rule_pack_checksum=self.rp.checksum,
             input_snapshot=self.inputs,
             output=output,
+            state_outputs=state_outputs,
             trace=self.traces,
         )
 
-    # ─── Input Resolution ─────────────────────────────────────
+    # â”€â”€â”€ State execution â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    def _resolve_inputs(self):
-        """Pre-populate resolved dict with raw input aggregates."""
-        self.resolved["input.filing_status"] = Decimal("0")  # sentinel; actual used as string
-        self._filing_status = self.inputs.filing_status.value
+    def _run_states(self) -> list[StateReturnOutput]:
+        outs: list[StateReturnOutput] = []
+        if not self.state_packs:
+            return outs
 
-        # W-2 wages
+        # Normalize GA withholding input (extend as you add more states).
+        self.resolved["input.withholding.state.GA"] = sum(
+            (
+                w.state_withheld
+                for tp in self.inputs.taxpayers
+                for w in tp.w2s
+                if (w.state or "").upper() == "GA"
+            ),
+            Decimal("0"),
+        )
+
+        for state_code, sp in self.state_packs.items():
+            # Temporarily swap the active rule pack so _evaluate_rule and
+            # _enforce_rule_namespace operate against the state pack's rules
+            # and namespace.  The finally block guarantees restoration.
+            orig_pack = self.rp
+            self.rp = sp
+            try:
+                for rule_id in sp.rule_order:
+                    self._evaluate_rule(sp.rules[rule_id])
+
+                st = state_code.upper()
+                if st == "GA":
+                    outs.append(
+                        StateReturnOutput(
+                            state="GA",
+                            state_agi=self.resolved.get("ga.2024.agi", Decimal("0")),
+                            state_standard_deduction=self.resolved.get(
+                                "ga.2024.standard_deduction", Decimal("0")
+                            ),
+                            state_personal_exemption=self.resolved.get(
+                                "ga.2024.personal_exemption", Decimal("0")
+                            ),
+                            state_taxable_income=self.resolved.get(
+                                "ga.2024.taxable_income", Decimal("0")
+                            ),
+                            state_tax=self.resolved.get("ga.2024.tax", Decimal("0")),
+                            state_withholding=self.resolved.get("ga.2024.withholding", Decimal("0")),
+                            state_refund_or_owed=self.resolved.get(
+                                "ga.2024.refund_or_owed", Decimal("0")
+                            ),
+                        )
+                    )
+            finally:
+                self.rp = orig_pack
+
+        return outs
+
+    # â”€â”€â”€ Input normalization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+    def _resolve_inputs(self) -> None:
         self.resolved["input.w2.wages"] = self.inputs.total_wages()
-        # 1099-INT
         self.resolved["input.1099int.amount"] = self.inputs.total_interest()
-        # 1099-DIV
         self.resolved["input.1099div.ordinary"] = self.inputs.total_dividends()
-        # 1099-B
         self.resolved["input.1099b.net_gain"] = self.inputs.total_capital_gains()
-        # Withholding
         self.resolved["input.withholding.federal"] = self.inputs.total_federal_withholding()
 
-    # ─── Rule Evaluation (closed set of types) ────────────────
+    # â”€â”€â”€ Rule evaluation dispatch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    def _evaluate_rule(self, rule: dict):
-        rule_type = rule["type"]
+    def _evaluate_rule(self, rule: dict[str, Any]) -> None:
+        rule_type = rule.get("type")
         if rule_type == "sum":
             self._eval_sum(rule)
         elif rule_type == "formula":
@@ -107,88 +173,117 @@ class CalculationEngine:
         elif rule_type == "bracket_table":
             self._eval_bracket_table(rule)
         else:
-            raise ValueError(f"Unknown rule type: {rule_type}")
+            raise RulePackError(f"Unknown rule type: {rule_type}")
 
-    def _resolve_ref(self, ref_spec: Any) -> Decimal:
-        """Resolve a reference — either a string or dict with 'ref' key."""
-        if isinstance(ref_spec, str):
-            ref = ref_spec
-        elif isinstance(ref_spec, dict) and "ref" in ref_spec:
-            ref = ref_spec["ref"]
-        else:
-            return _to_decimal(ref_spec)
+    def _enforce_rule_namespace(self, rule_id: str) -> None:
+        """Ensure the currently-active RulePack cannot write outside its namespace."""
+        if not rule_id.startswith(self.rp.id_prefix):
+            raise RulePackError(
+                f"Rule id {rule_id!r} violates namespace for jurisdiction {self.rp.jurisdiction!r} "
+                f"(expected prefix {self.rp.id_prefix!r})"
+            )
 
-        if ref in self.resolved:
-            return self.resolved[ref]
-        # Check if it's a rule we haven't evaluated yet
-        if ref in self.rp.rules:
-            self._evaluate_rule(self.rp.rules[ref])
-            return self.resolved[ref]
-        raise ValueError(f"Unresolved reference: {ref}")
+    def _resolve_ref(self, spec: Any) -> Decimal:
+        # Strings may be rule IDs, input IDs, or numeric literals.
+        if isinstance(spec, str):
+            ref = spec
+            if ref == "input.filing_status":
+                raise RulePackError("input.filing_status cannot be resolved as Decimal")
+            if ref in self.resolved:
+                return self.resolved[ref]
+            if ref in self.rp.rules:
+                self._evaluate_rule(self.rp.rules[ref])
+                return self.resolved[ref]
+            return _to_decimal(ref)
 
-    def _eval_sum(self, rule: dict):
+        # Canonical spec: {literal: ...} or {ref: ...}
+        if isinstance(spec, dict):
+            if "literal" in spec:
+                return _to_decimal(spec["literal"])
+            if "ref" in spec:
+                return self._resolve_ref(spec["ref"])
+
+        return _to_decimal(spec)
+
+    # â”€â”€â”€ Rule evaluators â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+    def _eval_sum(self, rule: dict[str, Any]) -> None:
         rule_id = rule["id"]
-        items_spec = rule["inputs"]["items"]
-        rounding = rule.get("rounding", "ROUND_HALF_UP")
-        precision = rule.get("rounding_precision", 2)
+        self._enforce_rule_namespace(rule_id)
 
-        # items can be a single ref or list of refs
+        items_spec = rule.get("inputs", {}).get("items")
+        rounding = rule.get("rounding", "ROUND_HALF_UP")
+        precision = int(rule.get("rounding_precision", 2))
+
         if isinstance(items_spec, list):
             values = [self._resolve_ref(item) for item in items_spec]
         else:
-            # Single ref to an already-resolved aggregate
-            val = self._resolve_ref(items_spec)
-            values = [val]
+            values = [self._resolve_ref(items_spec)]
 
         total = sum(values, Decimal("0"))
         result = _round(total, rounding, precision)
         self.resolved[rule_id] = result
 
-        self.traces.append(TraceNode(
-            node_id=rule_id,
-            rule_id=rule_id,
-            rule_pack_version=self.rp.version,
-            description=rule["description"],
-            inputs={"items": [str(v) for v in values]},
-            intermediates=[],
-            result={"value": str(result), "units": "USD", "rounding": rounding, "precision": precision},
-            explanation=f"Sum of {len(values)} item(s) = {_format_usd(result)}",
-        ))
+        self.traces.append(
+            TraceNode(
+                node_id=rule_id,
+                rule_id=rule_id,
+                rule_pack_version=self.rp.version,
+                description=rule.get("description", ""),
+                inputs={"items": [str(v) for v in values]},
+                intermediates=[],
+                result={
+                    "value": str(result),
+                    "units": "USD",
+                    "rounding": rounding,
+                    "precision": precision,
+                },
+                explanation=f"Sum of {len(values)} item(s) = {_format_usd(result)}",
+            )
+        )
 
-    def _eval_formula(self, rule: dict):
+    def _eval_formula(self, rule: dict[str, Any]) -> None:
         rule_id = rule["id"]
-        expression = rule["expression"]
+        self._enforce_rule_namespace(rule_id)
+
+        expr = rule["expression"]
         rounding = rule.get("rounding", "ROUND_HALF_UP")
-        precision = rule.get("rounding_precision", 2)
+        precision = int(rule.get("rounding_precision", 2))
 
-        # Resolve named inputs
-        input_vals: dict[str, Decimal] = {}
-        for name, spec in rule["inputs"].items():
-            input_vals[name] = self._resolve_ref(spec)
+        inputs = {k: self._resolve_ref(v) for k, v in (rule.get("inputs") or {}).items()}
 
-        # Safe expression evaluation (closed set of operations)
-        result = self._safe_eval(expression, input_vals)
+        result = self._safe_eval(expr, inputs)
         result = _round(result, rounding, precision)
         self.resolved[rule_id] = result
 
-        self.traces.append(TraceNode(
-            node_id=rule_id,
-            rule_id=rule_id,
-            rule_pack_version=self.rp.version,
-            description=rule["description"],
-            inputs={k: str(v) for k, v in input_vals.items()},
-            intermediates=[{"expression": expression}],
-            result={"value": str(result), "units": "USD", "rounding": rounding, "precision": precision},
-            explanation=self._explain_formula(expression, input_vals, result),
-        ))
+        self.traces.append(
+            TraceNode(
+                node_id=rule_id,
+                rule_id=rule_id,
+                rule_pack_version=self.rp.version,
+                description=rule.get("description", ""),
+                inputs={k: str(v) for k, v in inputs.items()},
+                intermediates=[{"expression": expr}],
+                result={
+                    "value": str(result),
+                    "units": "USD",
+                    "rounding": rounding,
+                    "precision": precision,
+                },
+                explanation=self._explain_formula(expr, inputs, result),
+            )
+        )
 
-    def _eval_lookup(self, rule: dict):
+    def _eval_lookup(self, rule: dict[str, Any]) -> None:
         rule_id = rule["id"]
+        self._enforce_rule_namespace(rule_id)
+
         table_path = rule["table"]
         key_spec = rule["key"]
 
-        # Determine the lookup key
         if isinstance(key_spec, dict) and key_spec.get("ref") == "input.filing_status":
+            key = self._filing_status
+        elif isinstance(key_spec, str) and key_spec == "input.filing_status":
             key = self._filing_status
         else:
             key = str(self._resolve_ref(key_spec))
@@ -196,189 +291,207 @@ class CalculationEngine:
         value = _to_decimal(self.rp.get_constant(table_path, key))
         self.resolved[rule_id] = value
 
-        self.traces.append(TraceNode(
-            node_id=rule_id,
-            rule_id=rule_id,
-            rule_pack_version=self.rp.version,
-            description=rule["description"],
-            inputs={"table": table_path, "key": key},
-            intermediates=[],
-            result={"value": str(value), "units": "USD"},
-            explanation=f"Lookup {table_path}[{key}] = {_format_usd(value)}",
-        ))
+        self.traces.append(
+            TraceNode(
+                node_id=rule_id,
+                rule_id=rule_id,
+                rule_pack_version=self.rp.version,
+                description=rule.get("description", ""),
+                inputs={"table": table_path, "key": key},
+                intermediates=[],
+                result={"value": str(value), "units": "USD"},
+                explanation=f"Lookup {table_path}[{key}] = {_format_usd(value)}",
+            )
+        )
 
-    def _eval_bracket_table(self, rule: dict):
+    def _eval_bracket_table(self, rule: dict[str, Any]) -> None:
         rule_id = rule["id"]
+        self._enforce_rule_namespace(rule_id)
+
         rounding = rule.get("rounding", "ROUND_HALF_UP")
-        precision = rule.get("rounding_precision", 0)
+        precision = int(rule.get("rounding_precision", 0))
 
         income = self._resolve_ref(rule["input"])
 
-        # Determine filing status key
         key_spec = rule["key"]
         if isinstance(key_spec, dict) and key_spec.get("ref") == "input.filing_status":
+            fs_key = self._filing_status
+        elif isinstance(key_spec, str) and key_spec == "input.filing_status":
             fs_key = self._filing_status
         else:
             fs_key = str(self._resolve_ref(key_spec))
 
-        brackets = rule["tables"][fs_key]
-        total_tax = Decimal("0")
-        intermediates = []
+        tables = rule.get("tables") or {}
+        if fs_key not in tables:
+            raise RulePackError(f"Bracket table missing filing status key: {fs_key}")
+        brackets = tables[fs_key]
+        if not isinstance(brackets, list):
+            raise RulePackError(f"Bracket table for {fs_key} must be a list")
 
-        for bracket in brackets:
-            lower = _to_decimal(bracket["lower"])
-            upper = _to_decimal(bracket["upper"]) if bracket["upper"] is not None else None
-            rate = _to_decimal(bracket["rate"])
+        total_tax = Decimal("0")
+        intermediates: list[dict[str, Any]] = []
+
+        for b in brackets:
+            lower = _to_decimal(b["lower"])
+            upper = _to_decimal(b["upper"]) if b.get("upper") is not None else None
+            rate = _to_decimal(b["rate"])
 
             if income <= lower:
                 break
 
-            if upper is not None:
-                taxable_in_bracket = min(income, upper) - lower
-            else:
-                taxable_in_bracket = income - lower
+            taxable_in_bracket = (min(income, upper) if upper is not None else income) - lower
+            if taxable_in_bracket <= 0:
+                continue
 
             tax_in_bracket = taxable_in_bracket * rate
             total_tax += tax_in_bracket
 
-            intermediates.append({
-                "bracket": f"{rate * 100}%",
-                "range": f"{_format_usd(lower)}–{_format_usd(upper) if upper else '∞'}",
-                "taxable_amount": str(taxable_in_bracket),
-                "tax": str(tax_in_bracket),
-            })
+            intermediates.append(
+                {
+                    "bracket": f"{(rate * 100):g}%",
+                    "range": f"{_format_usd(lower)}â€“{_format_usd(upper) if upper is not None else 'âˆž'}",
+                    "taxable_amount": str(taxable_in_bracket),
+                    "tax": str(tax_in_bracket),
+                }
+            )
 
         result = _round(total_tax, rounding, precision)
         self.resolved[rule_id] = result
 
-        # Build explanation
-        parts = []
-        for inter in intermediates:
-            parts.append(f"{inter['bracket']} on {inter['range']}: {_format_usd(_to_decimal(inter['tax']))}")
-        explanation = f"Tax on {_format_usd(income)} ({fs_key.upper()}): " + " + ".join(parts) + f" = {_format_usd(result)}"
+        parts = [
+            f"{i['bracket']} on {i['range']}: {_format_usd(_to_decimal(i['tax']))}"
+            for i in intermediates
+        ]
+        explanation = (
+            f"Tax on {_format_usd(income)} ({fs_key.upper()}): "
+            + (" + ".join(parts) if parts else "$0.00")
+            + f" = {_format_usd(result)}"
+        )
 
-        self.traces.append(TraceNode(
-            node_id=rule_id,
-            rule_id=rule_id,
-            rule_pack_version=self.rp.version,
-            description=rule["description"],
-            inputs={"taxable_income": str(income), "filing_status": fs_key},
-            intermediates=intermediates,
-            result={"value": str(result), "units": "USD", "rounding": rounding, "precision": precision},
-            explanation=explanation,
-        ))
+        self.traces.append(
+            TraceNode(
+                node_id=rule_id,
+                rule_id=rule_id,
+                rule_pack_version=self.rp.version,
+                description=rule.get("description", ""),
+                inputs={"taxable_income": str(income), "filing_status": fs_key},
+                intermediates=intermediates,
+                result={
+                    "value": str(result),
+                    "units": "USD",
+                    "rounding": rounding,
+                    "precision": precision,
+                },
+                explanation=explanation,
+            )
+        )
 
-    # ─── Safe Expression Evaluator ────────────────────────────
+    # â”€â”€â”€ Safe expression evaluation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def _safe_eval(self, expr: str, variables: dict[str, Decimal]) -> Decimal:
-        """Evaluate a simple expression. Supports: +, -, *, /, max(), min().
-        No arbitrary code — just string parsing of a fixed grammar."""
+        """Evaluate a formula expression safely using recursive-descent parsing.
+
+        Supports: +, -, *, /, max(), min(), parentheses, variable refs, and
+        numeric literals.  No eval() or exec() is used anywhere.
+        Operator precedence: additive < multiplicative < atom.
+        Scanning is right-to-left to get left-associative binding.
+        """
         expr = expr.strip()
 
-        # Handle max(a, b) and min(a, b)
         for func in ("max", "min"):
             if expr.startswith(f"{func}(") and expr.endswith(")"):
-                inner = expr[len(func) + 1:-1]
+                inner = expr[len(func) + 1 : -1]
                 args = self._split_args(inner)
                 vals = [self._safe_eval(a.strip(), variables) for a in args]
                 return max(vals) if func == "max" else min(vals)
 
-        # Handle binary operations (left to right, no precedence beyond +/- vs */÷)
-        # Simple approach: substitute variables, then evaluate
-        result = self._eval_additive(expr, variables)
-        return result
+        return self._eval_additive(expr, variables)
 
     def _split_args(self, s: str) -> list[str]:
-        """Split comma-separated args respecting parentheses."""
+        """Split a comma-separated argument list, respecting nested parentheses."""
         depth = 0
-        parts = []
-        current = []
+        parts: list[str] = []
+        current: list[str] = []
         for ch in s:
-            if ch == '(':
+            if ch == "(":
                 depth += 1
-            elif ch == ')':
+            elif ch == ")":
                 depth -= 1
-            elif ch == ',' and depth == 0:
-                parts.append(''.join(current))
+            elif ch == "," and depth == 0:
+                parts.append("".join(current))
                 current = []
                 continue
             current.append(ch)
-        parts.append(''.join(current))
-        return parts
+        parts.append("".join(current))
+        return [p for p in parts if p.strip()]
 
     def _eval_additive(self, expr: str, variables: dict[str, Decimal]) -> Decimal:
-        """Parse addition and subtraction."""
-        # Find the rightmost + or - not inside parens
         depth = 0
         pos = -1
-        op = None
+        op: str | None = None
+
         for i in range(len(expr) - 1, -1, -1):
             ch = expr[i]
-            if ch == ')':
+            if ch == ")":
                 depth += 1
-            elif ch == '(':
+            elif ch == "(":
                 depth -= 1
-            elif depth == 0 and ch in ('+', '-') and i > 0:
-                pos = i
-                op = ch
+            elif depth == 0 and ch in ("+", "-") and i > 0:
+                pos, op = i, ch
                 break
 
-        if pos > 0 and op:
+        if pos > 0 and op is not None:
             left = self._eval_additive(expr[:pos].strip(), variables)
-            right = self._eval_multiplicative(expr[pos + 1:].strip(), variables)
-            return left + right if op == '+' else left - right
+            right = self._eval_multiplicative(expr[pos + 1 :].strip(), variables)
+            return left + right if op == "+" else left - right
 
         return self._eval_multiplicative(expr, variables)
 
     def _eval_multiplicative(self, expr: str, variables: dict[str, Decimal]) -> Decimal:
-        """Parse multiplication and division."""
         depth = 0
         pos = -1
-        op = None
+        op: str | None = None
+
         for i in range(len(expr) - 1, -1, -1):
             ch = expr[i]
-            if ch == ')':
+            if ch == ")":
                 depth += 1
-            elif ch == '(':
+            elif ch == "(":
                 depth -= 1
-            elif depth == 0 and ch in ('*', '/') and i > 0:
-                pos = i
-                op = ch
+            elif depth == 0 and ch in ("*", "/") and i > 0:
+                pos, op = i, ch
                 break
 
-        if pos > 0 and op:
+        if pos > 0 and op is not None:
             left = self._eval_multiplicative(expr[:pos].strip(), variables)
-            right = self._eval_atom(expr[pos + 1:].strip(), variables)
-            return left * right if op == '*' else left / right
+            right = self._eval_atom(expr[pos + 1 :].strip(), variables)
+            if op == "/" and right == 0:
+                raise RulePackError("Division by zero in formula evaluation")
+            return left * right if op == "*" else left / right
 
         return self._eval_atom(expr, variables)
 
     def _eval_atom(self, expr: str, variables: dict[str, Decimal]) -> Decimal:
-        """Parse an atom: number, variable, or parenthesized expression."""
         expr = expr.strip()
 
-        # Handle max/min at atom level too
         for func in ("max", "min"):
             if expr.startswith(f"{func}(") and expr.endswith(")"):
-                inner = expr[len(func) + 1:-1]
+                inner = expr[len(func) + 1 : -1]
                 args = self._split_args(inner)
                 vals = [self._safe_eval(a.strip(), variables) for a in args]
                 return max(vals) if func == "max" else min(vals)
 
-        # Parenthesized
         if expr.startswith("(") and expr.endswith(")"):
             return self._eval_additive(expr[1:-1], variables)
 
-        # Variable
         if expr in variables:
             return variables[expr]
 
-        # Numeric literal
         try:
             return Decimal(expr)
-        except Exception:
-            raise ValueError(f"Cannot evaluate expression atom: '{expr}'")
+        except Exception as e:
+            raise RulePackError(f"Cannot evaluate expression atom: '{expr}'") from e
 
     def _explain_formula(self, expr: str, inputs: dict[str, Decimal], result: Decimal) -> str:
         parts = [f"{k}={_format_usd(v)}" for k, v in inputs.items()]
-        return f"{expr} where {', '.join(parts)} → {_format_usd(result)}"
+        return f"{expr} where {', '.join(parts)} â†’ {_format_usd(result)}"
