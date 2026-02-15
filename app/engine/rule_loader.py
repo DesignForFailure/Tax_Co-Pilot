@@ -83,6 +83,29 @@ def _read_yaml(path: Path) -> dict[str, Any]:
     return data
 
 
+def _resolve_pack_file(pack_dir: Path, canonical_name: str, pattern_suffix: str) -> Path:
+    """Resolve a rule-pack file path with backward-compatible naming.
+
+    Preferred names are the canonical files (`manifest.yaml` and `rules.yaml`).
+    For compatibility with legacy/generated packs, this also supports exactly
+    one `*_<suffix>.yaml` match (for example `federal_2024_manifest.yaml`).
+    """
+    canonical = pack_dir / canonical_name
+    if canonical.exists():
+        return canonical
+
+    candidates = sorted(pack_dir.glob(f"*_{pattern_suffix}.yaml"), key=lambda p: p.name)
+    if len(candidates) == 1:
+        return candidates[0]
+    if not candidates:
+        raise RulePackError(
+            f"Missing rule pack file: expected {canonical} or one '*_{pattern_suffix}.yaml' file"
+        )
+    raise RulePackError(
+        f"Ambiguous rule pack file for {canonical_name}: found {', '.join(p.name for p in candidates)}"
+    )
+
+
 def _sha256_files(paths: Iterable[Path]) -> str:
     """Compute a deterministic SHA-256 checksum over a set of files."""
     h = hashlib.sha256()
@@ -297,8 +320,11 @@ class RulePack:
     @classmethod
     def load(cls, pack_dir: Path) -> "RulePack":
         pack_dir = pack_dir.resolve()
-        manifest = _read_yaml(pack_dir / "manifest.yaml")
-        rules_yaml = _read_yaml(pack_dir / "rules.yaml")
+        manifest_path = _resolve_pack_file(pack_dir, "manifest.yaml", "manifest")
+        rules_path = _resolve_pack_file(pack_dir, "rules.yaml", "rules")
+
+        manifest = _read_yaml(manifest_path)
+        rules_yaml = _read_yaml(rules_path)
 
         version = str(manifest.get("version", "0.0.0"))
         tax_year = int(manifest.get("tax_year", 0))
