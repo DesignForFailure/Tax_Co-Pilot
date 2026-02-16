@@ -22,9 +22,10 @@ Future improvements:
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Iterator
+from typing import Any
 
 import yaml
 
@@ -216,7 +217,7 @@ def _toposort_rules(rules: dict[str, dict[str, Any]], deps: dict[str, set[str]])
     return order
 
 
-# â”€â”€â”€ Rule type validators â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── Rule type validators ─────────────────────────────────────
 
 def _extract_identifiers(expr: str) -> set[str]:
     out: set[str] = set()
@@ -318,7 +319,7 @@ class RulePack:
     rule_order: list[str]
 
     @classmethod
-    def load(cls, pack_dir: Path) -> "RulePack":
+    def load(cls, pack_dir: Path) -> RulePack:
         pack_dir = pack_dir.resolve()
         manifest_path = _resolve_pack_file(pack_dir, "manifest.yaml", "manifest")
         rules_path = _resolve_pack_file(pack_dir, "rules.yaml", "rules")
