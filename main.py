@@ -27,6 +27,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from app.config import config as encryption_config
 from app.engine.calculator import CalculationEngine
 from app.engine.rule_loader import RulePack
 from app.models.domain import (
@@ -37,22 +38,21 @@ from app.models.domain import (
     TaxReturnInput,
     W2Data,
 )
-from app.config import config as encryption_config
 from app.services.database import (
+    DB_PATH,
     get_return_run,
     init_db,
     list_return_runs,
     save_return_run,
     set_cached_password,
-    DB_PATH,
 )
 from app.services.encryption import (
     DatabaseState,
+    PasswordValidationError,
     detect_encryption_state,
     get_password,
     set_password_in_keyring,
     validate_password,
-    PasswordValidationError,
 )
 
 # ─── FastAPI app and basic hardening ───────────────────────────
@@ -405,7 +405,7 @@ def unlock_submit(request: Request, password: str = Form(""), csrf_token: str = 
     except PasswordValidationError as e:
         error_msg = str(e).replace(" ", "+")
         return RedirectResponse(url=f"/unlock?error={error_msg}", status_code=303)
-    except ValueError as e:
+    except ValueError:
         # Wrong password or corrupted database
         error_msg = "Incorrect+password+or+corrupted+database"
         return RedirectResponse(url=f"/unlock?error={error_msg}", status_code=303)
