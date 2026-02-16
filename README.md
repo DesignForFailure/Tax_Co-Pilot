@@ -36,8 +36,9 @@ This project treats taxes as a **ledger + rules + calculations problem**, where:
 ### 1. Local-First & Privacy
 - Runs entirely on local hardware
 - No cloud dependency
-- Data encrypted at rest
+- Data is currently stored in local SQLite **without encryption at rest by default**
 - Explicit export and backup flows
+- Encryption-at-rest support is planned as future work
 
 ### 2. Rules-as-Data
 - Federal and state tax logic lives in **versioned rule packs**
@@ -117,6 +118,8 @@ This project follows **Semantic Versioning (SemVer)**.
 - **Backend:** FastAPI
 - **ASGI Server:** Uvicorn
 - **Database:** SQLite
+- **Storage security (current):** plaintext SQLite database file on local disk
+- **Storage security (planned):** optional encryption-at-rest workflow (e.g., SQLCipher)
 - **UI:** Server-rendered HTML templates
 - **Numeric Type:** Decimal
 - **Rule Packs:** YAML (versioned)
