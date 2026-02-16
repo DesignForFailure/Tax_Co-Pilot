@@ -125,12 +125,12 @@ class TaxReturnInput(BaseModel):
         for tp in self.taxpayers:
             for w in tp.w2s:
                 total += w.federal_withheld
-            for f in tp.form_1099_ints:
-                total += f.federal_withheld
-            for f in tp.form_1099_divs:
-                total += f.federal_withheld
-            for f in tp.form_1099_bs:
-                total += f.federal_withheld
+            for i in tp.form_1099_ints:
+                total += i.federal_withheld
+            for d in tp.form_1099_divs:
+                total += d.federal_withheld
+            for b in tp.form_1099_bs:
+                total += b.federal_withheld
         return total
 
 

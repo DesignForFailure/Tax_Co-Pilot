@@ -1,9 +1,12 @@
+from typing import Any
+
 from fastapi.testclient import TestClient
+from httpx import Response
 
 from main import app
 
 
-def _post_calculate(**overrides):
+def _post_calculate(**overrides: Any) -> Response:
     client = TestClient(app, base_url="http://localhost")
     csrf = "test-csrf-token"
     client.cookies.set("csrf", csrf)

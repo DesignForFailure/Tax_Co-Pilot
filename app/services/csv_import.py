@@ -14,6 +14,8 @@ import csv
 import io
 from decimal import Decimal, InvalidOperation
 
+from pydantic import BaseModel
+
 from app.models.domain import Form1099BData, W2Data
 
 
@@ -51,14 +53,15 @@ def _money(
     if abs(d) > max_abs:
         raise ValueError("Money is too large")
 
-    if d.as_tuple().exponent < -max_decimals:
+    exp = d.as_tuple().exponent
+    if isinstance(exp, int) and exp < -max_decimals:
         raise ValueError(f"Money has more than {max_decimals} decimals")
 
     quant = Decimal("1") if max_decimals == 0 else (Decimal(10) ** (-max_decimals))
     return d.quantize(quant)
 
 
-def import_csv(csv_text: str, record_type: str):
+def import_csv(csv_text: str, record_type: str) -> tuple[list[BaseModel], list[str]]:
     """Import CSV text.
 
     Returns: (records, errors)
@@ -67,7 +70,7 @@ def import_csv(csv_text: str, record_type: str):
     """
     record_type = (record_type or "").strip().upper()
     errors: list[str] = []
-    records = []
+    records: list[BaseModel] = []
 
     reader = csv.DictReader(io.StringIO(csv_text or ""))
     for idx, row in enumerate(reader, start=2):  # header is line 1

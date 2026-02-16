@@ -41,7 +41,7 @@ GA = RulePack.load(Path("rule_packs/state/GA/2024"))
 # ═══════════════════════════════════════════════════════════════
 
 
-def test_single_w2_mfj():
+def test_single_w2_mfj() -> None:
     inp = TaxReturnInput(
         tax_year=2024,
         filing_status=FilingStatus.MFJ,
@@ -66,7 +66,7 @@ def test_single_w2_mfj():
     assert run.output.refund_or_owed == Decimal("5768")
 
 
-def test_trace_completeness():
+def test_trace_completeness() -> None:
     inp = TaxReturnInput(
         tax_year=2024,
         filing_status=FilingStatus.MFJ,
@@ -108,7 +108,7 @@ def test_trace_completeness():
 # ═══════════════════════════════════════════════════════════════
 
 
-def test_two_person_mfj():
+def test_two_person_mfj() -> None:
     """Primary $85k + Spouse $35k = $120k combined. MFJ."""
     inp = TaxReturnInput(
         tax_year=2024,
@@ -146,7 +146,7 @@ def test_two_person_mfj():
     assert run.output.taxable_income == Decimal("90800")
 
 
-def test_1099_income_mix():
+def test_1099_income_mix() -> None:
     """W-2 + 1099-INT + 1099-DIV + 1099-B."""
     inp = TaxReturnInput(
         tax_year=2024,
@@ -177,7 +177,7 @@ def test_1099_income_mix():
     assert run.output.gross_income == Decimal("82400.00")
 
 
-def test_csv_import_w2():
+def test_csv_import_w2() -> None:
     csv_text = """employer_name,wages,federal_withheld,state,state_withheld
 US Army,85000,12000,TX,0
 Walmart,25000,3000,GA,1500
@@ -190,7 +190,7 @@ Walmart,25000,3000,GA,1500
     assert records[1].state == "GA"
 
 
-def test_csv_import_1099b():
+def test_csv_import_1099b() -> None:
     csv_text = """description,proceeds,cost_basis,is_long_term
 BTC sale,900,200,false
 ETH sale,5000,3000,true
@@ -207,7 +207,7 @@ ETH sale,5000,3000,true
 # ═══════════════════════════════════════════════════════════════
 
 
-def test_whatif_mfj_vs_mfs():
+def test_whatif_mfj_vs_mfs() -> None:
     base = TaxReturnInput(
         tax_year=2024,
         filing_status=FilingStatus.MFJ,
@@ -248,7 +248,7 @@ def test_whatif_mfj_vs_mfs():
 # ═══════════════════════════════════════════════════════════════
 
 
-def test_georgia_state_tax_flow():
+def test_georgia_state_tax_flow() -> None:
     """Basic GA flow: starts from federal AGI, applies GA deduction/exemption, flat rate."""
     inp = TaxReturnInput(
         tax_year=2024,
@@ -285,7 +285,7 @@ def test_georgia_state_tax_flow():
 # ═══════════════════════════════════════════════════════════════
 
 
-def test_audit_export_json_and_html():
+def test_audit_export_json_and_html() -> None:
     inp = TaxReturnInput(
         tax_year=2024,
         filing_status=FilingStatus.MFJ,

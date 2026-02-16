@@ -25,7 +25,7 @@ from app.models.domain import (
 FED = RulePack.load(Path("rule_packs/federal/2024"))
 
 
-def test_single_w2_mfj():
+def test_single_w2_mfj() -> None:
     """Single W-2, MFJ filing.
 
     Wages: $85,000. Withheld: $12,000.
@@ -64,7 +64,7 @@ def test_single_w2_mfj():
     assert len(run.trace) > 0
 
 
-def test_single_filing():
+def test_single_filing() -> None:
     """Single filing, $50k wages.
 
     Standard deduction: $14,600. Taxable: $35,400.
@@ -95,7 +95,7 @@ def test_single_filing():
     assert run.output.refund_or_owed == Decimal("1984")
 
 
-def test_with_capital_gains():
+def test_with_capital_gains() -> None:
     """W-2 + crypto gain. Wages $85k + $700 net gain. MFJ.
 
     Gross: $85,700. Taxable: $56,500.
@@ -133,7 +133,7 @@ def test_with_capital_gains():
     assert run.output.federal_tax == Decimal("6316")
 
 
-def test_zero_income():
+def test_zero_income() -> None:
     """Zero income should produce zero tax."""
     inputs = TaxReturnInput(
         tax_year=2024,
@@ -155,7 +155,7 @@ def test_zero_income():
     assert run.output.federal_tax == Decimal("0")
 
 
-def test_trace_contains_all_rules():
+def test_trace_contains_all_rules() -> None:
     """Every rule in the pack should appear in the trace."""
     inputs = TaxReturnInput(
         tax_year=2024,
@@ -194,7 +194,7 @@ def test_trace_contains_all_rules():
     assert expected == traced_ids
 
 
-def test_immutable_run_has_snapshot_and_metadata():
+def test_immutable_run_has_snapshot_and_metadata() -> None:
     """ReturnRun must contain a frozen input snapshot + audit metadata."""
     inputs = TaxReturnInput(
         tax_year=2024,
@@ -221,7 +221,7 @@ def test_immutable_run_has_snapshot_and_metadata():
     assert len(run.rule_pack_checksum) == 64  # SHA-256 hex
 
 
-def test_high_income_hits_multiple_brackets():
+def test_high_income_hits_multiple_brackets() -> None:
     """$300k income, single. Hits 6 brackets.
 
     Standard deduction: $14,600. Taxable: $285,400.
