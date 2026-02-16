@@ -26,4 +26,7 @@ This repository is a local-first tax modeling application. Potentially sensitive
 
 - Input/import handling
 - Data storage and export paths
+- Database encryption and key management (SQLCipher / Fernet; see `docs/ENCRYPTION.md`)
+- Password handling and key derivation (PBKDF2-HMAC-SHA256)
 - Rule loading/parsing and execution pathways
+- Session management and CSRF protection

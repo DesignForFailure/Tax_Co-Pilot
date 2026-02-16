@@ -2,6 +2,8 @@
 
 Thanks for helping improve Tax_Co-Pilot. This project emphasizes deterministic behavior, transparency, and reproducibility.
 
+This project is licensed under the **GNU AGPL v3**. By contributing, you agree that your contributions will be licensed under the same terms. All new source files should include the AGPL v3 license header.
+
 ## Local development setup
 
 1. **Install Python**
@@ -22,7 +24,7 @@ Run all checks before opening a pull request:
 
 - **Lint:** `python -m ruff check .`
 - **Type-check:** `python -m mypy .`
-- **Tests:** `python -m pytest -q`
+- **Tests:** `python -m pytest -q` (tests live in the `tests/` directory)
 
 If any check fails, fix the issue and rerun until clean.
 
@@ -46,7 +48,6 @@ Before requesting review, confirm:
 - New logic is deterministic and auditable.
 - Existing tests still pass.
 - Added behavior is covered by tests where practical.
-# Contributing
 
 ## CI expectations
 

@@ -42,7 +42,9 @@ This roadmap reflects the near-term plan for evolving Tax_Co-Pilot from MVP/alph
 
 **Goal:** Raise confidence in local-first data protection and operational safety.
 
-- Harden data-at-rest protections and key-management workflow.
+- ~~Implement encryption at rest for the local database.~~ *(Done — SQLCipher AES-256 with Fernet fallback, PBKDF2 key derivation.)*
+- ~~Add CI pipeline with automated linting, type checking, and testing.~~ *(Done — GitHub Actions with ruff, mypy, pytest, pip-audit.)*
+- Harden key-management workflow and rotation procedures.
 - Strengthen audit logging and trace tamper-evidence characteristics.
 - Add dependency review and secure configuration baselines.
 - Introduce targeted security tests and threat-model updates.
