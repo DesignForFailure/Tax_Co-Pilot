@@ -38,7 +38,6 @@ from app.models.domain import (
 )
 from app.services.database import get_return_run, init_db, list_return_runs, save_return_run
 
-# â”€â”€â”€ FastAPI app and basic hardening â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # ─── FastAPI app and basic hardening ───────────────────────────
 # TrustedHostMiddleware mitigates DNS rebinding / Host header attacks.
 # Keep this locked to localhost unless you intentionally expose the service.

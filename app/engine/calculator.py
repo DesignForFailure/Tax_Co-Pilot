@@ -496,5 +496,4 @@ class CalculationEngine:
 
     def _explain_formula(self, expr: str, inputs: dict[str, Decimal], result: Decimal) -> str:
         parts = [f"{k}={_format_usd(v)}" for k, v in inputs.items()]
-        return f"{expr} where {', '.join(parts)} â†’ {_format_usd(result)}"
         return f"{expr} where {', '.join(parts)} → {_format_usd(result)}"
