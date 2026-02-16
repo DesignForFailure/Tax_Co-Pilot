@@ -133,35 +133,51 @@ This project follows **Semantic Versioning (SemVer)**.
 Tax_Co-Pilot/
 ├── app/
 │   ├── engine/
+│   │   ├── __init__.py
 │   │   ├── calculator.py
 │   │   ├── rule_loader.py
 │   │   └── whatif.py
 │   ├── models/
+│   │   ├── __init__.py
 │   │   └── domain.py
 │   ├── services/
+│   │   ├── __init__.py
 │   │   ├── audit_export.py
 │   │   ├── csv_import.py
-│   │   └── database.py
-│   └── templates/
-│       ├── layouts/
-│       │   └── base.html
-│       └── pages/
-│           ├── calculate.html
-│           ├── dashboard.html
-│           └── runs.html
+│   │   ├── database.py
+│   │   └── encryption.py
+│   ├── templates/
+│   │   ├── layouts/
+│   │   │   └── base.html
+│   │   └── pages/
+│   │       ├── calculate.html
+│   │       ├── dashboard.html
+│   │       └── runs.html
+│   ├── __init__.py
+│   └── config.py
+├── docs/
+│   └── ENCRYPTION.md
+├── rule_packs/
+│   ├── federal/2024/
+│   │   ├── federal_2024_manifest.yaml
+│   │   └── federal_2024_rules.yaml
+│   └── state/GA/2024/
+│       ├── state_GA_2024_manifest.yaml
+│       └── state_GA_2024_rules.yaml
+├── tests/
+│   ├── __init__.py
+│   ├── test_calculate_name_validation.py
+│   ├── test_calculator_resolve_ref.py
+│   ├── test_encoding_guard.py
+│   ├── test_encrypted_database.py
+│   ├── test_encryption.py
+│   ├── test_golden.py
+│   └── test_golden2.py
 ├── main.py
+├── pyproject.toml
 ├── requirements.txt
 ├── requirements-dev.txt
-├── run.sh
-├── test_golden.py
-├── test_golden2.py
-└── rule_packs/
-    ├── federal/2024/
-    │   ├── federal_2024_manifest.yaml
-    │   └── federal_2024_rules.yaml
-    └── state/GA/2024/
-        ├── state_GA_2024_manifest.yaml
-        └── state_GA_2024_rules.yaml
+└── run.sh
 ```
 
 ---
