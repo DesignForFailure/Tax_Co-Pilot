@@ -9,6 +9,9 @@ Security/QA notes:
 - Enables WAL and foreign_keys.
 - Sets a busy timeout to reduce "database is locked" errors.
 
+Storage security (current):
+- Uses standard SQLite and stores data unencrypted at rest by default.
+
 Future improvements:
 - Add an index on (tax_year, created_at) if volume grows.
 - Add optional encryption-at-rest (SQLCipher) if device threat model requires it.
