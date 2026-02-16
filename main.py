@@ -20,8 +20,9 @@ import json
 import secrets
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from typing import Any
 
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -61,7 +62,7 @@ _CSP = (
 
 
 @app.middleware("http")
-async def security_headers(request: Request, call_next):
+async def security_headers(request: Request, call_next: Any) -> Response:
     response = await call_next(request)
 
     # Clickjacking + MIME sniffing defenses
@@ -138,7 +139,7 @@ def _parse_money(
 
     # Enforce decimal precision without silent rounding.
     exp = d.as_tuple().exponent
-    if exp < -max_decimals:
+    if isinstance(exp, int) and exp < -max_decimals:
         raise ValueError(f"Money value has more than {max_decimals} decimal places")
 
     # Normalize to fixed decimals for consistent storage/display.
@@ -152,7 +153,7 @@ def _get_csrf_token(request: Request) -> str:
     Uses a cookie named `csrf` plus a hidden form field.
     This is the 'double-submit cookie' pattern.
     """
-    token = request.cookies.get("csrf")
+    token: str | None = request.cookies.get("csrf")
     if not token:
         token = secrets.token_urlsafe(32)
     return token
@@ -218,7 +219,7 @@ def calculate_submit(
     cg_desc: str = Form(""),
     cg_proceeds: str = Form("0"),
     cg_basis: str = Form("0"),
-):
+) -> RedirectResponse:
     _verify_csrf(request, csrf_token)
 
     # Bound string inputs to prevent oversized payloads (defense-in-depth).

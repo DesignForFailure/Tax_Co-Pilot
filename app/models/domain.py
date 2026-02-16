@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -20,7 +20,7 @@ def new_id() -> str:
     return str(uuid.uuid4())
 
 
-class FilingStatus(str, Enum):
+class FilingStatus(StrEnum):
     SINGLE = "single"
     MFJ = "mfj"
     MFS = "mfs"
@@ -28,7 +28,7 @@ class FilingStatus(str, Enum):
     QSS = "qss"
 
 
-class TaxpayerRole(str, Enum):
+class TaxpayerRole(StrEnum):
     PRIMARY = "primary"
     SPOUSE = "spouse"
 
@@ -125,12 +125,12 @@ class TaxReturnInput(BaseModel):
         for tp in self.taxpayers:
             for w in tp.w2s:
                 total += w.federal_withheld
-            for f in tp.form_1099_ints:
-                total += f.federal_withheld
-            for f in tp.form_1099_divs:
-                total += f.federal_withheld
-            for f in tp.form_1099_bs:
-                total += f.federal_withheld
+            for i in tp.form_1099_ints:
+                total += i.federal_withheld
+            for d in tp.form_1099_divs:
+                total += d.federal_withheld
+            for b in tp.form_1099_bs:
+                total += b.federal_withheld
         return total
 
 

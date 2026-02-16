@@ -28,14 +28,14 @@ def _engine() -> CalculationEngine:
     return engine
 
 
-def test_resolve_ref_typoed_input_ref_raises_clear_missing_reference_error():
+def test_resolve_ref_typoed_input_ref_raises_clear_missing_reference_error() -> None:
     engine = _engine()
 
     with pytest.raises(RulePackError, match=r"Missing reference: input\.w2\.wage"):
         engine._resolve_ref("input.w2.wage")
 
 
-def test_resolve_ref_typoed_rule_ref_raises_clear_missing_reference_error():
+def test_resolve_ref_typoed_rule_ref_raises_clear_missing_reference_error() -> None:
     engine = _engine()
 
     with pytest.raises(RulePackError, match=r"Missing reference: fed\.2024\.taxable_incom"):
