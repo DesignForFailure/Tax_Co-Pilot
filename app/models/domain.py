@@ -8,7 +8,7 @@ Security/QA notes:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from enum import Enum
 from typing import Any
@@ -198,5 +198,5 @@ class ReturnRun(BaseModel):
     state_outputs: list[StateReturnOutput] = Field(default_factory=list)
     trace: list[TraceNode] = Field(default_factory=list)
     created_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds")
+        default_factory=lambda: datetime.now(UTC).isoformat(timespec="seconds")
     )
