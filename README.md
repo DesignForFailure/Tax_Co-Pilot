@@ -91,6 +91,28 @@ The initial MVP focuses on proving the architecture:
 
 ## Tech Stack (Current)
 
+## Project Status
+
+Tax_Co-Pilot is currently **MVP / alpha**.  
+Expect rapid iteration while the rules model, APIs, and data contracts are being validated.
+
+## Versioning Approach
+
+This project follows **Semantic Versioning (SemVer)**.
+
+- During alpha, releases will use the `0.y.z` series (and may include `-alpha` tags).
+- Breaking changes are expected between minor alpha releases.
+- A stable compatibility promise begins at `1.0.0`.
+
+## Support Policy (Alpha)
+
+- **Release stage:** Alpha / MVP
+- **Compatibility:** No backward-compatibility guarantees yet
+- **Breaking changes:** Expected and may occur without long deprecation windows
+- **Production use:** Not recommended for production tax filing workflows yet
+
+## Tech Stack (Initial)
+
 - **Language:** Python
 - **Backend:** FastAPI
 - **ASGI Server:** Uvicorn
