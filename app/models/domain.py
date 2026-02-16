@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -20,7 +20,7 @@ def new_id() -> str:
     return str(uuid.uuid4())
 
 
-class FilingStatus(str, Enum):
+class FilingStatus(StrEnum):
     SINGLE = "single"
     MFJ = "mfj"
     MFS = "mfs"
@@ -28,7 +28,7 @@ class FilingStatus(str, Enum):
     QSS = "qss"
 
 
-class TaxpayerRole(str, Enum):
+class TaxpayerRole(StrEnum):
     PRIMARY = "primary"
     SPOUSE = "spouse"
 

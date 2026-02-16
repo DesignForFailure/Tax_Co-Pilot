@@ -60,6 +60,20 @@ ignore = [
   "E501", # handled by formatter preference; adjust if you add ruff format
 ]
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Form",
+    "fastapi.Query",
+    "fastapi.Header",
+    "fastapi.Cookie",
+    "fastapi.Body",
+    "fastapi.Path",
+    "fastapi.Security",
+    "fastapi.File",
+    "fastapi.UploadFile",
+]
+
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
 
