@@ -13,8 +13,27 @@ from app.services.encryption import (
     DatabaseState,
     SQLCipherProvider,
     detect_encryption_state,
+    hybrid_factory,
     migrate_to_encrypted,
 )
+
+
+def test_hybrid_factory_supports_index_and_name_access() -> None:
+    """Hybrid row factory should support sqlite3.Row-like access patterns."""
+
+    class _Cursor:
+        description = (
+            ("id", None, None, None, None, None, None),
+            ("data", None, None, None, None, None, None),
+        )
+
+    row = hybrid_factory(_Cursor(), ("test-1", "hello"))
+
+    assert row[0] == "test-1"
+    assert row[1] == "hello"
+    assert row["id"] == "test-1"
+    assert row["data"] == "hello"
+    assert row.keys() == ("id", "data")
 
 
 @pytest.fixture

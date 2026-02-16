@@ -17,13 +17,46 @@ import os
 import secrets
 import sqlite3
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from datetime import UTC
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     pass
+
+
+class HybridRow:
+    """Row wrapper supporting both index-based and name-based access."""
+
+    __slots__ = ("_values", "_columns", "_index_by_name")
+
+    def __init__(self, cursor: Any, row: tuple[Any, ...]) -> None:
+        self._values = tuple(row)
+        self._columns = tuple(description[0] for description in cursor.description)
+        self._index_by_name = {name: idx for idx, name in enumerate(self._columns)}
+
+    def __getitem__(self, key: int | str) -> Any:
+        if isinstance(key, int):
+            return self._values[key]
+        if isinstance(key, str):
+            return self._values[self._index_by_name[key]]
+        raise TypeError(f"Row indices must be integers or strings, not {type(key).__name__}")
+
+    def __iter__(self) -> Iterator[Any]:
+        return iter(self._values)
+
+    def __len__(self) -> int:
+        return len(self._values)
+
+    def keys(self) -> tuple[str, ...]:
+        return self._columns
+
+
+def hybrid_factory(cursor: Any, row: tuple[Any, ...]) -> HybridRow:
+    """Convert a database row into a hybrid row with dict+sequence semantics."""
+    return HybridRow(cursor, row)
 
 
 class DatabaseState(Enum):
@@ -291,7 +324,7 @@ class SQLCipherProvider(EncryptionProvider):
             conn.execute(f"PRAGMA kdf_iter = {self.kdf_iterations}")
 
             # Configure SQLite pragmas (matching unencrypted behavior)
-            conn.row_factory = sqlite3.Row
+            conn.row_factory = hybrid_factory
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA foreign_keys=ON")
             conn.execute("PRAGMA busy_timeout=5000")
@@ -510,7 +543,7 @@ def _migrate_to_sqlcipher(
         raise ImportError("pysqlcipher3 required for SQLCipher migration") from e
 
     encrypted_path = db_path.with_suffix(".db.encrypted.tmp")
-    backup_path = db_path.with_suffix(backup_suffix)
+    backup_path = Path(f"{db_path}{backup_suffix}")
 
     try:
         # Open source database (unencrypted)
