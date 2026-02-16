@@ -17,10 +17,11 @@ import os
 import secrets
 import sqlite3
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from datetime import UTC
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterator
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     pass
