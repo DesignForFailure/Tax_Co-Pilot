@@ -219,7 +219,7 @@ def startup() -> None:
 
 
 @app.get("/", response_class=HTMLResponse)
-def dashboard(request: Request) -> HTMLResponse:
+def dashboard(request: Request) -> Response:
     # Check if database unlock is needed
     if encryption_config.enabled:
         db_state = detect_encryption_state(DB_PATH)
