@@ -27,6 +27,9 @@ dependencies = [
   "PyYAML>=6.0",
   "Jinja2>=3.1.0",
   "python-multipart>=0.0.6",
+  "pysqlcipher3>=1.2.0",
+  "cryptography>=42.0.0",
+  "keyring>=24.0.0",
 ]
 
 [project.optional-dependencies]

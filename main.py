@@ -37,7 +37,23 @@ from app.models.domain import (
     TaxReturnInput,
     W2Data,
 )
-from app.services.database import get_return_run, init_db, list_return_runs, save_return_run
+from app.config import config as encryption_config
+from app.services.database import (
+    get_return_run,
+    init_db,
+    list_return_runs,
+    save_return_run,
+    set_cached_password,
+    DB_PATH,
+)
+from app.services.encryption import (
+    DatabaseState,
+    detect_encryption_state,
+    get_password,
+    set_password_in_keyring,
+    validate_password,
+    PasswordValidationError,
+)
 
 # ─── FastAPI app and basic hardening ───────────────────────────
 # TrustedHostMiddleware mitigates DNS rebinding / Host header attacks.
@@ -173,11 +189,47 @@ def _verify_csrf(request: Request, form_token: str) -> None:
 
 @app.on_event("startup")
 def startup() -> None:
-    init_db()
+    """Initialize database on startup.
+
+    Handles encryption setup:
+    1. If encryption enabled and DB encrypted, password must be provided via env/keyring
+    2. If encryption enabled and DB unencrypted, allow access (migration handled via UI)
+    3. If encryption disabled, proceed normally
+    """
+    if encryption_config.enabled:
+        db_state = detect_encryption_state(DB_PATH)
+
+        if db_state in (DatabaseState.ENCRYPTED_SQLCIPHER, DatabaseState.ENCRYPTED_PYTHON):
+            # Database is encrypted - try to get password
+            password = get_password(source=encryption_config.password_source)
+            if password:
+                # Password available from env/keyring - cache it
+                set_cached_password(password)
+                init_db()
+            else:
+                # Password needed - will redirect to /unlock on first request
+                # Don't init_db() yet - will happen after unlock
+                pass
+        else:
+            # Database doesn't exist or is unencrypted - init normally
+            init_db()
+    else:
+        # Encryption disabled - normal init
+        init_db()
 
 
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request) -> HTMLResponse:
+    # Check if database unlock is needed
+    if encryption_config.enabled:
+        db_state = detect_encryption_state(DB_PATH)
+        if db_state in (DatabaseState.ENCRYPTED_SQLCIPHER, DatabaseState.ENCRYPTED_PYTHON):
+            from app.services.database import get_cached_password
+
+            if not get_cached_password():
+                # Redirect to unlock page
+                return RedirectResponse(url="/unlock", status_code=303)
+
     runs = list_return_runs()
     run = None
     if runs:
@@ -298,6 +350,68 @@ def view_run(request: Request, run_id: str) -> HTMLResponse:
 
     run = ReturnRun(**{k: v for k, v in run_data.items() if not k.endswith("_json")})
     return templates.TemplateResponse("pages/dashboard.html", {"request": request, "run": run})
+
+
+@app.get("/unlock", response_class=HTMLResponse)
+def unlock_form(request: Request, error: str | None = None) -> HTMLResponse:
+    """Show password unlock form for encrypted database."""
+    csrf = _get_csrf_token(request)
+    resp = templates.TemplateResponse(
+        "pages/unlock.html", {"request": request, "csrf": csrf, "error": error}
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+@app.post("/unlock")
+def unlock_submit(request: Request, password: str = Form(""), csrf_token: str = Form("")) -> RedirectResponse:
+    """Handle password unlock submission."""
+    _verify_csrf(request, csrf_token)
+
+    if not password:
+        return RedirectResponse(url="/unlock?error=Password+is+required", status_code=303)
+
+    try:
+        # Validate password format
+        validate_password(password)
+
+        # Try to open database with this password
+        db_state = detect_encryption_state(DB_PATH)
+        if db_state not in (DatabaseState.ENCRYPTED_SQLCIPHER, DatabaseState.ENCRYPTED_PYTHON):
+            return RedirectResponse(
+                url="/unlock?error=Database+is+not+encrypted", status_code=303
+            )
+
+        # Test the password by attempting to connect
+        from app.services.database import get_connection
+
+        conn = get_connection(password=password)
+        # Test read access
+        conn.execute("SELECT count(*) FROM sqlite_master")
+        conn.close()
+
+        # Password works - cache it
+        set_cached_password(password)
+
+        # Store in keyring for future use
+        set_password_in_keyring(password)
+
+        # Initialize database if not already done
+        init_db()
+
+        # Redirect to dashboard
+        return RedirectResponse(url="/", status_code=303)
+
+    except PasswordValidationError as e:
+        error_msg = str(e).replace(" ", "+")
+        return RedirectResponse(url=f"/unlock?error={error_msg}", status_code=303)
+    except ValueError as e:
+        # Wrong password or corrupted database
+        error_msg = "Incorrect+password+or+corrupted+database"
+        return RedirectResponse(url=f"/unlock?error={error_msg}", status_code=303)
+    except Exception as e:
+        error_msg = f"Unlock+failed:+{str(e)[:50]}"
+        return RedirectResponse(url=f"/unlock?error={error_msg}", status_code=303)
 
 
 @app.exception_handler(ValueError)
