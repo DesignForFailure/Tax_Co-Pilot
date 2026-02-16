@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import yaml
+import yaml  # type: ignore
 
 # Expression validation is intentionally simple:
 # - We do NOT execute expressions.

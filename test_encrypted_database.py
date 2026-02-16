@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import os
 import sqlite3
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
 
-from app.services.database import DB_PATH
 from app.services.encryption import (
     DatabaseState,
     SQLCipherProvider,
@@ -19,7 +18,7 @@ from app.services.encryption import (
 
 
 @pytest.fixture
-def temp_db():
+def temp_db() -> Generator[Path, None, None]:
     """Create a temporary database for testing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
@@ -27,7 +26,7 @@ def temp_db():
 
 
 @pytest.fixture
-def unencrypted_db(temp_db):
+def unencrypted_db(temp_db: Path) -> Path:
     """Create an unencrypted test database with sample data."""
     conn = sqlite3.connect(str(temp_db))
     conn.execute(
@@ -54,7 +53,7 @@ def unencrypted_db(temp_db):
     return temp_db
 
 
-def test_sqlcipher_create_and_open(temp_db):
+def test_sqlcipher_create_and_open(temp_db: Path) -> None:
     """Test creating and opening SQLCipher encrypted database."""
     try:
         from pysqlcipher3 import dbapi2 as sqlcipher  # noqa: F401
@@ -81,7 +80,7 @@ def test_sqlcipher_create_and_open(temp_db):
     conn.close()
 
 
-def test_sqlcipher_wrong_password(temp_db):
+def test_sqlcipher_wrong_password(temp_db: Path) -> None:
     """Test that wrong password fails to open database."""
     try:
         from pysqlcipher3 import dbapi2 as sqlcipher  # noqa: F401
@@ -101,7 +100,7 @@ def test_sqlcipher_wrong_password(temp_db):
         provider.create_connection(temp_db, "wrong_password", timeout=5.0)
 
 
-def test_migrate_to_sqlcipher(unencrypted_db):
+def test_migrate_to_sqlcipher(unencrypted_db: Path) -> None:
     """Test migrating unencrypted database to SQLCipher."""
     try:
         from pysqlcipher3 import dbapi2 as sqlcipher  # noqa: F401
@@ -134,7 +133,7 @@ def test_migrate_to_sqlcipher(unencrypted_db):
     conn.close()
 
 
-def test_migrate_already_encrypted_fails(temp_db):
+def test_migrate_already_encrypted_fails(temp_db: Path) -> None:
     """Test that migrating already encrypted database fails."""
     try:
         from pysqlcipher3 import dbapi2 as sqlcipher  # noqa: F401
@@ -154,7 +153,7 @@ def test_migrate_already_encrypted_fails(temp_db):
         migrate_to_encrypted(temp_db, "new_password", provider_type="sqlcipher")
 
 
-def test_detect_encryption_state_comprehensive():
+def test_detect_encryption_state_comprehensive() -> None:
     """Test encryption state detection for all scenarios."""
     with tempfile.TemporaryDirectory() as tmpdir:
         # Test 1: Non-existent database

@@ -17,12 +17,13 @@ import os
 import secrets
 import sqlite3
 from abc import ABC, abstractmethod
+from datetime import UTC
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
+    pass
 
 
 class DatabaseState(Enum):
@@ -98,7 +99,7 @@ def detect_encryption_state(db_path: Path) -> DatabaseState:
         conn = sqlite3.connect(str(db_path), timeout=1.0)
         # Try to read from sqlite_master (will fail if encrypted)
         cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' LIMIT 1")
-        tables = cursor.fetchall()
+        _ = cursor.fetchall()  # Check if we can read (will fail if encrypted)
         conn.close()
 
         # Check for Python encryption metadata table
@@ -165,7 +166,8 @@ def get_password_from_keyring(service_name: str = "tax_copilot", username: str =
         import keyring
 
         password = keyring.get_password(service_name, username)
-        return password
+        # keyring.get_password returns str | None
+        return str(password) if password is not None else None
     except Exception:
         # keyring library not available or error accessing keyring
         return None
@@ -297,7 +299,8 @@ class SQLCipherProvider(EncryptionProvider):
             # Verify encryption works by trying to read
             conn.execute("SELECT count(*) FROM sqlite_master")
 
-            return conn
+            # pysqlcipher3 connection is compatible with sqlite3.Connection interface
+            return conn  # type: ignore
 
         except Exception as e:
             raise ValueError(
@@ -352,7 +355,9 @@ class PythonEncryptionProvider(EncryptionProvider):
             salt=salt,
             iterations=self.kdf_iterations,
         )
-        return kdf.derive(password.encode("utf-8"))
+        # kdf.derive returns bytes
+        derived_key: bytes = kdf.derive(password.encode("utf-8"))
+        return derived_key
 
     def create_connection(
         self, db_path: Path, password: str, timeout: float = 5.0
@@ -574,11 +579,12 @@ def _migrate_to_python_encryption(
         kdf_iterations: PBKDF2 iterations
         backup_suffix: Suffix for backup file
     """
+    import base64
+    from datetime import datetime
+
+    from cryptography.fernet import Fernet
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-    from cryptography.fernet import Fernet
-    import base64
-    from datetime import datetime, timezone
 
     encrypted_path = db_path.with_suffix(".db.encrypted.tmp")
     backup_path = db_path.with_suffix(backup_suffix)
@@ -615,7 +621,7 @@ def _migrate_to_python_encryption(
         dest_conn.execute(
             """INSERT INTO _encryption_metadata (id, encryption_provider, salt, iterations, encrypted_at, key_version)
                VALUES (1, 'python', ?, ?, ?, 1)""",
-            (salt, kdf_iterations, datetime.now(timezone.utc).isoformat()),
+            (salt, kdf_iterations, datetime.now(UTC).isoformat()),
         )
 
         # Copy schema (all tables except _encryption_metadata)
