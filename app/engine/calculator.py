@@ -19,6 +19,7 @@ Future improvements:
 
 from __future__ import annotations
 
+import re
 from decimal import ROUND_DOWN, ROUND_HALF_UP, ROUND_UP, Decimal
 from typing import Any
 
@@ -30,6 +31,9 @@ ROUNDING_MODES = {
     "ROUND_DOWN": ROUND_DOWN,
     "ROUND_UP": ROUND_UP,
 }
+
+_NUMERIC_LITERAL_RE = re.compile(r"^[+-]?(?:(?:\d+(?:\.\d*)?)|(?:\.\d+))(?:[eE][+-]?\d+)?$")
+_REF_LIKE_RE = re.compile(r"^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+$")
 
 
 def _to_decimal(val: Any) -> Decimal:
@@ -47,6 +51,19 @@ def _round(val: Decimal, mode: str, precision: int) -> Decimal:
 
 def _format_usd(val: Decimal) -> str:
     return f"${val:,.2f}"
+
+
+def _is_numeric_literal(spec: str) -> bool:
+    return bool(_NUMERIC_LITERAL_RE.fullmatch(spec.strip()))
+
+
+def _looks_like_reference(spec: str) -> bool:
+    stripped = spec.strip()
+    if stripped.startswith("input."):
+        return True
+    if _is_numeric_literal(stripped):
+        return False
+    return bool(_REF_LIKE_RE.fullmatch(stripped))
 
 
 class CalculationEngine:
@@ -188,7 +205,7 @@ class CalculationEngine:
     def _resolve_ref(self, spec: Any) -> Decimal:
         # Strings may be rule IDs, input IDs, or numeric literals.
         if isinstance(spec, str):
-            ref = spec
+            ref = spec.strip()
             if ref == "input.filing_status":
                 raise RulePackError("input.filing_status cannot be resolved as Decimal")
             if ref in self.resolved:
@@ -196,7 +213,11 @@ class CalculationEngine:
             if ref in self.rp.rules:
                 self._evaluate_rule(self.rp.rules[ref])
                 return self.resolved[ref]
-            return _to_decimal(ref)
+            if _looks_like_reference(ref):
+                raise RulePackError(f"Missing reference: {ref}")
+            if _is_numeric_literal(ref):
+                return _to_decimal(ref)
+            raise RulePackError(f"Cannot resolve ref or numeric literal: {spec!r}")
 
         # Canonical spec: {literal: ...} or {ref: ...}
         if isinstance(spec, dict):
