@@ -140,7 +140,9 @@ class CalculationEngine:
                                 "ga.2024.taxable_income", Decimal("0")
                             ),
                             state_tax=self.resolved.get("ga.2024.tax", Decimal("0")),
-                            state_withholding=self.resolved.get("ga.2024.withholding", Decimal("0")),
+                            state_withholding=self.resolved.get(
+                                "ga.2024.withholding", Decimal("0")
+                            ),
                             state_refund_or_owed=self.resolved.get(
                                 "ga.2024.refund_or_owed", Decimal("0")
                             ),
@@ -494,4 +496,5 @@ class CalculationEngine:
 
     def _explain_formula(self, expr: str, inputs: dict[str, Decimal], result: Decimal) -> str:
         parts = [f"{k}={_format_usd(v)}" for k, v in inputs.items()]
+        return f"{expr} where {', '.join(parts)} â†’ {_format_usd(result)}"
         return f"{expr} where {', '.join(parts)} → {_format_usd(result)}"

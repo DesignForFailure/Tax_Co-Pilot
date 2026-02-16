@@ -38,6 +38,7 @@ from app.models.domain import (
 )
 from app.services.database import get_return_run, init_db, list_return_runs, save_return_run
 
+# â”€â”€â”€ FastAPI app and basic hardening â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # ─── FastAPI app and basic hardening ───────────────────────────
 # TrustedHostMiddleware mitigates DNS rebinding / Host header attacks.
 # Keep this locked to localhost unless you intentionally expose the service.
@@ -81,6 +82,7 @@ async def security_headers(request: Request, call_next):
     response.headers.setdefault("Cache-Control", "no-store")
 
     return response
+
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
@@ -222,8 +224,12 @@ def calculate_submit(
 
     # Bound string inputs to prevent oversized payloads (defense-in-depth).
     _MAX_TEXT = 200
-    for label, val in [("first name", p_first), ("last name", p_last),
-                       ("employer", p_employer), ("description", cg_desc)]:
+    for label, val in [
+        ("first name", p_first),
+        ("last name", p_last),
+        ("employer", p_employer),
+        ("description", cg_desc),
+    ]:
         if len(val or "") > _MAX_TEXT:
             raise ValueError(f"{label} exceeds {_MAX_TEXT} characters")
 

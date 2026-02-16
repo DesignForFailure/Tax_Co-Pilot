@@ -46,7 +46,7 @@ class WhatIfEngine:
             refund_or_owed=b_run.output.refund_or_owed,
         )
 
-        savings = (b_tax - a_tax)
+        savings = b_tax - a_tax
         recommendation = "mfj" if savings >= 0 else "mfs"
 
         diffs = [

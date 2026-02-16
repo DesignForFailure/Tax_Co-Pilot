@@ -108,10 +108,14 @@ class TaxReturnInput(BaseModel):
         return sum((w.wages for tp in self.taxpayers for w in tp.w2s), Decimal("0"))
 
     def total_interest(self) -> Decimal:
-        return sum((f.interest_income for tp in self.taxpayers for f in tp.form_1099_ints), Decimal("0"))
+        return sum(
+            (f.interest_income for tp in self.taxpayers for f in tp.form_1099_ints), Decimal("0")
+        )
 
     def total_dividends(self) -> Decimal:
-        return sum((f.ordinary_dividends for tp in self.taxpayers for f in tp.form_1099_divs), Decimal("0"))
+        return sum(
+            (f.ordinary_dividends for tp in self.taxpayers for f in tp.form_1099_divs), Decimal("0")
+        )
 
     def total_capital_gains(self) -> Decimal:
         return sum((f.net_gain for tp in self.taxpayers for f in tp.form_1099_bs), Decimal("0"))
@@ -197,6 +201,7 @@ class ReturnRun(BaseModel):
     output: ReturnOutput
     state_outputs: list[StateReturnOutput] = Field(default_factory=list)
     trace: list[TraceNode] = Field(default_factory=list)
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat(timespec="seconds"))
     created_at: str = Field(
         default_factory=lambda: datetime.now(UTC).isoformat(timespec="seconds")
     )

@@ -63,7 +63,7 @@ def generate_audit_html(run: ReturnRun) -> str:
   <h1>Tax Copilot — Audit Report</h1>
   <p><strong>Tax year:</strong> {run.tax_year} &nbsp; <strong>Filing status:</strong> {esc(run.filing_status.value.upper())}</p>
   <p><strong>Taxpayers:</strong> {esc(tp_names)}</p>
-  <p><strong>Gross income:</strong> {esc(f'{run.output.gross_income:,.0f}')} &nbsp; <strong>Federal tax:</strong> {esc(str(run.output.federal_tax))}</p>
+  <p><strong>Gross income:</strong> {esc(f"{run.output.gross_income:,.0f}")} &nbsp; <strong>Federal tax:</strong> {esc(str(run.output.federal_tax))}</p>
   {state_bits}
   <h2>Trace</h2>
   <table>

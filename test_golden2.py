@@ -40,6 +40,7 @@ GA = RulePack.load(Path("rule_packs/state/GA/2024"))
 # M1: FEDERAL BASICS
 # ═══════════════════════════════════════════════════════════════
 
+
 def test_single_w2_mfj():
     inp = TaxReturnInput(
         tax_year=2024,
@@ -49,7 +50,11 @@ def test_single_w2_mfj():
                 role=TaxpayerRole.PRIMARY,
                 first_name="A",
                 last_name="B",
-                w2s=[W2Data(employer_name="X", wages=Decimal("85000"), federal_withheld=Decimal("12000"))],
+                w2s=[
+                    W2Data(
+                        employer_name="X", wages=Decimal("85000"), federal_withheld=Decimal("12000")
+                    )
+                ],
             )
         ],
     )
@@ -70,7 +75,13 @@ def test_trace_completeness():
                 role=TaxpayerRole.PRIMARY,
                 first_name="A",
                 last_name="B",
-                w2s=[W2Data(employer_name="X", wages=Decimal("100000"), federal_withheld=Decimal("15000"))],
+                w2s=[
+                    W2Data(
+                        employer_name="X",
+                        wages=Decimal("100000"),
+                        federal_withheld=Decimal("15000"),
+                    )
+                ],
             )
         ],
     )
@@ -96,6 +107,7 @@ def test_trace_completeness():
 # M2: TWO-PERSON, MULTIPLE INCOME TYPES, CSV
 # ═══════════════════════════════════════════════════════════════
 
+
 def test_two_person_mfj():
     """Primary $85k + Spouse $35k = $120k combined. MFJ."""
     inp = TaxReturnInput(
@@ -106,13 +118,25 @@ def test_two_person_mfj():
                 role=TaxpayerRole.PRIMARY,
                 first_name="John",
                 last_name="Doe",
-                w2s=[W2Data(employer_name="Army", wages=Decimal("85000"), federal_withheld=Decimal("12000"))],
+                w2s=[
+                    W2Data(
+                        employer_name="Army",
+                        wages=Decimal("85000"),
+                        federal_withheld=Decimal("12000"),
+                    )
+                ],
             ),
             Taxpayer(
                 role=TaxpayerRole.SPOUSE,
                 first_name="Jane",
                 last_name="Doe",
-                w2s=[W2Data(employer_name="Cafe", wages=Decimal("35000"), federal_withheld=Decimal("4000"))],
+                w2s=[
+                    W2Data(
+                        employer_name="Cafe",
+                        wages=Decimal("35000"),
+                        federal_withheld=Decimal("4000"),
+                    )
+                ],
             ),
         ],
     )
@@ -132,10 +156,20 @@ def test_1099_income_mix():
                 role=TaxpayerRole.PRIMARY,
                 first_name="A",
                 last_name="B",
-                w2s=[W2Data(employer_name="X", wages=Decimal("80000"), federal_withheld=Decimal("10000"))],
+                w2s=[
+                    W2Data(
+                        employer_name="X", wages=Decimal("80000"), federal_withheld=Decimal("10000")
+                    )
+                ],
                 form_1099_ints=[Form1099INTData(payer_name="Bank", interest_income=Decimal("500"))],
-                form_1099_divs=[Form1099DIVData(payer_name="Broker", ordinary_dividends=Decimal("1200"))],
-                form_1099_bs=[Form1099BData(description="BTC", proceeds=Decimal("900"), cost_basis=Decimal("200"))],
+                form_1099_divs=[
+                    Form1099DIVData(payer_name="Broker", ordinary_dividends=Decimal("1200"))
+                ],
+                form_1099_bs=[
+                    Form1099BData(
+                        description="BTC", proceeds=Decimal("900"), cost_basis=Decimal("200")
+                    )
+                ],
             )
         ],
     )
@@ -172,6 +206,7 @@ ETH sale,5000,3000,true
 # M3: WHAT-IF ENGINE
 # ═══════════════════════════════════════════════════════════════
 
+
 def test_whatif_mfj_vs_mfs():
     base = TaxReturnInput(
         tax_year=2024,
@@ -181,13 +216,21 @@ def test_whatif_mfj_vs_mfs():
                 role=TaxpayerRole.PRIMARY,
                 first_name="A",
                 last_name="B",
-                w2s=[W2Data(employer_name="X", wages=Decimal("85000"), federal_withheld=Decimal("12000"))],
+                w2s=[
+                    W2Data(
+                        employer_name="X", wages=Decimal("85000"), federal_withheld=Decimal("12000")
+                    )
+                ],
             ),
             Taxpayer(
                 role=TaxpayerRole.SPOUSE,
                 first_name="C",
                 last_name="D",
-                w2s=[W2Data(employer_name="Y", wages=Decimal("35000"), federal_withheld=Decimal("4000"))],
+                w2s=[
+                    W2Data(
+                        employer_name="Y", wages=Decimal("35000"), federal_withheld=Decimal("4000")
+                    )
+                ],
             ),
         ],
     )
@@ -203,6 +246,7 @@ def test_whatif_mfj_vs_mfs():
 # ═══════════════════════════════════════════════════════════════
 # M4: GEORGIA STATE (MVP)
 # ═══════════════════════════════════════════════════════════════
+
 
 def test_georgia_state_tax_flow():
     """Basic GA flow: starts from federal AGI, applies GA deduction/exemption, flat rate."""
@@ -240,6 +284,7 @@ def test_georgia_state_tax_flow():
 # M5: AUDIT EXPORT
 # ═══════════════════════════════════════════════════════════════
 
+
 def test_audit_export_json_and_html():
     inp = TaxReturnInput(
         tax_year=2024,
@@ -249,7 +294,11 @@ def test_audit_export_json_and_html():
                 role=TaxpayerRole.PRIMARY,
                 first_name="A",
                 last_name="B",
-                w2s=[W2Data(employer_name="X", wages=Decimal("85000"), federal_withheld=Decimal("12000"))],
+                w2s=[
+                    W2Data(
+                        employer_name="X", wages=Decimal("85000"), federal_withheld=Decimal("12000")
+                    )
+                ],
             )
         ],
     )

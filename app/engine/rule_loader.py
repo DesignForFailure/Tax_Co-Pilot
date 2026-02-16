@@ -32,7 +32,9 @@ import yaml
 # Expression validation is intentionally simple:
 # - We do NOT execute expressions.
 # - We scan to ensure only allowed chars/functions/identifiers appear.
-_ALLOWED_EXPR_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_+-*/(),. ")
+_ALLOWED_EXPR_CHARS = set(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_+-*/(),. "
+)
 _ALLOWED_FUNCS = {"max", "min"}
 
 
@@ -218,6 +220,7 @@ def _toposort_rules(rules: dict[str, dict[str, Any]], deps: dict[str, set[str]])
 
 
 # ─── Rule type validators ─────────────────────────────────────
+
 
 def _extract_identifiers(expr: str) -> set[str]:
     out: set[str] = set()
