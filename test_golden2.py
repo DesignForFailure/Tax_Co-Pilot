@@ -185,8 +185,10 @@ Walmart,25000,3000,GA,1500
     records, errors = import_csv(csv_text, "W2")
     assert errors == []
     assert len(records) == 2
+    assert isinstance(records[0], W2Data)
     assert records[0].employer_name == "US Army"
     assert records[0].wages == Decimal("85000.00")
+    assert isinstance(records[1], W2Data)
     assert records[1].state == "GA"
 
 
@@ -198,7 +200,9 @@ ETH sale,5000,3000,true
     records, errors = import_csv(csv_text, "1099-B")
     assert errors == []
     assert len(records) == 2
+    assert isinstance(records[0], Form1099BData)
     assert records[0].net_gain == Decimal("700.00")
+    assert isinstance(records[1], Form1099BData)
     assert records[1].is_long_term is True
 
 
