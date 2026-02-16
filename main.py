@@ -20,7 +20,7 @@ import json
 import secrets
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import FastAPI, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -97,7 +97,7 @@ async def security_headers(request: Request, call_next: Any) -> Response:
     # Prevent caching of potentially sensitive tax data in shared browser caches.
     response.headers.setdefault("Cache-Control", "no-store")
 
-    return response
+    return cast(Response, response)
 
 
 BASE_DIR = Path(__file__).resolve().parent
