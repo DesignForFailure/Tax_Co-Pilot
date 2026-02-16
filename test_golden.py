@@ -31,7 +31,7 @@ def test_single_w2_mfj():
     Wages: $85,000. Withheld: $12,000.
     Standard deduction (MFJ 2024): $29,200
     Taxable income: $55,800
-    Tax: 10% on $23,200 = $2,320 + 12% on $32,600 = $3,912 â†’ $6,232
+    Tax: 10% on $23,200 = $2,320 + 12% on $32,600 = $3,912 → $6,232
     Refund: $12,000 - $6,232 = $5,768
     """
     inputs = TaxReturnInput(
@@ -68,7 +68,7 @@ def test_single_filing():
     """Single filing, $50k wages.
 
     Standard deduction: $14,600. Taxable: $35,400.
-    Tax: 10% on $11,600 = $1,160 + 12% on $23,800 = $2,856 â†’ $4,016
+    Tax: 10% on $11,600 = $1,160 + 12% on $23,800 = $2,856 → $4,016
     """
     inputs = TaxReturnInput(
         tax_year=2024,
@@ -99,7 +99,7 @@ def test_with_capital_gains():
     """W-2 + crypto gain. Wages $85k + $700 net gain. MFJ.
 
     Gross: $85,700. Taxable: $56,500.
-    Tax: 10% on $23,200 = $2,320 + 12% on $33,300 = $3,996 â†’ $6,316
+    Tax: 10% on $23,200 = $2,320 + 12% on $33,300 = $3,996 → $6,316
     """
     inputs = TaxReturnInput(
         tax_year=2024,
@@ -225,7 +225,7 @@ def test_high_income_hits_multiple_brackets():
     """$300k income, single. Hits 6 brackets.
 
     Standard deduction: $14,600. Taxable: $285,400.
-    Total: $70,264.75 â†’ $70,265 (rounded)
+    Total: $70,264.75 → $70,265 (rounded)
     """
     inputs = TaxReturnInput(
         tax_year=2024,

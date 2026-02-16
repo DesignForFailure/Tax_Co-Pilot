@@ -202,3 +202,6 @@ class ReturnRun(BaseModel):
     state_outputs: list[StateReturnOutput] = Field(default_factory=list)
     trace: list[TraceNode] = Field(default_factory=list)
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat(timespec="seconds"))
+    created_at: str = Field(
+        default_factory=lambda: datetime.now(UTC).isoformat(timespec="seconds")
+    )

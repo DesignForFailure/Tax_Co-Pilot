@@ -1,0 +1,34 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Type checker and test caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Coverage outputs
+.coverage
+.coverage.*
+htmlcov/
+
+# Local database artifacts
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# Generated audit exports
+data/audit_exports/
+exports/audit/
+
+# OS/editor noise
+.DS_Store
+.idea/
+.vscode/

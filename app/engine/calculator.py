@@ -96,7 +96,7 @@ class CalculationEngine:
             trace=self.traces,
         )
 
-    # â”€â”€â”€ State execution â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ─── State execution ───────────────────────────────────────
 
     def _run_states(self) -> list[StateReturnOutput]:
         outs: list[StateReturnOutput] = []
@@ -153,7 +153,7 @@ class CalculationEngine:
 
         return outs
 
-    # â”€â”€â”€ Input normalization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ─── Input normalization ───────────────────────────────────
 
     def _resolve_inputs(self) -> None:
         self.resolved["input.w2.wages"] = self.inputs.total_wages()
@@ -162,7 +162,7 @@ class CalculationEngine:
         self.resolved["input.1099b.net_gain"] = self.inputs.total_capital_gains()
         self.resolved["input.withholding.federal"] = self.inputs.total_federal_withholding()
 
-    # â”€â”€â”€ Rule evaluation dispatch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ─── Rule evaluation dispatch ───────────────────────────────
 
     def _evaluate_rule(self, rule: dict[str, Any]) -> None:
         rule_type = rule.get("type")
@@ -207,7 +207,7 @@ class CalculationEngine:
 
         return _to_decimal(spec)
 
-    # â”€â”€â”€ Rule evaluators â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ─── Rule evaluators ───────────────────────────────────────
 
     def _eval_sum(self, rule: dict[str, Any]) -> None:
         rule_id = rule["id"]
@@ -351,7 +351,7 @@ class CalculationEngine:
             intermediates.append(
                 {
                     "bracket": f"{(rate * 100):g}%",
-                    "range": f"{_format_usd(lower)}â€“{_format_usd(upper) if upper is not None else 'âˆž'}",
+                    "range": f"{_format_usd(lower)}–{_format_usd(upper) if upper is not None else '∞'}",
                     "taxable_amount": str(taxable_in_bracket),
                     "tax": str(tax_in_bracket),
                 }
@@ -388,7 +388,7 @@ class CalculationEngine:
             )
         )
 
-    # â”€â”€â”€ Safe expression evaluation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ─── Safe expression evaluation ────────────────────────────
 
     def _safe_eval(self, expr: str, variables: dict[str, Decimal]) -> Decimal:
         """Evaluate a formula expression safely using recursive-descent parsing.
@@ -497,3 +497,4 @@ class CalculationEngine:
     def _explain_formula(self, expr: str, inputs: dict[str, Decimal], result: Decimal) -> str:
         parts = [f"{k}={_format_usd(v)}" for k, v in inputs.items()]
         return f"{expr} where {', '.join(parts)} â†’ {_format_usd(result)}"
+        return f"{expr} where {', '.join(parts)} → {_format_usd(result)}"
