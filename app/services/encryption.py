@@ -543,7 +543,7 @@ def _migrate_to_sqlcipher(
         raise ImportError("pysqlcipher3 required for SQLCipher migration") from e
 
     encrypted_path = db_path.with_suffix(".db.encrypted.tmp")
-    backup_path = db_path.with_suffix(backup_suffix)
+    backup_path = Path(f"{db_path}{backup_suffix}")
 
     try:
         # Open source database (unencrypted)
