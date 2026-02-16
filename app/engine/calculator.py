@@ -19,7 +19,7 @@ Future improvements:
 
 from __future__ import annotations
 
-from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP, ROUND_UP
+from decimal import ROUND_DOWN, ROUND_HALF_UP, ROUND_UP, Decimal
 from typing import Any
 
 from app.engine.rule_loader import RulePack, RulePackError
@@ -140,7 +140,9 @@ class CalculationEngine:
                                 "ga.2024.taxable_income", Decimal("0")
                             ),
                             state_tax=self.resolved.get("ga.2024.tax", Decimal("0")),
-                            state_withholding=self.resolved.get("ga.2024.withholding", Decimal("0")),
+                            state_withholding=self.resolved.get(
+                                "ga.2024.withholding", Decimal("0")
+                            ),
                             state_refund_or_owed=self.resolved.get(
                                 "ga.2024.refund_or_owed", Decimal("0")
                             ),

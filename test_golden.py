@@ -143,7 +143,9 @@ def test_zero_income():
                 role=TaxpayerRole.PRIMARY,
                 first_name="No",
                 last_name="Income",
-                w2s=[W2Data(employer_name="None", wages=Decimal("0"), federal_withheld=Decimal("0"))],
+                w2s=[
+                    W2Data(employer_name="None", wages=Decimal("0"), federal_withheld=Decimal("0"))
+                ],
             )
         ],
     )
@@ -163,7 +165,13 @@ def test_trace_contains_all_rules():
                 role=TaxpayerRole.PRIMARY,
                 first_name="Trace",
                 last_name="Test",
-                w2s=[W2Data(employer_name="Corp", wages=Decimal("100000"), federal_withheld=Decimal("15000"))],
+                w2s=[
+                    W2Data(
+                        employer_name="Corp",
+                        wages=Decimal("100000"),
+                        federal_withheld=Decimal("15000"),
+                    )
+                ],
             )
         ],
     )
@@ -196,7 +204,13 @@ def test_immutable_run_has_snapshot_and_metadata():
                 role=TaxpayerRole.PRIMARY,
                 first_name="Snap",
                 last_name="Shot",
-                w2s=[W2Data(employer_name="Corp", wages=Decimal("75000"), federal_withheld=Decimal("10000"))],
+                w2s=[
+                    W2Data(
+                        employer_name="Corp",
+                        wages=Decimal("75000"),
+                        federal_withheld=Decimal("10000"),
+                    )
+                ],
             )
         ],
     )
@@ -221,7 +235,13 @@ def test_high_income_hits_multiple_brackets():
                 role=TaxpayerRole.PRIMARY,
                 first_name="High",
                 last_name="Earner",
-                w2s=[W2Data(employer_name="BigCo", wages=Decimal("300000"), federal_withheld=Decimal("80000"))],
+                w2s=[
+                    W2Data(
+                        employer_name="BigCo",
+                        wages=Decimal("300000"),
+                        federal_withheld=Decimal("80000"),
+                    )
+                ],
             )
         ],
     )

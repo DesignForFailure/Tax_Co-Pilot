@@ -22,16 +22,19 @@ Future improvements:
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Iterator
+from typing import Any
 
 import yaml
 
 # Expression validation is intentionally simple:
 # - We do NOT execute expressions.
 # - We scan to ensure only allowed chars/functions/identifiers appear.
-_ALLOWED_EXPR_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_+-*/(),. ")
+_ALLOWED_EXPR_CHARS = set(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_+-*/(),. "
+)
 _ALLOWED_FUNCS = {"max", "min"}
 
 
@@ -218,6 +221,7 @@ def _toposort_rules(rules: dict[str, dict[str, Any]], deps: dict[str, set[str]])
 
 # â”€â”€â”€ Rule type validators â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+
 def _extract_identifiers(expr: str) -> set[str]:
     out: set[str] = set()
     buf: list[str] = []
@@ -318,7 +322,7 @@ class RulePack:
     rule_order: list[str]
 
     @classmethod
-    def load(cls, pack_dir: Path) -> "RulePack":
+    def load(cls, pack_dir: Path) -> RulePack:
         pack_dir = pack_dir.resolve()
         manifest_path = _resolve_pack_file(pack_dir, "manifest.yaml", "manifest")
         rules_path = _resolve_pack_file(pack_dir, "rules.yaml", "rules")

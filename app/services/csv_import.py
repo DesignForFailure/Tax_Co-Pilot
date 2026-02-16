@@ -77,10 +77,14 @@ def import_csv(csv_text: str, record_type: str):
                     W2Data(
                         employer_name=(row.get("employer_name") or "").strip(),
                         wages=_money(row.get("wages", "0"), allow_negative=False),
-                        federal_withheld=_money(row.get("federal_withheld", "0"), allow_negative=False),
+                        federal_withheld=_money(
+                            row.get("federal_withheld", "0"), allow_negative=False
+                        ),
                         state=(row.get("state") or "").strip(),
                         state_withheld=_money(row.get("state_withheld", "0"), allow_negative=False),
-                        state_wages=_money(row.get("state_wages", row.get("wages", "0")), allow_negative=False),
+                        state_wages=_money(
+                            row.get("state_wages", row.get("wages", "0")), allow_negative=False
+                        ),
                     )
                 )
             elif record_type in {"1099-B", "1099B"}:
