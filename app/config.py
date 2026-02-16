@@ -1,0 +1,67 @@
+"""Configuration management for Tax Copilot.
+
+Handles encryption settings, password sources, and feature flags.
+"""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from typing import Literal
+
+
+@dataclass
+class EncryptionConfig:
+    """Configuration for database encryption.
+
+    Attributes:
+        enabled: Whether encryption is enabled (default: False for MVP, True for production)
+        provider: Which encryption provider to use ('auto' tries SQLCipher then Python fallback)
+        password_source: Where to get the password from ('env' | 'keyring' | 'prompt')
+        key_derivation_iterations: PBKDF2 iterations for key derivation (100k minimum)
+        allow_unencrypted: Safety flag - if False, refuse to create unencrypted DBs
+    """
+
+    enabled: bool = False  # Start disabled, enable after full implementation
+    provider: Literal["sqlcipher", "python", "auto"] = "auto"
+    password_source: Literal["env", "keyring", "prompt", "auto"] = "auto"
+    key_derivation_iterations: int = 100_000
+    allow_unencrypted: bool = True  # Allow unencrypted during migration period
+
+    @classmethod
+    def from_environment(cls) -> EncryptionConfig:
+        """Load configuration from environment variables.
+
+        Environment variables:
+            TAX_COPILOT_ENCRYPTION_ENABLED: "true" or "false" (default: false)
+            TAX_COPILOT_ENCRYPTION_PROVIDER: "sqlcipher", "python", or "auto" (default: auto)
+            TAX_COPILOT_PASSWORD_SOURCE: "env", "keyring", "prompt", or "auto" (default: auto)
+            TAX_COPILOT_KEY_ITERATIONS: integer (default: 100000)
+        """
+        enabled = os.getenv("TAX_COPILOT_ENCRYPTION_ENABLED", "false").lower() == "true"
+        provider = os.getenv("TAX_COPILOT_ENCRYPTION_PROVIDER", "auto")
+        password_source = os.getenv("TAX_COPILOT_PASSWORD_SOURCE", "auto")
+        iterations = int(os.getenv("TAX_COPILOT_KEY_ITERATIONS", "100000"))
+
+        # Validate provider
+        if provider not in ("sqlcipher", "python", "auto"):
+            provider = "auto"
+
+        # Validate password_source
+        if password_source not in ("env", "keyring", "prompt", "auto"):
+            password_source = "auto"
+
+        # Enforce minimum iterations
+        if iterations < 100_000:
+            iterations = 100_000
+
+        return cls(
+            enabled=enabled,
+            provider=provider,  # type: ignore
+            password_source=password_source,  # type: ignore
+            key_derivation_iterations=iterations,
+        )
+
+
+# Global configuration instance
+config = EncryptionConfig.from_environment()

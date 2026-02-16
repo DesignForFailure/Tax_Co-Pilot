@@ -36,9 +36,10 @@ This project treats taxes as a **ledger + rules + calculations problem**, where:
 ### 1. Local-First & Privacy
 - Runs entirely on local hardware
 - No cloud dependency
-- Data is currently stored in local SQLite **without encryption at rest by default**
+- Data stored in local SQLite with **optional encryption at rest** (AES-256 via SQLCipher)
+- Password-protected database with secure key derivation (PBKDF2)
 - Explicit export and backup flows
-- Encryption-at-rest support is planned as future work
+- See [docs/ENCRYPTION.md](docs/ENCRYPTION.md) for encryption setup guide
 
 ### 2. Rules-as-Data
 - Federal and state tax logic lives in **versioned rule packs**

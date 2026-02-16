@@ -9,12 +9,13 @@ Security/QA notes:
 - Enables WAL and foreign_keys.
 - Sets a busy timeout to reduce "database is locked" errors.
 
-Storage security (current):
-- Uses standard SQLite and stores data unencrypted at rest by default.
+Storage security (with encryption):
+- Supports optional encryption-at-rest via SQLCipher (AES-256) or Python fallback.
+- Password-protected database with PBKDF2 key derivation.
+- Transparent encryption (no schema changes required for SQLCipher).
 
 Future improvements:
 - Add an index on (tax_year, created_at) if volume grows.
-- Add optional encryption-at-rest (SQLCipher) if device threat model requires it.
 - Add export/import tooling for backups.
 """
 
@@ -24,24 +25,120 @@ import json
 import sqlite3
 from pathlib import Path
 
+from app.config import config
+from app.services.encryption import (
+    DatabaseState,
+    detect_encryption_state,
+    get_encryption_provider,
+)
+
 DB_PATH = Path("data/tax_copilot.db")
 
+# Global password cache (set by main.py startup or unlock route)
+_cached_password: str | None = None
 
-def get_connection() -> sqlite3.Connection:
+
+def set_cached_password(password: str) -> None:
+    """Set the cached database password.
+
+    Called by main.py after user authentication.
+
+    Args:
+        password: Database encryption password
+    """
+    global _cached_password
+    _cached_password = password
+
+
+def get_cached_password() -> str | None:
+    """Get the cached database password.
+
+    Returns:
+        Cached password if set, None otherwise
+    """
+    return _cached_password
+
+
+def get_connection(password: str | None = None) -> sqlite3.Connection:
     """Open a SQLite connection with safe defaults.
+
+    Supports both encrypted and unencrypted databases. If database is encrypted,
+    password must be provided (either directly or via cached password).
 
     Notes:
     - `isolation_level=None` puts sqlite3 in autocommit mode.
       For this MVP (append-only inserts), that's fine and avoids partial commits.
     - If you later add multi-step transactions, switch to explicit BEGIN/COMMIT.
+
+    Args:
+        password: Optional encryption password. If None, uses cached password or
+                 creates unencrypted connection.
+
+    Returns:
+        sqlite3.Connection instance
+
+    Raises:
+        ValueError: If database is encrypted but no password provided
     """
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(DB_PATH), timeout=5.0, isolation_level=None)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    conn.execute("PRAGMA busy_timeout=5000")
-    return conn
+    # Use provided password or fall back to cached password
+    password = password or _cached_password
+
+    # Check if encryption is enabled and database state
+    if config.enabled:
+        db_state = detect_encryption_state(DB_PATH)
+
+        if db_state in (DatabaseState.ENCRYPTED_SQLCIPHER, DatabaseState.ENCRYPTED_PYTHON):
+            # Database is encrypted, password required
+            if not password:
+                raise ValueError(
+                    "Database is encrypted but no password provided. "
+                    "Please unlock the database first."
+                )
+
+            # Get encryption provider and create encrypted connection
+            provider = get_encryption_provider(
+                provider_type=config.provider, kdf_iterations=config.key_derivation_iterations
+            )
+            return provider.create_connection(DB_PATH, password, timeout=5.0)
+
+        elif db_state == DatabaseState.UNENCRYPTED:
+            # Database exists but is unencrypted
+            # For now, allow unencrypted connections (migration happens in main.py)
+            DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+            conn = sqlite3.connect(str(DB_PATH), timeout=5.0, isolation_level=None)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA foreign_keys=ON")
+            conn.execute("PRAGMA busy_timeout=5000")
+            return conn
+
+        else:  # DatabaseState.NONE
+            # New database - create encrypted if password provided
+            if password:
+                provider = get_encryption_provider(
+                    provider_type=config.provider,
+                    kdf_iterations=config.key_derivation_iterations,
+                )
+                return provider.create_connection(DB_PATH, password, timeout=5.0)
+            else:
+                # Create unencrypted database
+                DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+                conn = sqlite3.connect(str(DB_PATH), timeout=5.0, isolation_level=None)
+                conn.row_factory = sqlite3.Row
+                conn.execute("PRAGMA journal_mode=WAL")
+                conn.execute("PRAGMA foreign_keys=ON")
+                conn.execute("PRAGMA busy_timeout=5000")
+                return conn
+
+    else:
+        # Encryption disabled - use standard SQLite
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(str(DB_PATH), timeout=5.0, isolation_level=None)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.execute("PRAGMA busy_timeout=5000")
+        return conn
 
 
 def init_db() -> None:
