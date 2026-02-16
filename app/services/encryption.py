@@ -20,10 +20,15 @@ from abc import ABC, abstractmethod
 from datetime import UTC
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     pass
+
+
+def dict_factory(cursor: Any, row: tuple[Any, ...]) -> dict[str, Any]:
+    """Convert a database row into a dictionary keyed by column name."""
+    return {description[0]: row[idx] for idx, description in enumerate(cursor.description)}
 
 
 class DatabaseState(Enum):
@@ -291,7 +296,7 @@ class SQLCipherProvider(EncryptionProvider):
             conn.execute(f"PRAGMA kdf_iter = {self.kdf_iterations}")
 
             # Configure SQLite pragmas (matching unencrypted behavior)
-            conn.row_factory = sqlite3.Row
+            conn.row_factory = dict_factory
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA foreign_keys=ON")
             conn.execute("PRAGMA busy_timeout=5000")
