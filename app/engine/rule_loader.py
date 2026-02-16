@@ -216,7 +216,7 @@ def _toposort_rules(rules: dict[str, dict[str, Any]], deps: dict[str, set[str]])
     return order
 
 
-# â”€â”€â”€ Rule type validators â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── Rule type validators ─────────────────────────────────────
 
 def _extract_identifiers(expr: str) -> set[str]:
     out: set[str] = set()

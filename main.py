@@ -1,4 +1,4 @@
-"""Tax Copilot â€” FastAPI Application (MVP Vertical Slice).
+"""Tax Copilot — FastAPI Application (MVP Vertical Slice).
 
 Sections:
 - App setup + middleware: localhost hardening defaults.
@@ -39,13 +39,13 @@ from app.models.domain import (
 from app.services.database import init_db, save_return_run, get_return_run, list_return_runs
 
 
-# â”€â”€â”€ FastAPI app and basic hardening â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── FastAPI app and basic hardening ───────────────────────────
 # TrustedHostMiddleware mitigates DNS rebinding / Host header attacks.
 # Keep this locked to localhost unless you intentionally expose the service.
 app = FastAPI(title="Tax Copilot", version="0.1.0")
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
 
-# â”€â”€â”€ Security headers (defense-in-depth) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── Security headers (defense-in-depth) ───────────────────────
 # Even for localhost, these headers reduce the blast radius of common web attacks.
 # If you later serve over HTTPS or expose remotely, revisit CSP and add HSTS.
 

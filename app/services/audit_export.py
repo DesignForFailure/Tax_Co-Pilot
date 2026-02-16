@@ -51,7 +51,7 @@ def generate_audit_html(run: ReturnRun) -> str:
 <head>
   <meta charset=\"utf-8\" />
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
-  <title>Tax Copilot â€” Audit Report</title>
+  <title>Tax Copilot — Audit Report</title>
   <style>
     body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px; }}
     table {{ width: 100%; border-collapse: collapse; }}
@@ -60,7 +60,7 @@ def generate_audit_html(run: ReturnRun) -> str:
   </style>
 </head>
 <body>
-  <h1>Tax Copilot â€” Audit Report</h1>
+  <h1>Tax Copilot — Audit Report</h1>
   <p><strong>Tax year:</strong> {run.tax_year} &nbsp; <strong>Filing status:</strong> {esc(run.filing_status.value.upper())}</p>
   <p><strong>Taxpayers:</strong> {esc(tp_names)}</p>
   <p><strong>Gross income:</strong> {esc(f'{run.output.gross_income:,.0f}')} &nbsp; <strong>Federal tax:</strong> {esc(str(run.output.federal_tax))}</p>
