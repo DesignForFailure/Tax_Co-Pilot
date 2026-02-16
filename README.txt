@@ -24,6 +24,7 @@ No additional environment variables are required for the MVP.
 
 The app uses:
 - SQLite for local persistence (database file is created on first run)
+- Optional AES-256 encryption at rest via SQLCipher (see docs/ENCRYPTION.md)
 - YAML rule packs under:
   - rule_packs/federal/2024/
   - rule_packs/state/GA/2024/
@@ -54,9 +55,7 @@ Execute the test suite with:
 
 Notes
 -----
+- This project is licensed under the GNU AGPL v3. See the LICENSE file.
 - This project is local-first and intended to run on your own machine.
 - It is an engineering system for tax modeling and reproducible calculations,
   not legal or tax advice.
-- Outdated references to `ARCHITECTURE.md` and `Tax_Filing_System_Overview`
-  have been removed from current run/setup guidance because those files are
-  not present in this repository.

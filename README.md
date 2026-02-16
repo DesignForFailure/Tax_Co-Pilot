@@ -91,8 +91,6 @@ The initial MVP focuses on proving the architecture:
 
 ---
 
-## Tech Stack (Current)
-
 ## Project Status
 
 Tax_Co-Pilot is currently **MVP / alpha**.  
@@ -113,17 +111,17 @@ This project follows **Semantic Versioning (SemVer)**.
 - **Breaking changes:** Expected and may occur without long deprecation windows
 - **Production use:** Not recommended for production tax filing workflows yet
 
-## Tech Stack (Initial)
+## Tech Stack
 
-- **Language:** Python
+- **Language:** Python 3.11+
 - **Backend:** FastAPI
 - **ASGI Server:** Uvicorn
-- **Database:** SQLite
-- **Storage security (current):** plaintext SQLite database file on local disk
-- **Storage security (planned):** optional encryption-at-rest workflow (e.g., SQLCipher)
-- **UI:** Server-rendered HTML templates
+- **Database:** SQLite (with optional AES-256 encryption via SQLCipher)
+- **Encryption:** SQLCipher (primary) / Python Fernet (fallback); PBKDF2-HMAC-SHA256 key derivation
+- **UI:** Server-rendered HTML templates (Jinja2)
 - **Numeric Type:** Decimal
 - **Rule Packs:** YAML (versioned)
+- **CI:** GitHub Actions (ruff, mypy, pytest, pip-audit)
 
 ---
 
@@ -131,7 +129,15 @@ This project follows **Semantic Versioning (SemVer)**.
 
 ```text
 Tax_Co-Pilot/
+├── .editorconfig
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+├── .gitignore
+├── .pre-commit-config.yaml
 ├── app/
+│   ├── __init__.py
+│   ├── config.py
 │   ├── engine/
 │   │   ├── __init__.py
 │   │   ├── calculator.py
@@ -146,15 +152,14 @@ Tax_Co-Pilot/
 │   │   ├── csv_import.py
 │   │   ├── database.py
 │   │   └── encryption.py
-│   ├── templates/
-│   │   ├── layouts/
-│   │   │   └── base.html
-│   │   └── pages/
-│   │       ├── calculate.html
-│   │       ├── dashboard.html
-│   │       └── runs.html
-│   ├── __init__.py
-│   └── config.py
+│   └── templates/
+│       ├── layouts/
+│       │   └── base.html
+│       └── pages/
+│           ├── calculate.html
+│           ├── dashboard.html
+│           ├── runs.html
+│           └── unlock.html
 ├── docs/
 │   └── ENCRYPTION.md
 ├── rule_packs/
@@ -173,6 +178,14 @@ Tax_Co-Pilot/
 │   ├── test_encryption.py
 │   ├── test_golden.py
 │   └── test_golden2.py
+├── CHANGELOG.md
+├── CODE_OF_CONDUCT.md
+├── CONTRIBUTING.md
+├── LICENSE
+├── README.md
+├── README.txt
+├── ROADMAP.md
+├── SECURITY.md
 ├── main.py
 ├── pyproject.toml
 ├── requirements.txt

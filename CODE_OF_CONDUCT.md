@@ -15,6 +15,12 @@ We are committed to a respectful, inclusive, and harassment-free community for e
 - Personal insults, trolling, or sustained disruption.
 - Publishing private information without consent.
 
+## Reporting
+
+To report a conduct concern, email: **conduct@tax-copilot.local**
+
+Reports will be reviewed promptly and handled confidentially.
+
 ## Enforcement
 
 Project maintainers may moderate discussions, remove contributions, or restrict participation for behavior that violates this policy.
