@@ -28,15 +28,23 @@ The app uses:
   - rule_packs/federal/2024/
   - rule_packs/state/GA/2024/
 
-3) Run the Web App
-------------------
-Start the local server with Uvicorn:
+3) Run the Web App (Canonical)
+------------------------------
+Start the local server with the provided launcher script:
 
-    python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+    ./run.sh
 
-Then open:
+`run.sh` starts Uvicorn with ASGI import target:
+
+    main:app
+
+Expected local URL:
 
     http://127.0.0.1:8000
+
+(Direct alternative command, same ASGI target):
+
+    python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 
 4) Run Tests
 ------------
@@ -49,3 +57,6 @@ Notes
 - This project is local-first and intended to run on your own machine.
 - It is an engineering system for tax modeling and reproducible calculations,
   not legal or tax advice.
+- Outdated references to `ARCHITECTURE.md` and `Tax_Filing_System_Overview`
+  have been removed from current run/setup guidance because those files are
+  not present in this repository.

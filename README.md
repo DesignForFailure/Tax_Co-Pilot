@@ -89,41 +89,30 @@ The initial MVP focuses on proving the architecture:
 
 ---
 
-## Tech Stack (Initial)
+## Tech Stack (Current)
 
-- **Language:** Python (primary)
-- **Optional:** Rust for sandboxed calculation core
+- **Language:** Python
 - **Backend:** FastAPI
-- **Database:** SQLite (MVP), path to Postgres
-- **UI:** Local web UI (server-rendered or React)
+- **ASGI Server:** Uvicorn
+- **Database:** SQLite
+- **UI:** Server-rendered HTML templates
 - **Numeric Type:** Decimal
-- **Rule Packs:** JSON/YAML (versioned)
+- **Rule Packs:** YAML (versioned)
 
 ---
 
-## Repository Structure (Planned)
+## Actual Current Repository Structure
 
 ```text
-tax-copilot/
-├── main.py
-├── pyproject.toml
-├── requirements.txt
-├── test_golden.py
-├── test_golden2.py
-├── ARCHITECTURE.md
-├── Tax_Filing_System_Overview
+Tax_Co-Pilot/
 ├── app/
-│   ├── __init__.py
 │   ├── engine/
-│   │   ├── __init__.py
 │   │   ├── calculator.py
 │   │   ├── rule_loader.py
 │   │   └── whatif.py
 │   ├── models/
-│   │   ├── __init__.py
 │   │   └── domain.py
 │   ├── services/
-│   │   ├── __init__.py
 │   │   ├── audit_export.py
 │   │   ├── csv_import.py
 │   │   └── database.py
@@ -134,13 +123,54 @@ tax-copilot/
 │           ├── calculate.html
 │           ├── dashboard.html
 │           └── runs.html
+├── main.py
+├── requirements.txt
+├── requirements-dev.txt
+├── run.sh
+├── test_golden.py
+├── test_golden2.py
 └── rule_packs/
-    ├── federal/
-    │   └── 2024/
-    │       ├── manifest.yaml
-    │       └── rules.yaml
-    └── state/
-        └── GA/
-            └── 2024/
-                ├── manifest.yaml
-                └── rules.yaml
+    ├── federal/2024/
+    │   ├── federal_2024_manifest.yaml
+    │   └── federal_2024_rules.yaml
+    └── state/GA/2024/
+        ├── state_GA_2024_manifest.yaml
+        └── state_GA_2024_rules.yaml
+```
+
+---
+
+## Install
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+# Optional: dev tooling
+python -m pip install -r requirements-dev.txt
+```
+
+## Run (Canonical)
+
+Use the project launcher script:
+
+```bash
+./run.sh
+```
+
+The script starts Uvicorn with the ASGI import target `main:app`.
+
+Expected local URL:
+
+- <http://127.0.0.1:8000>
+
+## Run (Direct Uvicorn Alternative)
+
+```bash
+python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+## Test
+
+```bash
+pytest -q
+```
