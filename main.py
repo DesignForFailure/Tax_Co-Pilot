@@ -233,6 +233,13 @@ def calculate_submit(
             raise ValueError(f"{label} exceeds {_MAX_TEXT} characters")
 
     # W-2 amounts must be non-negative; wages/withholding are monetary values.
+    first_name = (p_first or "").strip()
+    last_name = (p_last or "").strip()
+    if not first_name:
+        raise ValueError("first name is required")
+    if not last_name:
+        raise ValueError("last name is required")
+
     w2 = W2Data(
         employer_name=(p_employer or "").strip(),
         wages=_parse_money(p_wages, allow_negative=False),
@@ -241,8 +248,8 @@ def calculate_submit(
 
     primary = Taxpayer(
         role=TaxpayerRole.PRIMARY,
-        first_name=(p_first or "").strip(),
-        last_name=(p_last or "").strip(),
+        first_name=first_name,
+        last_name=last_name,
         w2s=[w2],
     )
 
