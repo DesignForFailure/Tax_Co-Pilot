@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Database Encryption Guide
 
 Tax Co-Pilot supports optional encryption-at-rest for the SQLite database to protect your sensitive tax data.

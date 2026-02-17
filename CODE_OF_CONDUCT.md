@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Code of Conduct
 
 We are committed to a respectful, inclusive, and harassment-free community for everyone.
