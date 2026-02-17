@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Roadmap
 
 This roadmap reflects the near-term plan for evolving Tax_Co-Pilot from MVP/alpha toward a broader and more stable release.

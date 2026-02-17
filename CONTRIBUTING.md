@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Contributing to Tax_Co-Pilot
 
 Thanks for helping improve Tax_Co-Pilot. This project emphasizes deterministic behavior, transparency, and reproducibility.

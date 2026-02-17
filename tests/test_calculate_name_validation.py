@@ -14,6 +14,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""Tests for name field validation in the /calculate form submission."""
+
 from typing import Any
 
 from fastapi.testclient import TestClient

@@ -14,6 +14,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""Tests that source files are valid UTF-8 and free of mojibake encoding artifacts."""
+
 from pathlib import Path
 
 FILES_TO_CHECK = [
