@@ -24,6 +24,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Test for UTF-8 encoding integrity (`tests/test_encoding_guard.py`).
 
 ### Changed
+- Tightened AI agent governance docs (`AGENTS.md`, `.agent_tools/*`) with stricter MUST-level routing, formatting, append-only log protocol, and explicit validation reporting rules.
+- Added a README tree mapping rule so agents use the documented repository structure first and must update the tree when structure changes.
 - License changed from MIT to **GNU AGPL v3**; AGPL headers added to all source files.
 - Restructured tests from project root into `tests/` directory.
 - Moved `whatif.py` into `app/engine/`.
@@ -32,9 +34,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 - SQLCipher cursor compatibility via hybrid row factory supporting both index and key access.
-- Ruff UP035 typing import warnings in encryption service.
-- Mypy `no-any-return` error in security headers middleware.
-- Mypy type errors across `test_golden2.py`, `main.py`, and other modules.
+- SQLCipher backup-path handling in encryption service corrected to append suffix safely.
+- Ruff UP035 typing import warnings resolved in encryption service.
+- Mypy `no-any-return` error resolved in security headers middleware.
+- Additional MyPy type fixes across `app/main.py`, `tests/test_golden2.py`, and related modules.
 - UTF-8 encoding issues in calculation outputs.
 
 ## [0.1.0-alpha.1] - 2026-02-15
