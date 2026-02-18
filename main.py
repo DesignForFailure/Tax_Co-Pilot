@@ -481,6 +481,12 @@ def view_run(request: Request, run_id: str) -> HTMLResponse:
     return templates.TemplateResponse("pages/dashboard.html", {"request": request, "run": run})
 
 
+@app.get("/legal", response_class=HTMLResponse)
+def legal_notices(request: Request) -> HTMLResponse:
+    """Display third-party license and legal notices."""
+    return templates.TemplateResponse("pages/legal.html", {"request": request})
+
+
 @app.get("/unlock", response_class=HTMLResponse)
 def unlock_form(request: Request, error: str | None = None) -> HTMLResponse:
     """Show password unlock form for encrypted database."""

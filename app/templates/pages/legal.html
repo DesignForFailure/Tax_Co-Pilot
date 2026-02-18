@@ -1,0 +1,213 @@
+{% extends "layouts/base.html" %}
+{% block title %}Legal Notices{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>Legal Notices</h2>
+
+    <div class="mb-4">
+        <h3>Tax_Co-Pilot</h3>
+        <p class="text-sm text-dim">
+            Copyright &copy; 2026 Tax Co-Pilot Contributors.<br>
+            Licensed under the
+            <a href="https://www.gnu.org/licenses/agpl-3.0.html"
+               target="_blank" rel="noopener noreferrer">
+                GNU Affero General Public License v3.0
+            </a> or later.
+        </p>
+        <p class="text-sm text-dim">
+            Source code:
+            <a href="https://github.com/tax-co-pilot/Tax_Co-Pilot"
+               target="_blank" rel="noopener noreferrer">
+                github.com/tax-co-pilot/Tax_Co-Pilot
+            </a>
+        </p>
+    </div>
+
+    <hr style="border-color: var(--border); margin: 20px 0;">
+
+    <div class="mb-4">
+        <h3>Database Encryption — SQLCipher</h3>
+        <p class="text-sm text-dim">
+            This application uses
+            <a href="https://www.zetetic.net/sqlcipher/"
+               target="_blank" rel="noopener noreferrer">SQLCipher</a>
+            for AES-256 database encryption at rest.
+        </p>
+        <div style="background: var(--surface2); border: 1px solid var(--border);
+                    border-radius: 8px; padding: 14px; margin-top: 10px;
+                    font-size: 12px; color: var(--text-dim);
+                    white-space: pre-wrap; font-family: monospace;">
+Copyright (c) 2008-2024, ZETETIC LLC. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+3. Neither the name of the copyright holder nor the names of its contributors
+   may be used to endorse or promote products derived from this software
+   without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY ZETETIC LLC ''AS IS'' AND ANY EXPRESS OR IMPLIED
+WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
+EVENT SHALL ZETETIC LLC BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.</div>
+    </div>
+
+    <hr style="border-color: var(--border); margin: 20px 0;">
+
+    <div class="mb-4">
+        <h3>Cryptography &amp; OpenSSL</h3>
+        <p class="text-sm text-dim">
+            This application uses the
+            <a href="https://github.com/pyca/cryptography"
+               target="_blank" rel="noopener noreferrer">cryptography</a>
+            library (Apache-2.0 OR BSD-3-Clause) which includes
+            <a href="https://www.openssl.org/"
+               target="_blank" rel="noopener noreferrer">OpenSSL</a>
+            (Apache-2.0).
+        </p>
+        <p class="text-sm text-dim" style="margin-top: 6px;">
+            Copyright 1995-2024 The OpenSSL Project Authors. All Rights Reserved.
+        </p>
+    </div>
+
+    <hr style="border-color: var(--border); margin: 20px 0;">
+
+    <div class="mb-4">
+        <h3>Additional Third-Party Libraries</h3>
+        <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+            <thead>
+                <tr style="text-align: left; color: var(--text-dim); border-bottom: 1px solid var(--border);">
+                    <th style="padding: 8px 12px;">Library</th>
+                    <th style="padding: 8px 12px;">License</th>
+                    <th style="padding: 8px 12px;">Copyright</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 8px 12px;">FastAPI</td>
+                    <td style="padding: 8px 12px;">MIT</td>
+                    <td style="padding: 8px 12px;">&copy; 2018 Sebastian Ramirez</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 8px 12px;">Starlette</td>
+                    <td style="padding: 8px 12px;">BSD-3-Clause</td>
+                    <td style="padding: 8px 12px;">&copy; 2018 Encode OSS Ltd.</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 8px 12px;">Uvicorn</td>
+                    <td style="padding: 8px 12px;">BSD-3-Clause</td>
+                    <td style="padding: 8px 12px;">&copy; 2017 Encode OSS Ltd.</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 8px 12px;">Pydantic</td>
+                    <td style="padding: 8px 12px;">MIT</td>
+                    <td style="padding: 8px 12px;">&copy; 2017 Pydantic Services Inc.</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 8px 12px;">Jinja2</td>
+                    <td style="padding: 8px 12px;">BSD-3-Clause</td>
+                    <td style="padding: 8px 12px;">&copy; 2007 Pallets</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 8px 12px;">MarkupSafe</td>
+                    <td style="padding: 8px 12px;">BSD-3-Clause</td>
+                    <td style="padding: 8px 12px;">&copy; 2010 Pallets</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 8px 12px;">PyYAML</td>
+                    <td style="padding: 8px 12px;">MIT</td>
+                    <td style="padding: 8px 12px;">&copy; 2017 Ingy dot Net / &copy; 2006 Kirill Simonov</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 8px 12px;">python-multipart</td>
+                    <td style="padding: 8px 12px;">Apache-2.0</td>
+                    <td style="padding: 8px 12px;">&copy; 2012 Andrew Dunham</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 8px 12px;">pysqlcipher3</td>
+                    <td style="padding: 8px 12px;">zlib/libpng</td>
+                    <td style="padding: 8px 12px;">&copy; 2015 David Riggleman</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 8px 12px;">keyring</td>
+                    <td style="padding: 8px 12px;">MIT</td>
+                    <td style="padding: 8px 12px;">&copy; Jason R. Coombs</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 12px;">htmx</td>
+                    <td style="padding: 8px 12px;">0BSD</td>
+                    <td style="padding: 8px 12px;">&copy; Big Sky Software</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <hr style="border-color: var(--border); margin: 20px 0;">
+
+    <div class="mb-4">
+        <h3>Encryption Notice</h3>
+        <p class="text-sm text-dim">
+            This software includes cryptographic functionality and uses AES-256
+            encryption (via SQLCipher) and PBKDF2-HMAC-SHA256 key derivation.
+            The export, re-export, or transfer of this software may be restricted
+            by U.S. and international regulations. This software is publicly
+            available open-source software distributed under the TSU exception
+            (EAR &sect;740.13(e)). See
+            <a href="https://github.com/tax-co-pilot/Tax_Co-Pilot/blob/main/docs/EXPORT_CONTROL.md"
+               target="_blank" rel="noopener noreferrer">EXPORT_CONTROL.md</a>
+            for details.
+        </p>
+    </div>
+
+    <hr style="border-color: var(--border); margin: 20px 0;">
+
+    <div class="mb-4">
+        <h3>Disclaimer</h3>
+        <p class="text-sm text-dim">
+            <strong>THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+            KIND.</strong> Tax_Co-Pilot is an engineering tool for tax modeling
+            and calculation. It is <strong>not</strong> tax advice software and
+            does not constitute legal, financial, or tax advice.
+        </p>
+        <p class="text-sm text-dim" style="margin-top: 8px;">
+            <strong>DATA RESPONSIBILITY:</strong> This is a local-first
+            application. All tax data is stored exclusively on your device.
+            The developers and contributors are not responsible for any data
+            loss, corruption, or unauthorized access resulting from hardware
+            failure, software defects, user error, or any other cause.
+            <strong>You are solely responsible for maintaining backups of your
+            data and for the security of your device and encryption
+            passwords.</strong>
+        </p>
+        <p class="text-sm text-dim" style="margin-top: 8px;">
+            See the full
+            <a href="https://www.gnu.org/licenses/agpl-3.0.html"
+               target="_blank" rel="noopener noreferrer">
+                AGPL-3.0 license
+            </a>
+            sections 15 (Disclaimer of Warranty) and 16 (Limitation of
+            Liability) for the complete legal terms.
+        </p>
+    </div>
+
+    <hr style="border-color: var(--border); margin: 20px 0;">
+
+    <p class="text-sm text-dim">
+        Full attribution details are available in
+        <a href="https://github.com/tax-co-pilot/Tax_Co-Pilot/blob/main/docs/NOTICE.md"
+           target="_blank" rel="noopener noreferrer">docs/NOTICE.md</a>
+        in the project repository.
+    </p>
+</div>
+{% endblock %}

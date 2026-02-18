@@ -59,3 +59,16 @@ Notes
 - This project is local-first and intended to run on your own machine.
 - It is an engineering system for tax modeling and reproducible calculations,
   not legal or tax advice.
+
+Legal & Acknowledgments
+-----------------------
+Database encryption powered by SQLCipher (c) 2008-2024 Zetetic LLC (BSD-3-Clause).
+Cryptography library (Apache-2.0 OR BSD-3-Clause) with OpenSSL (Apache-2.0).
+All third-party licenses are permissive and AGPL-3.0-compatible.
+Full attribution details: docs/NOTICE.md
+Export control notice: docs/EXPORT_CONTROL.md
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+Tax_Co-Pilot is not tax advice software. All data is stored locally
+on your device. You are solely responsible for your data, backups,
+and encryption passwords.
