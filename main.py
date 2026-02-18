@@ -33,6 +33,7 @@ Future improvements:
 from __future__ import annotations
 
 import json
+import re
 import secrets
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -41,6 +42,7 @@ from typing import Any, cast
 from fastapi import FastAPI, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.datastructures import FormData
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import config as encryption_config
@@ -49,6 +51,8 @@ from app.engine.rule_loader import RulePack
 from app.models.domain import (
     FilingStatus,
     Form1099BData,
+    Form1099DIVData,
+    Form1099INTData,
     Taxpayer,
     TaxpayerRole,
     TaxReturnInput,
@@ -273,71 +277,180 @@ def calculate_form(request: Request) -> HTMLResponse:
     return resp
 
 
-@app.post("/calculate")
-def calculate_submit(
-    request: Request,
-    csrf_token: str = Form(""),
-    tax_year: int = Form(2024),
-    filing_status: str = Form("mfj"),
-    p_first: str = Form(""),
-    p_last: str = Form(""),
-    p_employer: str = Form(""),
-    p_wages: str = Form("0"),
-    p_withheld: str = Form("0"),
-    cg_desc: str = Form(""),
-    cg_proceeds: str = Form("0"),
-    cg_basis: str = Form("0"),
-) -> RedirectResponse:
-    _verify_csrf(request, csrf_token)
+# ─── Form parsing helpers ──────────────────────────────────────
 
-    # Bound string inputs to prevent oversized payloads (defense-in-depth).
-    _MAX_TEXT = 200
-    for label, val in [
-        ("first name", p_first),
-        ("last name", p_last),
-        ("employer", p_employer),
-        ("description", cg_desc),
-    ]:
-        if len(val or "") > _MAX_TEXT:
-            raise ValueError(f"{label} exceeds {_MAX_TEXT} characters")
+_MAX_TEXT = 200
+_MAX_INDEXED_ENTRIES = 50  # Cap on dynamic rows per section (defense-in-depth)
+_IDX_RE = re.compile(r"^(\w+?)_(\d+)_(\w+)$")
 
-    # W-2 amounts must be non-negative; wages/withholding are monetary values.
-    first_name = (p_first or "").strip()
-    last_name = (p_last or "").strip()
-    if not first_name:
-        raise ValueError("first name is required")
-    if not last_name:
-        raise ValueError("last name is required")
 
-    w2 = W2Data(
-        employer_name=(p_employer or "").strip(),
-        wages=_parse_money(p_wages, allow_negative=False),
-        federal_withheld=_parse_money(p_withheld, allow_negative=False),
-    )
+def _form_str(fd: FormData, key: str, default: str = "") -> str:
+    """Extract a trimmed string from form data, bounded to _MAX_TEXT."""
+    raw = str(fd.get(key, default) or default).strip()
+    if len(raw) > _MAX_TEXT:
+        raise ValueError(f"{key} exceeds {_MAX_TEXT} characters")
+    return raw
 
-    primary = Taxpayer(
-        role=TaxpayerRole.PRIMARY,
-        first_name=first_name,
-        last_name=last_name,
-        w2s=[w2],
-    )
 
-    # 1099-B proceeds/basis must be non-negative; (losses appear via proceeds < basis).
-    proceeds = _parse_money(cg_proceeds, allow_negative=False)
-    if proceeds > 0:
-        primary.form_1099_bs.append(
-            Form1099BData(
-                description=(cg_desc or "Capital gain").strip(),
-                proceeds=proceeds,
-                cost_basis=_parse_money(cg_basis, allow_negative=False),
+def _form_money(fd: FormData, key: str, default: str = "0") -> Decimal:
+    return _parse_money(str(fd.get(key, default) or default), allow_negative=False)
+
+
+def _collect_indices(fd: FormData, prefix: str) -> list[int]:
+    """Find all integer indices for keys matching ``{prefix}_{N}_*``."""
+    indices: set[int] = set()
+    prefix_under = prefix + "_"
+    for key in fd:
+        if key.startswith(prefix_under):
+            m = _IDX_RE.fullmatch(key)
+            if m and m.group(1) == prefix:
+                idx = int(m.group(2))
+                if idx < _MAX_INDEXED_ENTRIES:
+                    indices.add(idx)
+    return sorted(indices)
+
+
+def _parse_w2s(fd: FormData, prefix: str) -> list[W2Data]:
+    """Parse W-2 rows from indexed form fields like ``{prefix}_0_wages``."""
+    w2s: list[W2Data] = []
+    for idx in _collect_indices(fd, prefix):
+        p = f"{prefix}_{idx}"
+        wages = _form_money(fd, f"{p}_wages")
+        withheld = _form_money(fd, f"{p}_federal_withheld")
+        employer = _form_str(fd, f"{p}_employer")
+        # Skip rows with no data entered
+        if wages == 0 and withheld == 0 and not employer:
+            continue
+        w2s.append(
+            W2Data(
+                employer_name=employer,
+                wages=wages,
+                federal_withheld=withheld,
+                state=_form_str(fd, f"{p}_state").upper(),
+                state_wages=_form_money(fd, f"{p}_state_wages"),
+                state_withheld=_form_money(fd, f"{p}_state_withheld"),
             )
         )
+    return w2s
 
-    inputs = TaxReturnInput(
-        tax_year=tax_year,
-        filing_status=FilingStatus(filing_status),
-        taxpayers=[primary],
+
+def _parse_1099ints(fd: FormData, prefix: str) -> list[Form1099INTData]:
+    items: list[Form1099INTData] = []
+    for idx in _collect_indices(fd, prefix):
+        p = f"{prefix}_{idx}"
+        interest = _form_money(fd, f"{p}_interest")
+        payer = _form_str(fd, f"{p}_payer")
+        if interest == 0 and not payer:
+            continue
+        items.append(
+            Form1099INTData(
+                payer_name=payer,
+                interest_income=interest,
+                federal_withheld=_form_money(fd, f"{p}_federal_withheld"),
+            )
+        )
+    return items
+
+
+def _parse_1099divs(fd: FormData, prefix: str) -> list[Form1099DIVData]:
+    items: list[Form1099DIVData] = []
+    for idx in _collect_indices(fd, prefix):
+        p = f"{prefix}_{idx}"
+        ordinary = _form_money(fd, f"{p}_ordinary")
+        payer = _form_str(fd, f"{p}_payer")
+        if ordinary == 0 and not payer:
+            continue
+        items.append(
+            Form1099DIVData(
+                payer_name=payer,
+                ordinary_dividends=ordinary,
+                qualified_dividends=_form_money(fd, f"{p}_qualified"),
+                federal_withheld=_form_money(fd, f"{p}_federal_withheld"),
+            )
+        )
+    return items
+
+
+def _parse_1099bs(fd: FormData, prefix: str) -> list[Form1099BData]:
+    items: list[Form1099BData] = []
+    for idx in _collect_indices(fd, prefix):
+        p = f"{prefix}_{idx}"
+        proceeds = _form_money(fd, f"{p}_proceeds")
+        desc = _form_str(fd, f"{p}_desc")
+        if proceeds == 0 and not desc:
+            continue
+        items.append(
+            Form1099BData(
+                description=desc or "Capital gain",
+                proceeds=proceeds,
+                cost_basis=_form_money(fd, f"{p}_basis"),
+                is_long_term=str(fd.get(f"{p}_long_term", "")) == "1",
+                federal_withheld=_form_money(fd, f"{p}_federal_withheld"),
+            )
+        )
+    return items
+
+
+def _parse_taxpayer(fd: FormData, prefix: str, role: TaxpayerRole) -> Taxpayer:
+    """Build a Taxpayer from indexed form fields under a given prefix (``p`` or ``s``)."""
+    first_name = _form_str(fd, f"{prefix}_first")
+    last_name = _form_str(fd, f"{prefix}_last")
+
+    if role == TaxpayerRole.PRIMARY:
+        if not first_name:
+            raise ValueError("first name is required")
+        if not last_name:
+            raise ValueError("last name is required")
+
+    return Taxpayer(
+        role=role,
+        first_name=first_name,
+        last_name=last_name,
+        w2s=_parse_w2s(fd, f"{prefix}_w2"),
+        form_1099_ints=_parse_1099ints(fd, f"{prefix}_1099int"),
+        form_1099_divs=_parse_1099divs(fd, f"{prefix}_1099div"),
+        form_1099_bs=_parse_1099bs(fd, f"{prefix}_1099b"),
     )
+
+
+def _parse_tax_input_from_form(fd: FormData) -> TaxReturnInput:
+    """Convert raw multi-part form data into a validated ``TaxReturnInput``."""
+    tax_year = int(str(fd.get("tax_year", "2024") or "2024"))
+    filing_status = FilingStatus(str(fd.get("filing_status", "mfj") or "mfj"))
+
+    primary = _parse_taxpayer(fd, "p", TaxpayerRole.PRIMARY)
+    taxpayers: list[Taxpayer] = [primary]
+
+    # Spouse is only expected for MFJ/MFS
+    if filing_status in (FilingStatus.MFJ, FilingStatus.MFS):
+        s_first = _form_str(fd, "s_first")
+        s_last = _form_str(fd, "s_last")
+        # Only add spouse if they provided at least a name or income data
+        has_spouse_income = bool(
+            _collect_indices(fd, "s_w2")
+            or _collect_indices(fd, "s_1099int")
+            or _collect_indices(fd, "s_1099div")
+            or _collect_indices(fd, "s_1099b")
+        )
+        if s_first or s_last or has_spouse_income:
+            taxpayers.append(_parse_taxpayer(fd, "s", TaxpayerRole.SPOUSE))
+
+    return TaxReturnInput(
+        tax_year=tax_year,
+        filing_status=filing_status,
+        taxpayers=taxpayers,
+    )
+
+
+# ─── Calculate route ─────────────────────────────────────────────
+
+
+@app.post("/calculate")
+async def calculate_submit(request: Request) -> RedirectResponse:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+
+    inputs = _parse_tax_input_from_form(fd)
 
     run = CalculationEngine(rule_pack, inputs).run()
     run_dict = json.loads(run.model_dump_json())

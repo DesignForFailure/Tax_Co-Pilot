@@ -35,12 +35,9 @@ def _post_calculate(**overrides: Any) -> Response:
         "filing_status": "mfj",
         "p_first": "Jane",
         "p_last": "Doe",
-        "p_employer": "Acme",
-        "p_wages": "1000",
-        "p_withheld": "100",
-        "cg_desc": "",
-        "cg_proceeds": "0",
-        "cg_basis": "0",
+        "p_w2_0_employer": "Acme",
+        "p_w2_0_wages": "1000",
+        "p_w2_0_federal_withheld": "100",
     }
     form.update(overrides)
     return client.post("/calculate", data=form, follow_redirects=False)
