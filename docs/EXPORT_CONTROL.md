@@ -83,28 +83,6 @@ encryption at rest for privacy protection.
 This source code is publicly available at the URL above at no charge.
 ```
 
-## International Considerations
-
-Encryption regulations vary by jurisdiction. Users and contributors outside the
-United States should consult their local regulations regarding:
-
-- Import of encryption software
-- Use of encryption software
-- Re-export of encryption software
-
-Some jurisdictions that restrict encryption use or import include (non-exhaustive):
-China, Russia, Belarus, Iran, and others.
-
-## Sanctions Compliance
-
-This software must not be exported, re-exported, or transferred to:
-
-- Countries subject to comprehensive U.S. sanctions (currently: Cuba, Iran,
-  North Korea, Syria, and the Crimea, Donetsk, and Luhansk regions of Ukraine)
-- Persons or entities on the U.S. Treasury Department's Specially Designated
-  Nationals (SDN) list
-- Persons or entities on the U.S. Commerce Department's Entity List
-
 ## Disclaimer
 
 This notice is provided for informational purposes only and does not constitute
