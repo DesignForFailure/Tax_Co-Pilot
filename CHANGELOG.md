@@ -9,6 +9,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Added
+- Full third-party license audit and NOTICE file (`docs/NOTICE.md`) with copyright notices for all production dependencies.
+- Legal notices page in the web UI (`/legal` route, `app/templates/pages/legal.html`) with SQLCipher BSD-3-Clause attribution, dependency table, and disclaimers.
+- Footer attribution bar in `app/templates/layouts/base.html` with license, SQLCipher credit, and link to legal notices page.
+- Export control notice (`docs/EXPORT_CONTROL.md`) with ECCN classification, TSU exception details, and BIS notification template.
+- Data privacy and liability disclaimer (`docs/DISCLAIMER.md`) tailored for local-first tax software.
+- Legal & Acknowledgments section in `README.md` and `README.txt` crediting the encryption engine and key frameworks.
 - Established project-level release documentation with a formal changelog.
 - Added a public roadmap focused on federal completeness, state expansion, forms support, and security hardening.
 - Added an explicit alpha support policy and versioning approach in the README.

@@ -159,10 +159,14 @@ Tax_Co-Pilot/
 │       └── pages/
 │           ├── calculate.html
 │           ├── dashboard.html
+│           ├── legal.html
 │           ├── runs.html
 │           └── unlock.html
 ├── docs/
-│   └── ENCRYPTION.md
+│   ├── DISCLAIMER.md
+│   ├── ENCRYPTION.md
+│   ├── EXPORT_CONTROL.md
+│   └── NOTICE.md
 ├── rule_packs/
 │   ├── federal/2024/
 │   │   ├── federal_2024_manifest.yaml
@@ -230,3 +234,39 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```bash
 pytest -q
 ```
+
+---
+
+## Legal & Acknowledgments
+
+Tax_Co-Pilot is licensed under the **GNU Affero General Public License v3.0 or later** (AGPL-3.0-or-later). See [LICENSE](LICENSE) for the full text.
+
+### Encryption Engine
+
+Database encryption at rest is powered by **[SQLCipher](https://www.zetetic.net/sqlcipher/)** (AES-256), Copyright (c) 2008-2024 Zetetic LLC, licensed under the **BSD-3-Clause** license. SQLCipher is built on [SQLite](https://www.sqlite.org/), which is in the public domain.
+
+The Python **[cryptography](https://github.com/pyca/cryptography)** library provides Fernet fallback encryption and is licensed under **Apache-2.0 OR BSD-3-Clause**. It includes **[OpenSSL](https://www.openssl.org/)** (Apache-2.0).
+
+### Key Frameworks
+
+| Library         | License       | Use                        |
+|-----------------|---------------|----------------------------|
+| FastAPI         | MIT           | Web framework              |
+| Uvicorn         | BSD-3-Clause  | ASGI server                |
+| Pydantic        | MIT           | Data validation            |
+| Jinja2          | BSD-3-Clause  | Template engine            |
+| PyYAML          | MIT           | YAML rule pack parsing     |
+| python-multipart| Apache-2.0    | Form data parsing          |
+| pysqlcipher3    | zlib/libpng   | SQLCipher Python binding   |
+| keyring         | MIT           | OS credential storage      |
+| htmx            | 0BSD          | Frontend interactivity     |
+
+All third-party licenses are permissive and compatible with AGPL-3.0. Full attribution details are in [docs/NOTICE.md](docs/NOTICE.md).
+
+### Encryption & Export Control
+
+This software contains cryptographic functionality (AES-256 via SQLCipher, PBKDF2-HMAC-SHA256 key derivation). As publicly available open-source software, it is distributed under the TSU exception (EAR §740.13(e)). See [docs/EXPORT_CONTROL.md](docs/EXPORT_CONTROL.md) for details.
+
+### Disclaimer
+
+**This software is provided "as is", without warranty of any kind.** Tax_Co-Pilot is not tax advice software. All data is stored locally on your device. You are solely responsible for your data, backups, and encryption passwords. See the [AGPL-3.0 license](LICENSE) sections 15-16 for the full warranty disclaimer and liability limitation.
