@@ -58,8 +58,8 @@ This roadmap reflects the near-term plan for evolving Tax_Co-Pilot from MVP/alph
 
 ~~**Goal:** Transform the calculate form from a single-W2/single-1099-B hardcoded layout into a dynamic, multi-form interface that exposes the full breadth of the existing domain models.~~
 
--~~ Add dynamic add/remove W-2 rows (HTMX or vanilla JS) with all relevant fields: employer name, wages (Box 1), federal withheld (Box 2), state (Box 15), state wages (Box 16), state withheld (Box 17). Use indexed form field names (e.g. `p_w2[0].wages`, `p_w2[1].wages`).
-- Add 1099-INT input section with dynamic rows: payer name, interest income, federal withheld. Models already exist in `app/models/domain.py` (`Form1099INTData`).~~
+- ~~Add dynamic add/remove W-2 rows (HTMX or vanilla JS) with all relevant fields: employer name, wages (Box 1), federal withheld (Box 2), state (Box 15), state wages (Box 16), state withheld (Box 17). Use indexed form field names (e.g. `p_w2[0].wages`, `p_w2[1].wages`).~~
+- ~~Add 1099-INT input section with dynamic rows: payer name, interest income, federal withheld. Models already exist in `app/models/domain.py` (`Form1099INTData`).~~
 - ~~Add 1099-DIV input section with dynamic rows: payer name, ordinary dividends, qualified dividends, federal withheld. Models already exist in `app/models/domain.py` (`Form1099DIVData`).~~
 - ~~Expand the 1099-B section to support multiple entries with add/remove, and expose the `is_long_term` boolean as a checkbox (field exists in model but not in UI).~~
 - ~~Add a Spouse section that appears when filing status is MFJ or MFS. Spouse gets their own name fields and income form blocks (W-2s, 1099s). Backend constructs a second `Taxpayer` with `role=SPOUSE`.~~
