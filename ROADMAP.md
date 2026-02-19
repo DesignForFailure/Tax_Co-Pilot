@@ -54,17 +54,17 @@ This roadmap reflects the near-term plan for evolving Tax_Co-Pilot from MVP/alph
 
 ## Growth Milestones
 
-~~## 5) Full Income Form UI and Spouse Support
+## ~~5) Full Income Form UI and Spouse Support~~
 
-**Goal:** Transform the calculate form from a single-W2/single-1099-B hardcoded layout into a dynamic, multi-form interface that exposes the full breadth of the existing domain models.
+~~**Goal:** Transform the calculate form from a single-W2/single-1099-B hardcoded layout into a dynamic, multi-form interface that exposes the full breadth of the existing domain models.~~
 
-- Add dynamic add/remove W-2 rows (HTMX or vanilla JS) with all relevant fields: employer name, wages (Box 1), federal withheld (Box 2), state (Box 15), state wages (Box 16), state withheld (Box 17). Use indexed form field names (e.g. `p_w2[0].wages`, `p_w2[1].wages`).
-- Add 1099-INT input section with dynamic rows: payer name, interest income, federal withheld. Models already exist in `app/models/domain.py` (`Form1099INTData`).
-- Add 1099-DIV input section with dynamic rows: payer name, ordinary dividends, qualified dividends, federal withheld. Models already exist in `app/models/domain.py` (`Form1099DIVData`).
-- Expand the 1099-B section to support multiple entries with add/remove, and expose the `is_long_term` boolean as a checkbox (field exists in model but not in UI).
-- Add a Spouse section that appears when filing status is MFJ or MFS. Spouse gets their own name fields and income form blocks (W-2s, 1099s). Backend constructs a second `Taxpayer` with `role=SPOUSE`.
-- Add Head of Household (HOH) and Qualifying Surviving Spouse (QSS) to the filing status dropdown. The `FilingStatus` enum and standard deduction constants already include these; bracket tables need to be added to the federal rules YAML.
-- Refactor form parsing in `main.py` `calculate_submit` from flat `Form(...)` parameters to structured indexed parsing. Extract into a helper like `_parse_tax_input_from_form(form_data) -> TaxReturnInput`.~~
+-~~ Add dynamic add/remove W-2 rows (HTMX or vanilla JS) with all relevant fields: employer name, wages (Box 1), federal withheld (Box 2), state (Box 15), state wages (Box 16), state withheld (Box 17). Use indexed form field names (e.g. `p_w2[0].wages`, `p_w2[1].wages`).
+- Add 1099-INT input section with dynamic rows: payer name, interest income, federal withheld. Models already exist in `app/models/domain.py` (`Form1099INTData`).~~
+- ~~Add 1099-DIV input section with dynamic rows: payer name, ordinary dividends, qualified dividends, federal withheld. Models already exist in `app/models/domain.py` (`Form1099DIVData`).~~
+- ~~Expand the 1099-B section to support multiple entries with add/remove, and expose the `is_long_term` boolean as a checkbox (field exists in model but not in UI).~~
+- ~~Add a Spouse section that appears when filing status is MFJ or MFS. Spouse gets their own name fields and income form blocks (W-2s, 1099s). Backend constructs a second `Taxpayer` with `role=SPOUSE`.~~
+- ~~Add Head of Household (HOH) and Qualifying Surviving Spouse (QSS) to the filing status dropdown. The `FilingStatus` enum and standard deduction constants already include these; bracket tables need to be added to the federal rules YAML.~~
+- ~~Refactor form parsing in `main.py` `calculate_submit` from flat `Form(...)` parameters to structured indexed parsing. Extract into a helper like `_parse_tax_input_from_form(form_data) -> TaxReturnInput`.~~
 
 ## 6) Wire Existing Backend Features to UI
 
@@ -167,62 +167,62 @@ Below are copy-paste-ready prompts for AI coding agents to implement each milest
 
 ---
 
-~~### Prompt: Milestone 5 — Full Income Form UI and Spouse Support
+### ~~Prompt: Milestone 5 — Full Income Form UI and Spouse Support~~
 
 ```
-You are working on Tax_Co-Pilot, a FastAPI + Jinja2 local-first tax application.
+~~You are working on Tax_Co-Pilot, a FastAPI + Jinja2 local-first tax application.~~
 
-TASK: Overhaul the tax calculation input form to support all income types the
-backend already handles, and add spouse support.
+~~TASK: Overhaul the tax calculation input form to support all income types the
+backend already handles, and add spouse support.~~
 
-CURRENT STATE:
-- The calculate form at `app/templates/pages/calculate.html` only captures a
+~~CURRENT STATE:~~
+- ~~The calculate form at `app/templates/pages/calculate.html` only captures a
   single W-2 (employer, wages, withheld) and a single 1099-B (description,
-  proceeds, basis).
-- The domain models in `app/models/domain.py` already support: multiple W-2s
+  proceeds, basis).~~
+- ~~The domain models in `app/models/domain.py` already support: multiple W-2s
   (with state fields Box 15-17), Form1099INTData, Form1099DIVData, multiple
-  Form1099BData (with is_long_term), and a Taxpayer model with spouse role.
-- The form parser in `main.py` `calculate_submit` (line ~276) uses flat
-  Form(...) parameters for a single W-2 and single 1099-B.
+  Form1099BData (with is_long_term), and a Taxpayer model with spouse role.~~
+- ~~The form parser in `main.py` `calculate_submit` (line ~276) uses flat
+  Form(...) parameters for a single W-2 and single 1099-B.~~
 
-WHAT TO BUILD:
+~~WHAT TO BUILD:~~
 
-1. In `app/templates/pages/calculate.html`:
-   - Add dynamic add/remove rows for W-2s using vanilla JS or HTMX. Each W-2
+1. ~~In `app/templates/pages/calculate.html`:~~
+   - ~~Add dynamic add/remove rows for W-2s using vanilla JS or HTMX. Each W-2
      row needs: employer_name, wages, federal_withheld, state, state_wages,
-     state_withheld. Use indexed names like `p_w2_0_wages`, `p_w2_1_wages`.
-   - Add a 1099-INT section with dynamic rows: payer_name, interest_income,
-     federal_withheld.
-   - Add a 1099-DIV section with dynamic rows: payer_name, ordinary_dividends,
-     qualified_dividends, federal_withheld.
-   - Make 1099-B support multiple entries with add/remove and an is_long_term
-     checkbox.
-   - Add a Spouse section that shows/hides based on filing status (MFJ/MFS).
-     Spouse gets the same income form blocks as primary.
-   - Add "hoh" (Head of Household) and "qss" (Qualifying Surviving Spouse) to
-     the filing status <select>.
+     state_withheld. Use indexed names like `p_w2_0_wages`, `p_w2_1_wages`.~~
+   - ~~Add a 1099-INT section with dynamic rows: payer_name, interest_income,
+     federal_withheld.~~
+   - ~~Add a 1099-DIV section with dynamic rows: payer_name, ordinary_dividends,
+     qualified_dividends, federal_withheld.~~
+   - ~~Make 1099-B support multiple entries with add/remove and an is_long_term
+     checkbox.~~
+   - ~~Add a Spouse section that shows/hides based on filing status (MFJ/MFS).
+     Spouse gets the same income form blocks as primary.~~
+   - ~~Add "hoh" (Head of Household) and "qss" (Qualifying Surviving Spouse) to
+     the filing status <select>.~~
 
-2. In `main.py` `calculate_submit`:
-   - Replace flat Form(...) params with parsing `await request.form()` to
-     extract indexed fields into lists of domain model objects.
-   - Extract this logic into a helper: `_parse_tax_input_from_form(form_data)
-     -> TaxReturnInput`.
-   - Build the Taxpayer list with primary + optional spouse, each with their
-     own W-2, 1099-INT, 1099-DIV, and 1099-B lists.
+~~2. In `main.py` `calculate_submit`:~~
+   - ~~Replace flat Form(...) params with parsing `await request.form()` to
+     extract indexed fields into lists of domain model objects.~~
+   - ~~Extract this logic into a helper: `_parse_tax_input_from_form(form_data)
+     -> TaxReturnInput`.~~
+   - ~~Build the Taxpayer list with primary + optional spouse, each with their
+     own W-2, 1099-INT, 1099-DIV, and 1099-B lists.~~
 
-3. In `rule_packs/federal/2024/federal_2024_rules.yaml`:
-   - Add HOH and QSS bracket tables under `fed.2024.tax.brackets.tables`
+~~3. In `rule_packs/federal/2024/federal_2024_rules.yaml`:~~
+   - ~~Add HOH and QSS bracket tables under `fed.2024.tax.brackets.tables`
      (currently only single, mfj, mfs exist). Use 2024 IRS bracket thresholds
-     for HOH and QSS.
+     for HOH and QSS.~~
 
-ACCEPTANCE CRITERIA:
-- A user can add multiple W-2s with state fields and remove them dynamically.
-- A user can add 1099-INT, 1099-DIV, and multiple 1099-B entries.
-- Selecting MFJ or MFS reveals a spouse section with its own income forms.
-- HOH and QSS are selectable filing statuses and produce correct calculations.
-- All existing tests continue to pass.
-- The form gracefully handles the case of zero income entries (empty form).
-```~~~
+~~ACCEPTANCE CRITERIA:~~
+- ~~A user can add multiple W-2s with state fields and remove them dynamically.~~
+- ~~A user can add 1099-INT, 1099-DIV, and multiple 1099-B entries.~~
+- ~~Selecting MFJ or MFS reveals a spouse section with its own income forms.~~
+- ~~HOH and QSS are selectable filing statuses and produce correct calculations.~~
+- ~~All existing tests continue to pass.~~
+- ~~The form gracefully handles the case of zero income entries (empty form).~~
+```
 
 ---
 
