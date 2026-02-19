@@ -54,7 +54,7 @@ This roadmap reflects the near-term plan for evolving Tax_Co-Pilot from MVP/alph
 
 ## Growth Milestones
 
-## 5) Full Income Form UI and Spouse Support
+~~## 5) Full Income Form UI and Spouse Support
 
 **Goal:** Transform the calculate form from a single-W2/single-1099-B hardcoded layout into a dynamic, multi-form interface that exposes the full breadth of the existing domain models.
 
@@ -64,7 +64,7 @@ This roadmap reflects the near-term plan for evolving Tax_Co-Pilot from MVP/alph
 - Expand the 1099-B section to support multiple entries with add/remove, and expose the `is_long_term` boolean as a checkbox (field exists in model but not in UI).
 - Add a Spouse section that appears when filing status is MFJ or MFS. Spouse gets their own name fields and income form blocks (W-2s, 1099s). Backend constructs a second `Taxpayer` with `role=SPOUSE`.
 - Add Head of Household (HOH) and Qualifying Surviving Spouse (QSS) to the filing status dropdown. The `FilingStatus` enum and standard deduction constants already include these; bracket tables need to be added to the federal rules YAML.
-- Refactor form parsing in `main.py` `calculate_submit` from flat `Form(...)` parameters to structured indexed parsing. Extract into a helper like `_parse_tax_input_from_form(form_data) -> TaxReturnInput`.
+- Refactor form parsing in `main.py` `calculate_submit` from flat `Form(...)` parameters to structured indexed parsing. Extract into a helper like `_parse_tax_input_from_form(form_data) -> TaxReturnInput`.~~
 
 ## 6) Wire Existing Backend Features to UI
 
@@ -167,7 +167,7 @@ Below are copy-paste-ready prompts for AI coding agents to implement each milest
 
 ---
 
-### Prompt: Milestone 5 — Full Income Form UI and Spouse Support
+~~### Prompt: Milestone 5 — Full Income Form UI and Spouse Support
 
 ```
 You are working on Tax_Co-Pilot, a FastAPI + Jinja2 local-first tax application.
@@ -222,7 +222,7 @@ ACCEPTANCE CRITERIA:
 - HOH and QSS are selectable filing statuses and produce correct calculations.
 - All existing tests continue to pass.
 - The form gracefully handles the case of zero income entries (empty form).
-```
+```~~~
 
 ---
 
