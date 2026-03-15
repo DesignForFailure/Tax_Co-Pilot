@@ -235,3 +235,14 @@ def get_return_run(run_id: str) -> dict | None:
     row = conn.execute("SELECT * FROM return_runs WHERE id = ?", (run_id,)).fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def delete_return_run(run_id: str) -> None:
+    """Delete a single run by id.
+
+    Security:
+    - Uses parameterized query (prevents SQL injection).
+    """
+    conn = get_connection()
+    conn.execute("DELETE FROM return_runs WHERE id = ?", (run_id,))
+    conn.close()

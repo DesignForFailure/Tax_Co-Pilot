@@ -1,0 +1,87 @@
+{% extends "layouts/base.html" %}
+{% block title %}Import CSV{% endblock %}
+{% block content %}
+
+<h1 style="font-size: 24px; margin-bottom: 8px;">Import CSV</h1>
+<p class="text-dim text-sm mb-4">Paste CSV data below to import income records. Select the record type that matches your CSV columns.</p>
+
+<form method="POST" action="/import-csv">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <div class="card">
+        <h2>CSV Import</h2>
+        <div class="form-row">
+            <div>
+                <label>Record Type</label>
+                <select name="record_type">
+                    <option value="W2" {% if record_type == "W2" %}selected{% endif %}>W-2</option>
+                    <option value="1099-B" {% if record_type == "1099-B" %}selected{% endif %}>1099-B (Capital Gains)</option>
+                    <option value="1099-INT" {% if record_type == "1099-INT" %}selected{% endif %}>1099-INT (Interest)</option>
+                    <option value="1099-DIV" {% if record_type == "1099-DIV" %}selected{% endif %}>1099-DIV (Dividends)</option>
+                </select>
+            </div>
+        </div>
+
+        <div>
+            <label>CSV Data</label>
+            <p class="text-dim text-sm" style="margin-bottom: 6px;">
+                W-2 columns: <code>employer_name,wages,federal_withheld,state,state_wages,state_withheld</code><br>
+                1099-B columns: <code>description,proceeds,cost_basis,is_long_term</code><br>
+                1099-INT columns: <code>payer_name,interest_income,federal_withheld</code><br>
+                1099-DIV columns: <code>payer_name,ordinary_dividends,qualified_dividends,federal_withheld</code>
+            </p>
+            <textarea name="csv_text" rows="10" style="width:100%;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:monospace;font-size:13px;resize:vertical;" placeholder="employer_name,wages,federal_withheld&#10;Acme Corp,85000,12000">{{ csv_text if csv_text is defined else "" }}</textarea>
+        </div>
+
+        <div style="margin-top: 14px;">
+            <button type="submit" class="btn">Import</button>
+        </div>
+    </div>
+</form>
+
+{# ─── Errors ──────────────────────────────────────────────── #}
+{% if errors is defined and errors %}
+<div class="card" style="border-color: var(--red); margin-top: 20px;">
+    <h2 style="color: var(--red);">Parse Errors</h2>
+    <ul style="margin-top: 10px; padding-left: 20px;">
+    {% for err in errors %}
+        <li style="color: var(--red); font-size: 13px; margin-bottom: 4px;">{{ err }}</li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{# ─── Results ─────────────────────────────────────────────── #}
+{% if records is defined and records %}
+<div class="card" style="margin-top: 20px;">
+    <h2>Imported Records ({{ records|length }})</h2>
+    <p class="text-dim text-sm" style="margin-bottom: 12px;">
+        Records parsed successfully. <a href="/calculate">Go to Calculate</a> to run a full tax return.
+    </p>
+    <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+                <tr>
+                {% for key in records[0].keys() %}
+                    <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);color:var(--text-dim);">{{ key }}</th>
+                {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+            {% for rec in records %}
+                <tr>
+                {% for val in rec.values() %}
+                    <td style="padding:8px;border-bottom:1px solid var(--border);">{{ val }}</td>
+                {% endfor %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% elif records is defined and not records and not errors %}
+<div class="card" style="margin-top: 20px;">
+    <p class="text-dim">No records found. Check that your CSV has a header row and at least one data row.</p>
+</div>
+{% endif %}
+
+{% endblock %}

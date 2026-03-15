@@ -159,9 +159,12 @@ Tax_Co-Pilot/
 │       └── pages/
 │           ├── calculate.html
 │           ├── dashboard.html
+│           ├── import_csv.html
 │           ├── legal.html
+│           ├── run_compare.html
 │           ├── runs.html
-│           └── unlock.html
+│           ├── unlock.html
+│           └── whatif.html
 ├── docs/
 │   ├── DISCLAIMER.md
 │   ├── ENCRYPTION.md
@@ -182,7 +185,8 @@ Tax_Co-Pilot/
 │   ├── test_encrypted_database.py
 │   ├── test_encryption.py
 │   ├── test_golden.py
-│   └── test_golden2.py
+│   ├── test_golden2.py
+│   └── test_milestone6_routes.py
 ├── CHANGELOG.md
 ├── CODE_OF_CONDUCT.md
 ├── CONTRIBUTING.md

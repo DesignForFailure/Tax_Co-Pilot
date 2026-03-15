@@ -1,0 +1,225 @@
+{% extends "layouts/base.html" %}
+{% block title %}What-If Comparison{% endblock %}
+{% block content %}
+
+<h1 style="font-size: 24px; margin-bottom: 8px;">What-If: MFJ vs MFS</h1>
+<p class="text-dim text-sm mb-4">Enter your household tax data below. The engine will automatically compare
+    Married Filing Jointly (MFJ) and Married Filing Separately (MFS) and show you the savings.</p>
+
+<form method="POST" action="/whatif">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <input type="hidden" name="tax_year" value="2024">
+    {# Filing status is fixed to mfj for the form — engine overrides it internally #}
+    <input type="hidden" name="filing_status" value="mfj">
+
+    {# ─── Primary Taxpayer ───────────────────────────────────── #}
+    <div class="card">
+        <h2>Primary Taxpayer</h2>
+        <div class="form-row">
+            <div><label>First Name</label><input type="text" name="p_first" required></div>
+            <div><label>Last Name</label><input type="text" name="p_last" required></div>
+        </div>
+
+        <div class="section-header">
+            <h3>W-2 Forms</h3>
+            <button type="button" class="btn btn-sm btn-outline" onclick="addRow('p_w2')">+ Add W-2</button>
+        </div>
+        <div id="p_w2_container" class="dynamic-section">
+            <div class="dynamic-row" data-section="p_w2" data-index="0">
+                <button type="button" class="remove-btn" onclick="removeRow(this)">Remove</button>
+                <div><label>Employer</label><input type="text" name="p_w2_0_employer" placeholder="Employer name"></div>
+                <div class="form-row">
+                    <div><label>Wages (Box 1)</label><input type="text" name="p_w2_0_wages" placeholder="85000"></div>
+                    <div><label>Federal Withheld (Box 2)</label><input type="text" name="p_w2_0_federal_withheld" placeholder="12000"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-header">
+            <h3>1099-INT (Interest)</h3>
+            <button type="button" class="btn btn-sm btn-outline" onclick="addRow('p_1099int')">+ Add 1099-INT</button>
+        </div>
+        <div id="p_1099int_container" class="dynamic-section"></div>
+
+        <div class="section-header">
+            <h3>1099-DIV (Dividends)</h3>
+            <button type="button" class="btn btn-sm btn-outline" onclick="addRow('p_1099div')">+ Add 1099-DIV</button>
+        </div>
+        <div id="p_1099div_container" class="dynamic-section"></div>
+
+        <div class="section-header">
+            <h3>1099-B (Capital Gains)</h3>
+            <button type="button" class="btn btn-sm btn-outline" onclick="addRow('p_1099b')">+ Add 1099-B</button>
+        </div>
+        <div id="p_1099b_container" class="dynamic-section"></div>
+    </div>
+
+    {# ─── Spouse Taxpayer ────────────────────────────────────── #}
+    <div class="card">
+        <h2>Spouse</h2>
+        <div class="form-row">
+            <div><label>First Name</label><input type="text" name="s_first"></div>
+            <div><label>Last Name</label><input type="text" name="s_last"></div>
+        </div>
+
+        <div class="section-header">
+            <h3>W-2 Forms</h3>
+            <button type="button" class="btn btn-sm btn-outline" onclick="addRow('s_w2')">+ Add W-2</button>
+        </div>
+        <div id="s_w2_container" class="dynamic-section"></div>
+
+        <div class="section-header">
+            <h3>1099-INT (Interest)</h3>
+            <button type="button" class="btn btn-sm btn-outline" onclick="addRow('s_1099int')">+ Add 1099-INT</button>
+        </div>
+        <div id="s_1099int_container" class="dynamic-section"></div>
+
+        <div class="section-header">
+            <h3>1099-DIV (Dividends)</h3>
+            <button type="button" class="btn btn-sm btn-outline" onclick="addRow('s_1099div')">+ Add 1099-DIV</button>
+        </div>
+        <div id="s_1099div_container" class="dynamic-section"></div>
+
+        <div class="section-header">
+            <h3>1099-B (Capital Gains)</h3>
+            <button type="button" class="btn btn-sm btn-outline" onclick="addRow('s_1099b')">+ Add 1099-B</button>
+        </div>
+        <div id="s_1099b_container" class="dynamic-section"></div>
+    </div>
+
+    <button class="btn" type="submit">Compare MFJ vs MFS</button>
+</form>
+
+{# ─── Results ─────────────────────────────────────────────── #}
+{% if comparison %}
+<div style="margin-top: 32px;">
+    <h2 style="font-size: 20px; margin-bottom: 16px;">Comparison Results</h2>
+
+    <div class="summary-grid">
+        <div class="summary-item">
+            <div class="label">MFJ — Federal Tax</div>
+            <div class="value">${{ "{:,.0f}".format(comparison.scenario_a.total_tax) }}</div>
+        </div>
+        <div class="summary-item">
+            <div class="label">MFJ — Refund / Owed</div>
+            <div class="value {% if comparison.scenario_a.refund_or_owed >= 0 %}positive{% else %}negative{% endif %}">
+                {% if comparison.scenario_a.refund_or_owed >= 0 %}
+                    +${{ "{:,.0f}".format(comparison.scenario_a.refund_or_owed) }}
+                {% else %}
+                    -${{ "{:,.0f}".format(comparison.scenario_a.refund_or_owed|abs) }}
+                {% endif %}
+            </div>
+        </div>
+        <div class="summary-item">
+            <div class="label">MFS — Federal Tax</div>
+            <div class="value">${{ "{:,.0f}".format(comparison.scenario_b.total_tax) }}</div>
+        </div>
+        <div class="summary-item">
+            <div class="label">MFS — Refund / Owed</div>
+            <div class="value {% if comparison.scenario_b.refund_or_owed >= 0 %}positive{% else %}negative{% endif %}">
+                {% if comparison.scenario_b.refund_or_owed >= 0 %}
+                    +${{ "{:,.0f}".format(comparison.scenario_b.refund_or_owed) }}
+                {% else %}
+                    -${{ "{:,.0f}".format(comparison.scenario_b.refund_or_owed|abs) }}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Diffs</h2>
+        <table style="width:100%;border-collapse:collapse;">
+            <thead>
+                <tr>
+                    <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Metric</th>
+                    <th style="text-align:right;padding:8px;border-bottom:1px solid var(--border);">MFJ</th>
+                    <th style="text-align:right;padding:8px;border-bottom:1px solid var(--border);">MFS</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for d in comparison.diffs %}
+                <tr>
+                    <td style="padding:8px;border-bottom:1px solid var(--border);">{{ d.metric }}</td>
+                    <td style="padding:8px;border-bottom:1px solid var(--border);text-align:right;">${{ "{:,.0f}".format(d.mfj|float) }}</td>
+                    <td style="padding:8px;border-bottom:1px solid var(--border);text-align:right;">${{ "{:,.0f}".format(d.mfs|float) }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card" style="border-color: var(--accent);">
+        <h2>Recommendation: <span style="color: var(--accent);">{{ comparison.recommendation.upper() }}</span></h2>
+        <p style="margin-top: 8px;">
+            Filing as <strong>{{ comparison.recommendation.upper() }}</strong> saves
+            <strong style="color: var(--green);">${{ "{:,.0f}".format(comparison.savings) }}</strong>
+            in federal tax compared to the other option.
+        </p>
+    </div>
+</div>
+{% endif %}
+
+<script>
+var counters = {
+    p_w2: 1, p_1099int: 0, p_1099div: 0, p_1099b: 0,
+    s_w2: 0, s_1099int: 0, s_1099div: 0, s_1099b: 0
+};
+
+function getTemplate(section, idx) {
+    var prefix = section + '_' + idx;
+    if (section.endsWith('_w2')) {
+        return '<div class="dynamic-row" data-section="' + section + '" data-index="' + idx + '">'
+            + '<button type="button" class="remove-btn" onclick="removeRow(this)">Remove</button>'
+            + '<div><label>Employer</label><input type="text" name="' + prefix + '_employer" placeholder="Employer name"></div>'
+            + '<div class="form-row">'
+            + '<div><label>Wages (Box 1)</label><input type="text" name="' + prefix + '_wages" placeholder="85000"></div>'
+            + '<div><label>Federal Withheld (Box 2)</label><input type="text" name="' + prefix + '_federal_withheld" placeholder="12000"></div>'
+            + '</div></div>';
+    }
+    if (section.endsWith('_1099int')) {
+        return '<div class="dynamic-row" data-section="' + section + '" data-index="' + idx + '">'
+            + '<button type="button" class="remove-btn" onclick="removeRow(this)">Remove</button>'
+            + '<div><label>Payer Name</label><input type="text" name="' + prefix + '_payer" placeholder="Bank name"></div>'
+            + '<div class="form-row">'
+            + '<div><label>Interest Income (Box 1)</label><input type="text" name="' + prefix + '_interest" placeholder="500"></div>'
+            + '<div><label>Federal Withheld</label><input type="text" name="' + prefix + '_federal_withheld" placeholder="0"></div>'
+            + '</div></div>';
+    }
+    if (section.endsWith('_1099div')) {
+        return '<div class="dynamic-row" data-section="' + section + '" data-index="' + idx + '">'
+            + '<button type="button" class="remove-btn" onclick="removeRow(this)">Remove</button>'
+            + '<div><label>Payer Name</label><input type="text" name="' + prefix + '_payer" placeholder="Brokerage name"></div>'
+            + '<div class="form-row-3">'
+            + '<div><label>Ordinary Dividends (Box 1a)</label><input type="text" name="' + prefix + '_ordinary" placeholder="1000"></div>'
+            + '<div><label>Qualified Dividends (Box 1b)</label><input type="text" name="' + prefix + '_qualified" placeholder="800"></div>'
+            + '<div><label>Federal Withheld</label><input type="text" name="' + prefix + '_federal_withheld" placeholder="0"></div>'
+            + '</div></div>';
+    }
+    if (section.endsWith('_1099b')) {
+        return '<div class="dynamic-row" data-section="' + section + '" data-index="' + idx + '">'
+            + '<button type="button" class="remove-btn" onclick="removeRow(this)">Remove</button>'
+            + '<div><label>Description</label><input type="text" name="' + prefix + '_desc" placeholder="AAPL sale"></div>'
+            + '<div class="form-row">'
+            + '<div><label>Proceeds</label><input type="text" name="' + prefix + '_proceeds" placeholder="900"></div>'
+            + '<div><label>Cost Basis</label><input type="text" name="' + prefix + '_basis" placeholder="200"></div>'
+            + '</div></div>';
+    }
+    return '';
+}
+
+function addRow(section) {
+    var idx = counters[section];
+    counters[section] = idx + 1;
+    var container = document.getElementById(section + '_container');
+    var div = document.createElement('div');
+    div.innerHTML = getTemplate(section, idx);
+    container.appendChild(div.firstChild);
+}
+
+function removeRow(btn) {
+    var row = btn.parentElement;
+    row.parentElement.removeChild(row);
+}
+</script>
+
+{% endblock %}

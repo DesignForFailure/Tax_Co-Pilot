@@ -21,17 +21,18 @@ Sections:
 - Template wiring: Jinja2 HTML rendering.
 - Input parsing: strict-ish money parsing and form extraction.
 - CSRF: double-submit cookie pattern to protect POSTs.
-- Routes: dashboard (latest run), calculate (GET/POST), runs list, run detail.
+- Routes: dashboard (latest run), calculate (GET/POST), runs list, run detail,
+  what-if comparison, CSV import, audit export, run deletion, run comparison.
 - Error handling: return safe 400s for invalid user input.
 
 Future improvements:
 - Add security headers (CSP, Referrer-Policy, etc.) if served beyond localhost.
 - Add rate limiting if ever exposed over a network.
-- Add multi-taxpayer form support and CSV import endpoints.
 """
 
 from __future__ import annotations
 
+import io
 import json
 import re
 import secrets
@@ -40,7 +41,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from fastapi import FastAPI, Form, Request, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from starlette.datastructures import FormData
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -48,18 +49,23 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.config import config as encryption_config
 from app.engine.calculator import CalculationEngine
 from app.engine.rule_loader import RulePack
+from app.engine.whatif import WhatIfEngine
 from app.models.domain import (
     FilingStatus,
     Form1099BData,
     Form1099DIVData,
     Form1099INTData,
+    ReturnRun,
     Taxpayer,
     TaxpayerRole,
     TaxReturnInput,
     W2Data,
 )
+from app.services.audit_export import generate_audit_html
+from app.services.csv_import import import_csv as _import_csv
 from app.services.database import (
     DB_PATH,
+    delete_return_run,
     get_return_run,
     init_db,
     list_return_runs,
@@ -259,8 +265,6 @@ def dashboard(request: Request) -> Response:
             run_data["input_snapshot"] = json.loads(run_data["input_snapshot_json"])
             run_data["output"] = json.loads(run_data["output_json"])
             run_data["trace"] = json.loads(run_data["trace_json"])
-            from app.models.domain import ReturnRun
-
             run = ReturnRun(**{k: v for k, v in run_data.items() if not k.endswith("_json")})
 
     csrf = _get_csrf_token(request)
@@ -460,9 +464,70 @@ async def calculate_submit(request: Request) -> RedirectResponse:
 
 
 @app.get("/runs", response_class=HTMLResponse)
-def past_runs(request: Request) -> HTMLResponse:
+def past_runs(request: Request) -> Response:
     runs = list_return_runs()
-    return templates.TemplateResponse("pages/runs.html", {"request": request, "runs": runs})
+    csrf = _get_csrf_token(request)
+    resp = templates.TemplateResponse(
+        "pages/runs.html", {"request": request, "runs": runs, "csrf": csrf}
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+# ─── Run Comparison (declared before /runs/{run_id}) ─────────
+# Must come before the {run_id} route so FastAPI does not bind
+# the literal string "compare" as a run_id path parameter.
+
+
+@app.get("/runs/compare", response_class=HTMLResponse)
+def compare_runs(request: Request, a: str = "", b: str = "") -> Response:
+    if not a or not b:
+        return HTMLResponse("Two run IDs are required (a= and b=)", status_code=400)
+    run_a_data = get_return_run(a)
+    run_b_data = get_return_run(b)
+    if not run_a_data or not run_b_data:
+        return HTMLResponse("One or both runs not found", status_code=404)
+    run_a_data["input_snapshot"] = json.loads(run_a_data["input_snapshot_json"])
+    run_a_data["output"] = json.loads(run_a_data["output_json"])
+    run_a_data["trace"] = json.loads(run_a_data["trace_json"])
+    run_a = ReturnRun(**{k: v for k, v in run_a_data.items() if not k.endswith("_json")})
+    run_b_data["input_snapshot"] = json.loads(run_b_data["input_snapshot_json"])
+    run_b_data["output"] = json.loads(run_b_data["output_json"])
+    run_b_data["trace"] = json.loads(run_b_data["trace_json"])
+    run_b = ReturnRun(**{k: v for k, v in run_b_data.items() if not k.endswith("_json")})
+    output_fields = [
+        "gross_income",
+        "agi",
+        "standard_deduction",
+        "taxable_income",
+        "federal_tax",
+        "total_withholding",
+        "refund_or_owed",
+    ]
+    output_diffs: list[dict[str, Any]] = []
+    for field in output_fields:
+        val_a = getattr(run_a.output, field)
+        val_b = getattr(run_b.output, field)
+        delta = val_b - val_a
+        output_diffs.append(
+            {
+                "field": field,
+                "val_a": val_a,
+                "val_b": val_b,
+                "delta": delta,
+                "delta_abs": abs(delta),
+                "delta_sign": "positive" if delta > 0 else ("negative" if delta < 0 else "zero"),
+            }
+        )
+    return templates.TemplateResponse(
+        "pages/run_compare.html",
+        {
+            "request": request,
+            "run_a": run_a,
+            "run_b": run_b,
+            "output_diffs": output_diffs,
+        },
+    )
 
 
 @app.get("/runs/{run_id}", response_class=HTMLResponse)
@@ -474,11 +539,124 @@ def view_run(request: Request, run_id: str) -> HTMLResponse:
     run_data["input_snapshot"] = json.loads(run_data["input_snapshot_json"])
     run_data["output"] = json.loads(run_data["output_json"])
     run_data["trace"] = json.loads(run_data["trace_json"])
-
-    from app.models.domain import ReturnRun
-
     run = ReturnRun(**{k: v for k, v in run_data.items() if not k.endswith("_json")})
     return templates.TemplateResponse("pages/dashboard.html", {"request": request, "run": run})
+
+
+# ─── What-If Comparison ──────────────────────────────────────
+
+
+@app.get("/whatif", response_class=HTMLResponse)
+def whatif_form(request: Request) -> Response:
+    csrf = _get_csrf_token(request)
+    resp = templates.TemplateResponse(
+        "pages/whatif.html", {"request": request, "csrf": csrf}
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+@app.post("/whatif", response_class=HTMLResponse)
+async def whatif_submit(request: Request) -> Response:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    inputs = _parse_tax_input_from_form(fd)
+    engine = WhatIfEngine(rule_pack)
+    comparison = engine.compare_filing_status(inputs)
+    csrf = _get_csrf_token(request)
+    resp = templates.TemplateResponse(
+        "pages/whatif.html",
+        {"request": request, "csrf": csrf, "comparison": comparison},
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+# ─── CSV Import ───────────────────────────────────────────────
+
+
+@app.get("/import-csv", response_class=HTMLResponse)
+def import_csv_form(request: Request) -> Response:
+    csrf = _get_csrf_token(request)
+    resp = templates.TemplateResponse(
+        "pages/import_csv.html", {"request": request, "csrf": csrf}
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+@app.post("/import-csv", response_class=HTMLResponse)
+async def import_csv_submit(request: Request) -> Response:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    csv_text = str(fd.get("csv_text", "") or "")
+    record_type = str(fd.get("record_type", "W2") or "W2")
+    records_raw, errors = _import_csv(csv_text, record_type)
+    record_dicts = [r.model_dump() for r in records_raw]
+    csrf = _get_csrf_token(request)
+    resp = templates.TemplateResponse(
+        "pages/import_csv.html",
+        {
+            "request": request,
+            "csrf": csrf,
+            "records": record_dicts,
+            "errors": errors,
+            "record_type": record_type,
+        },
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+# ─── Audit Export ─────────────────────────────────────────────
+
+
+@app.get("/runs/{run_id}/export/json")
+def export_run_json(run_id: str) -> Response:
+    run_data = get_return_run(run_id)
+    if not run_data:
+        return HTMLResponse("Run not found", status_code=404)
+    run_data["input_snapshot"] = json.loads(run_data["input_snapshot_json"])
+    run_data["output"] = json.loads(run_data["output_json"])
+    run_data["trace"] = json.loads(run_data["trace_json"])
+    run = ReturnRun(**{k: v for k, v in run_data.items() if not k.endswith("_json")})
+    # Serialize to indented JSON matching what export_json() would write to disk.
+    json_bytes = json.dumps(
+        json.loads(run.model_dump_json()), indent=2, ensure_ascii=False
+    ).encode("utf-8")
+    return StreamingResponse(
+        io.BytesIO(json_bytes),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="run_{run_id}.json"'},
+    )
+
+
+@app.get("/runs/{run_id}/export/html")
+def export_run_html(run_id: str) -> Response:
+    run_data = get_return_run(run_id)
+    if not run_data:
+        return HTMLResponse("Run not found", status_code=404)
+    run_data["input_snapshot"] = json.loads(run_data["input_snapshot_json"])
+    run_data["output"] = json.loads(run_data["output_json"])
+    run_data["trace"] = json.loads(run_data["trace_json"])
+    run = ReturnRun(**{k: v for k, v in run_data.items() if not k.endswith("_json")})
+    html_content = generate_audit_html(run)
+    return StreamingResponse(
+        io.BytesIO(html_content.encode("utf-8")),
+        media_type="text/html",
+        headers={"Content-Disposition": f'attachment; filename="audit_{run_id}.html"'},
+    )
+
+
+# ─── Run Deletion ─────────────────────────────────────────────
+
+
+@app.post("/runs/{run_id}/delete")
+async def delete_run(request: Request, run_id: str) -> RedirectResponse:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    delete_return_run(run_id)
+    return RedirectResponse(url="/runs", status_code=303)
 
 
 @app.get("/legal", response_class=HTMLResponse)

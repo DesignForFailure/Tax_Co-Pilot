@@ -6,6 +6,10 @@
 <p class="text-dim text-sm mb-4">Federal Return (MVP)</p>
 
 {% if run %}
+<div style="display:flex;gap:10px;margin-bottom:16px;">
+    <a href="/runs/{{ run.id }}/export/json" class="btn btn-sm btn-outline">Export JSON</a>
+    <a href="/runs/{{ run.id }}/export/html" class="btn btn-sm btn-outline">Export HTML</a>
+</div>
 <div class="summary-grid">
     {% for label, val in [
         ("Gross Income", run.output.gross_income),

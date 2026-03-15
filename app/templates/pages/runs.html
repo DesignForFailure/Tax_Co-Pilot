@@ -4,24 +4,43 @@
 
 <h1 style="font-size: 24px; margin-bottom: 8px;">Past Runs</h1>
 
+{% if runs %}
+<div style="margin-bottom: 12px;">
+    <button class="btn btn-sm btn-outline" onclick="compareSelected()">Compare Selected (2)</button>
+    <span id="compare-hint" class="text-dim text-sm" style="margin-left: 10px;">Check exactly two runs to compare.</span>
+</div>
+{% endif %}
+
 <div class="card">
     {% if runs %}
         <table style="width:100%;border-collapse:collapse;">
             <thead>
                 <tr>
+                    <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);width:32px;"></th>
                     <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Created</th>
                     <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Filing Status</th>
                     <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Rule Pack</th>
-                    <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Open</th>
+                    <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Actions</th>
                 </tr>
             </thead>
             <tbody>
             {% for r in runs %}
                 <tr>
+                    <td style="padding:8px;border-bottom:1px solid var(--border);">
+                        <input type="checkbox" class="compare-cb" value="{{ r.id }}" onchange="updateCompare()">
+                    </td>
                     <td style="padding:8px;border-bottom:1px solid var(--border);">{{ r.created_at }}</td>
                     <td style="padding:8px;border-bottom:1px solid var(--border);">{{ r.filing_status }}</td>
                     <td style="padding:8px;border-bottom:1px solid var(--border);">{{ r.rule_pack_version }}</td>
-                    <td style="padding:8px;border-bottom:1px solid var(--border);"><a href="/runs/{{ r.id }}">View</a></td>
+                    <td style="padding:8px;border-bottom:1px solid var(--border);">
+                        <a href="/runs/{{ r.id }}">View</a>
+                        &nbsp;
+                        <form method="POST" action="/runs/{{ r.id }}/delete" style="display:inline;"
+                              onsubmit="return confirm('Delete this run? This cannot be undone.')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf }}">
+                            <button type="submit" class="btn btn-sm btn-danger" style="font-size:11px;padding:4px 10px;">Delete</button>
+                        </form>
+                    </td>
                 </tr>
             {% endfor %}
             </tbody>
@@ -30,5 +49,36 @@
         <p class="text-dim">No runs saved yet.</p>
     {% endif %}
 </div>
+
+<script>
+function updateCompare() {
+    var boxes = document.querySelectorAll('.compare-cb:checked');
+    /* Enforce a maximum of 2 selections */
+    if (boxes.length > 2) {
+        this.checked = false;
+        return;
+    }
+}
+
+/* Called from each checkbox onchange — enforce max 2 via event target */
+document.addEventListener('change', function(e) {
+    if (!e.target.classList.contains('compare-cb')) return;
+    var boxes = document.querySelectorAll('.compare-cb:checked');
+    if (boxes.length > 2) {
+        e.target.checked = false;
+    }
+});
+
+function compareSelected() {
+    var boxes = document.querySelectorAll('.compare-cb:checked');
+    if (boxes.length !== 2) {
+        alert('Please select exactly two runs to compare.');
+        return;
+    }
+    var a = boxes[0].value;
+    var b = boxes[1].value;
+    window.location.href = '/runs/compare?a=' + encodeURIComponent(a) + '&b=' + encodeURIComponent(b);
+}
+</script>
 
 {% endblock %}

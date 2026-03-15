@@ -32,7 +32,7 @@ from decimal import Decimal, InvalidOperation
 
 from pydantic import BaseModel
 
-from app.models.domain import Form1099BData, W2Data
+from app.models.domain import Form1099BData, Form1099DIVData, Form1099INTData, W2Data
 
 
 def _money(
@@ -119,6 +119,33 @@ def import_csv(csv_text: str, record_type: str) -> tuple[list[BaseModel], list[s
                         proceeds=_money(row.get("proceeds", "0"), allow_negative=False),
                         cost_basis=_money(row.get("cost_basis", "0"), allow_negative=False),
                         is_long_term=is_long,
+                    )
+                )
+            elif record_type in {"1099-INT", "1099INT"}:
+                records.append(
+                    Form1099INTData(
+                        payer_name=(row.get("payer_name") or "").strip(),
+                        interest_income=_money(
+                            row.get("interest_income", "0"), allow_negative=False
+                        ),
+                        federal_withheld=_money(
+                            row.get("federal_withheld", "0"), allow_negative=False
+                        ),
+                    )
+                )
+            elif record_type in {"1099-DIV", "1099DIV"}:
+                records.append(
+                    Form1099DIVData(
+                        payer_name=(row.get("payer_name") or "").strip(),
+                        ordinary_dividends=_money(
+                            row.get("ordinary_dividends", "0"), allow_negative=False
+                        ),
+                        qualified_dividends=_money(
+                            row.get("qualified_dividends", "0"), allow_negative=False
+                        ),
+                        federal_withheld=_money(
+                            row.get("federal_withheld", "0"), allow_negative=False
+                        ),
                     )
                 )
             else:
