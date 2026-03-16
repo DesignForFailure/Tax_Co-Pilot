@@ -1,9 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Tests for generalized multi-state support in the calculation engine.
-
-Verifies that _run_states() uses convention-based rule-ID extraction
-rather than hardcoded state logic.
-"""
+"""State expansion tests — generalized engine, multi-state, and wiring."""
 
 from decimal import Decimal
 from pathlib import Path
@@ -109,3 +105,12 @@ def test_state_withholding_attributed_correctly() -> None:
     assert ga_out.state == "GA"
     # GA withholding should be only the GA W-2 amount.
     assert ga_out.state_withholding == Decimal("2500")
+
+
+def test_state_pack_discovery() -> None:
+    """_load_state_packs finds GA at minimum."""
+    from main import _load_state_packs
+
+    packs = _load_state_packs(2024)
+    assert "GA" in packs
+    assert packs["GA"].jurisdiction == "GA"
