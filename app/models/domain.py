@@ -94,6 +94,32 @@ class Form1099BData(BaseModel):
         return self.proceeds - self.cost_basis
 
 
+class Form1099NECData(BaseModel):
+    """1099-NEC nonemployee compensation."""
+
+    payer_name: str = ""
+    nonemployee_compensation: Decimal = Decimal("0")  # Box 1
+    federal_withheld: Decimal = Decimal("0")  # Box 4
+
+
+class Form1099SSAData(BaseModel):
+    """SSA-1099 Social Security benefits."""
+
+    payer_name: str = ""
+    total_benefits: Decimal = Decimal("0")  # Box 5
+    federal_withheld: Decimal = Decimal("0")  # Box 6
+
+
+class AdjustmentsData(BaseModel):
+    """Above-the-line deductions (Schedule 1 Part II)."""
+
+    student_loan_interest: Decimal = Decimal("0")
+    ira_contributions: Decimal = Decimal("0")
+    hsa_contributions: Decimal = Decimal("0")
+    educator_expenses: Decimal = Decimal("0")
+    self_employment_tax_deduction: Decimal = Decimal("0")
+
+
 # ─── Taxpayer ─────────────────────────────────────────────────
 
 
@@ -108,6 +134,8 @@ class Taxpayer(BaseModel):
     form_1099_ints: list[Form1099INTData] = Field(default_factory=list)
     form_1099_divs: list[Form1099DIVData] = Field(default_factory=list)
     form_1099_bs: list[Form1099BData] = Field(default_factory=list)
+    form_1099_necs: list[Form1099NECData] = Field(default_factory=list)
+    form_1099_ssas: list[Form1099SSAData] = Field(default_factory=list)
 
 
 # ─── Tax Return Input (snapshot) ──────────────────────────────
@@ -119,6 +147,8 @@ class TaxReturnInput(BaseModel):
     tax_year: int
     filing_status: FilingStatus
     taxpayers: list[Taxpayer] = Field(default_factory=list)
+    other_income: Decimal = Decimal("0")
+    adjustments: AdjustmentsData = Field(default_factory=AdjustmentsData)
 
     def total_wages(self) -> Decimal:
         return sum((w.wages for tp in self.taxpayers for w in tp.w2s), Decimal("0"))
@@ -147,7 +177,33 @@ class TaxReturnInput(BaseModel):
                 total += d.federal_withheld
             for b in tp.form_1099_bs:
                 total += b.federal_withheld
+            for n in tp.form_1099_necs:
+                total += n.federal_withheld
+            for s in tp.form_1099_ssas:
+                total += s.federal_withheld
         return total
+
+    def total_self_employment_income(self) -> Decimal:
+        return sum(
+            (f.nonemployee_compensation for tp in self.taxpayers for f in tp.form_1099_necs),
+            Decimal("0"),
+        )
+
+    def total_social_security_benefits(self) -> Decimal:
+        return sum(
+            (f.total_benefits for tp in self.taxpayers for f in tp.form_1099_ssas),
+            Decimal("0"),
+        )
+
+    def total_adjustments(self) -> Decimal:
+        a = self.adjustments
+        return (
+            a.student_loan_interest
+            + a.ira_contributions
+            + a.hsa_contributions
+            + a.educator_expenses
+            + a.self_employment_tax_deduction
+        )
 
 
 # ─── Trace / Audit Models ────────────────────────────────────
@@ -176,6 +232,7 @@ class ReturnOutput(BaseModel):
     federal_tax: Decimal
     total_withholding: Decimal
     refund_or_owed: Decimal  # positive = refund, negative = owed
+    adjustments_total: Decimal = Decimal("0")
 
 
 class StateReturnOutput(BaseModel):
