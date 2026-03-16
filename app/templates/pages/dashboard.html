@@ -3,7 +3,7 @@
 {% block content %}
 
 <h1 style="font-size: 24px; margin-bottom: 8px;">Tax Year 2024</h1>
-<p class="text-dim text-sm mb-4">Federal Return (MVP)</p>
+<p class="text-dim text-sm mb-4">Federal{% if run and run.state_outputs %} + State{% endif %} Return</p>
 
 {% if run %}
 <div style="display:flex;gap:10px;margin-bottom:16px;">
@@ -35,6 +35,36 @@
         </div>
     </div>
 </div>
+
+{% if run.state_outputs %}
+{% for st in run.state_outputs %}
+<h2 style="font-size: 20px; margin-top: 24px; margin-bottom: 8px;">{{ st.state }} State Return</h2>
+<div class="summary-grid">
+    {% for label, val in [
+        ("State AGI", st.state_agi),
+        ("Standard Deduction", st.state_standard_deduction),
+        ("Taxable Income", st.state_taxable_income),
+        ("State Tax", st.state_tax),
+        ("State Withholding", st.state_withholding),
+    ] %}
+    <div class="summary-item">
+        <div class="label">{{ label }}</div>
+        <div class="value">${{ "{:,.0f}".format(val) }}</div>
+    </div>
+    {% endfor %}
+    <div class="summary-item">
+        <div class="label">{% if st.state_refund_or_owed >= 0 %}Refund{% else %}Owed{% endif %}</div>
+        <div class="value {% if st.state_refund_or_owed >= 0 %}positive{% else %}negative{% endif %}">
+            {% if st.state_refund_or_owed >= 0 %}
+                ${{ "{:,.0f}".format(st.state_refund_or_owed) }}
+            {% else %}
+                -${{ "{:,.0f}".format(st.state_refund_or_owed|abs) }}
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
 
 <div class="card">
     <h2>Audit Trace</h2>
