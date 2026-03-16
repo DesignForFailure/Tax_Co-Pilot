@@ -114,6 +114,7 @@ class CalculationEngine:
             federal_tax=self.resolved.get("fed.2024.tax.brackets", Decimal("0")),
             total_withholding=self.resolved.get("fed.2024.total_withholding", Decimal("0")),
             refund_or_owed=self.resolved.get("fed.2024.refund_or_owed", Decimal("0")),
+            adjustments_total=self.resolved.get("fed.2024.adjustments.total", Decimal("0")),
         )
 
         state_outputs = self._run_states()
@@ -194,6 +195,24 @@ class CalculationEngine:
         self.resolved["input.1099div.ordinary"] = self.inputs.total_dividends()
         self.resolved["input.1099b.net_gain"] = self.inputs.total_capital_gains()
         self.resolved["input.withholding.federal"] = self.inputs.total_federal_withholding()
+        self.resolved["input.1099nec.compensation"] = self.inputs.total_self_employment_income()
+        self.resolved["input.ssa.total_benefits"] = self.inputs.total_social_security_benefits()
+        self.resolved["input.other_income"] = self.inputs.other_income
+        self.resolved["input.adjustments.student_loan_interest"] = (
+            self.inputs.adjustments.student_loan_interest
+        )
+        self.resolved["input.adjustments.ira_contributions"] = (
+            self.inputs.adjustments.ira_contributions
+        )
+        self.resolved["input.adjustments.hsa_contributions"] = (
+            self.inputs.adjustments.hsa_contributions
+        )
+        self.resolved["input.adjustments.educator_expenses"] = (
+            self.inputs.adjustments.educator_expenses
+        )
+        self.resolved["input.adjustments.self_employment_tax_deduction"] = (
+            self.inputs.adjustments.self_employment_tax_deduction
+        )
 
     # ─── Rule evaluation dispatch ───────────────────────────────
 
