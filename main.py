@@ -132,6 +132,25 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 RULE_PACK_DIR = BASE_DIR / "rule_packs" / "federal" / "2024"
 rule_pack = RulePack.load(RULE_PACK_DIR)
 
+STATE_PACKS_DIR = BASE_DIR / "rule_packs" / "state"
+
+
+def _load_state_packs(year: int) -> dict[str, RulePack]:
+    """Discover and load all state rule packs for the given tax year."""
+    packs: dict[str, RulePack] = {}
+    if not STATE_PACKS_DIR.exists():
+        return packs
+    for state_dir in sorted(STATE_PACKS_DIR.iterdir()):
+        if not state_dir.is_dir() or state_dir.name.startswith("_"):
+            continue
+        year_dir = state_dir / str(year)
+        if year_dir.exists():
+            packs[state_dir.name.upper()] = RulePack.load(year_dir)
+    return packs
+
+
+state_packs = _load_state_packs(2024)
+
 
 def _parse_money(
     raw: str,
@@ -456,7 +475,18 @@ async def calculate_submit(request: Request) -> RedirectResponse:
 
     inputs = _parse_tax_input_from_form(fd)
 
-    run = CalculationEngine(rule_pack, inputs).run()
+    states_needed = {
+        w.state.upper()
+        for tp in inputs.taxpayers
+        for w in tp.w2s
+        if w.state
+    }
+    active_state_packs = {
+        s: state_packs[s] for s in states_needed if s in state_packs
+    }
+    run = CalculationEngine(
+        rule_pack, inputs, state_packs=active_state_packs
+    ).run()
     run_dict = json.loads(run.model_dump_json())
     save_return_run(run_dict)
 

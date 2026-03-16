@@ -1,0 +1,26 @@
+# Tax_Co-Pilot - Local-first personal tax software system
+# Copyright (C) 2026  Tax_Co-Pilot Contributors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# ── Instructions ──
+# 1. Copy this entire _template directory to rule_packs/state/{ST}/2024/
+# 2. Rename files: state_TEMPLATE_2024_*.yaml → state_{ST}_2024_*.yaml
+# 3. Replace "TEMPLATE" with your 2-letter state code (e.g., "CA")
+# 4. Replace all "{st}" in rule IDs with your lowercase state code
+# 5. Update constants and expressions for your state's tax law
+
+version: "0.1.0"
+tax_year: 2024
+jurisdiction: "TEMPLATE"
