@@ -1,0 +1,206 @@
+# Tax_Co-Pilot - Local-first personal tax software system
+# Copyright (C) 2026  Tax_Co-Pilot Contributors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# ═══════════════════════════════════════════════════════════════════════
+# State Rule Pack Template — Tax Year 2024
+# ═══════════════════════════════════════════════════════════════════════
+#
+# HOW TO USE:
+#   1. Copy this file to rule_packs/state/{ST}/2024/state_{ST}_2024_rules.yaml
+#   2. Replace every "{st}" in rule IDs with your lowercase state code
+#   3. Replace "TEMPLATE" / "{ST}" in refs with your uppercase state code
+#   4. Fill in your state's actual constants (deductions, rates, brackets)
+#   5. Delete or comment out sections that don't apply
+#
+# RULE ID CONVENTION (required by the engine):
+#   {st}.2024.agi              — State adjusted gross income
+#   {st}.2024.standard_deduction — Standard deduction
+#   {st}.2024.taxable_income   — State taxable income
+#   {st}.2024.tax              — Computed state income tax
+#   {st}.2024.withholding      — Total state tax withheld from W-2s
+#   {st}.2024.refund_or_owed   — Refund (positive) or balance due (negative)
+#
+# FOUR RULE TYPES:
+#   formula       — Arithmetic expression over named inputs
+#   lookup        — Pick a value from a constants table keyed by filing status
+#   sum           — Add up a list of values (e.g., withholding from multiple W-2s)
+#   bracket_table — Progressive tax brackets keyed by filing status
+#
+# See rule_packs/state/GA/2024/ for a complete real-world example.
+# See rule_packs/state/TX/2024/ for a no-income-tax stub.
+# ═══════════════════════════════════════════════════════════════════════
+
+
+# ── Constants ──
+# Define filing-status-keyed values here. Lookup rules reference these
+# via "constants.{table_name}".
+constants:
+  standard_deduction:
+    single: "0"       # Replace with your state's actual amounts
+    mfj: "0"
+    mfs: "0"
+    hoh: "0"
+
+  # Add more constant tables as needed for your state, e.g.:
+  # personal_exemption:
+  #   single: "2700"
+  #   mfj: "7400"
+  #   mfs: "2700"
+  #   hoh: "2700"
+
+
+rules:
+
+  # ────────────────────────────────────────────────────────────────────
+  # 1. AGI — State adjusted gross income
+  # ────────────────────────────────────────────────────────────────────
+  # Most states start from federal AGI. If your state has additions or
+  # subtractions, build those as separate rules and combine them here.
+  #
+  # Rule type: formula
+  # A formula evaluates an arithmetic expression over named inputs.
+  # Inputs can reference other rules ({ ref: "rule.id" }), user input
+  # ({ ref: "input.field" }), or literal values ({ literal: "100" }).
+
+  - id: "{st}.2024.agi"
+    description: "{ST} AGI (starts from federal AGI)"
+    type: "formula"
+    expression: "federal_agi"
+    inputs:
+      federal_agi: { ref: "fed.2024.agi.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+
+  # ────────────────────────────────────────────────────────────────────
+  # 2. Standard Deduction
+  # ────────────────────────────────────────────────────────────────────
+  # Rule type: lookup
+  # A lookup picks a value from a constants table using a key.
+  # The key is typically the filing status from user input.
+
+  - id: "{st}.2024.standard_deduction"
+    description: "{ST} standard deduction"
+    type: "lookup"
+    table: "constants.standard_deduction"
+    key: { ref: "input.filing_status" }
+
+
+  # ────────────────────────────────────────────────────────────────────
+  # 3. Taxable Income
+  # ────────────────────────────────────────────────────────────────────
+  # Typically AGI minus deductions, floored at zero.
+
+  - id: "{st}.2024.taxable_income"
+    description: "{ST} taxable income = max(AGI - deductions, 0)"
+    type: "formula"
+    expression: "max(agi - deduction, 0)"
+    inputs:
+      agi: { ref: "{st}.2024.agi" }
+      deduction: { ref: "{st}.2024.standard_deduction" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+
+  # ────────────────────────────────────────────────────────────────────
+  # 4. Tax Calculation
+  # ────────────────────────────────────────────────────────────────────
+  # Choose ONE of the two options below depending on your state:
+  #
+  # OPTION A — Flat-rate state (e.g., GA at 5.39%)
+  # Use a formula rule that multiplies taxable income by a single rate.
+  #
+  # OPTION B — Progressive-bracket state (e.g., CA, NY)
+  # Use a bracket_table rule with graduated rates per filing status.
+  #
+  # Delete the option you don't need.
+
+  # ── OPTION A: Flat-rate tax (formula) ──
+  - id: "{st}.2024.tax"
+    description: "{ST} income tax (flat rate)"
+    type: "formula"
+    expression: "taxable_income * rate"
+    inputs:
+      taxable_income: { ref: "{st}.2024.taxable_income" }
+      rate: { literal: "0.05" }          # Replace with your state's rate
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  # ── OPTION B: Progressive brackets (bracket_table) ──
+  # Uncomment and customize this block instead of Option A if your state
+  # uses graduated tax brackets.
+  #
+  # A bracket_table computes progressive tax automatically. The engine
+  # applies each bracket's rate only to income within that bracket's
+  # range (lower to upper). Set upper to null for the top bracket.
+  #
+  # - id: "{st}.2024.tax"
+  #   description: "{ST} income tax (progressive brackets)"
+  #   type: "bracket_table"
+  #   input: { ref: "{st}.2024.taxable_income" }
+  #   key: { ref: "input.filing_status" }
+  #   rounding: "ROUND_HALF_UP"
+  #   rounding_precision: 0
+  #   tables:
+  #     single:
+  #       - { lower: "0",      upper: "10000",  rate: "0.02" }
+  #       - { lower: "10000",  upper: "40000",  rate: "0.04" }
+  #       - { lower: "40000",  upper: null,     rate: "0.06" }
+  #     mfj:
+  #       - { lower: "0",      upper: "20000",  rate: "0.02" }
+  #       - { lower: "20000",  upper: "80000",  rate: "0.04" }
+  #       - { lower: "80000",  upper: null,     rate: "0.06" }
+  #     mfs:
+  #       - { lower: "0",      upper: "10000",  rate: "0.02" }
+  #       - { lower: "10000",  upper: "40000",  rate: "0.04" }
+  #       - { lower: "40000",  upper: null,     rate: "0.06" }
+  #     hoh:
+  #       - { lower: "0",      upper: "15000",  rate: "0.02" }
+  #       - { lower: "15000",  upper: "60000",  rate: "0.04" }
+  #       - { lower: "60000",  upper: null,     rate: "0.06" }
+
+
+  # ────────────────────────────────────────────────────────────────────
+  # 5. Withholding
+  # ────────────────────────────────────────────────────────────────────
+  # Rule type: sum
+  # A sum adds up all values in a list. The engine collects state
+  # withholding amounts from W-2 inputs keyed by state code.
+  # Replace {ST} with your uppercase state code.
+
+  - id: "{st}.2024.withholding"
+    description: "Total {ST} tax withheld"
+    type: "sum"
+    inputs:
+      items: { ref: "input.withholding.state.{ST}" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+
+  # ────────────────────────────────────────────────────────────────────
+  # 6. Refund or Amount Owed
+  # ────────────────────────────────────────────────────────────────────
+  # Positive = refund, negative = balance due.
+
+  - id: "{st}.2024.refund_or_owed"
+    description: "{ST} refund (positive) or amount owed (negative)"
+    type: "formula"
+    expression: "withholding - tax"
+    inputs:
+      withholding: { ref: "{st}.2024.withholding" }
+      tax: { ref: "{st}.2024.tax" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
