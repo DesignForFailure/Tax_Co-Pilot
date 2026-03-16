@@ -1,0 +1,54 @@
+# Tax_Co-Pilot - Local-first personal tax software system
+# Copyright (C) 2026  Tax_Co-Pilot Contributors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+constants: {}
+
+rules:
+  - id: "tx.2024.agi"
+    description: "Texas — no state income tax"
+    type: "formula"
+    expression: "zero"
+    inputs:
+      zero: { literal: "0" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "tx.2024.tax"
+    description: "Texas state income tax (none)"
+    type: "formula"
+    expression: "zero"
+    inputs:
+      zero: { literal: "0" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "tx.2024.withholding"
+    description: "Texas withholding"
+    type: "sum"
+    inputs:
+      items: { ref: "input.withholding.state.TX" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "tx.2024.refund_or_owed"
+    description: "Texas refund/owed"
+    type: "formula"
+    expression: "withholding - tax"
+    inputs:
+      withholding: { ref: "tx.2024.withholding" }
+      tax: { ref: "tx.2024.tax" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0

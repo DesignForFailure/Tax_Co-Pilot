@@ -4,6 +4,8 @@
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
+
 from app.engine.calculator import CalculationEngine
 from app.engine.rule_loader import RulePack
 from app.models.domain import (
@@ -105,6 +107,50 @@ def test_state_withholding_attributed_correctly() -> None:
     assert ga_out.state == "GA"
     # GA withholding should be only the GA W-2 amount.
     assert ga_out.state_withholding == Decimal("2500")
+
+
+NO_TAX_STATES = ["TX", "FL", "WA", "NV", "WY", "SD", "AK", "NH", "TN"]
+
+
+@pytest.mark.parametrize("state_code", NO_TAX_STATES)
+def test_no_income_tax_stub_loads(state_code: str) -> None:
+    """Each no-income-tax stub loads without error."""
+    pack_dir = BASE / "rule_packs" / "state" / state_code / "2024"
+    sp = RulePack.load(pack_dir)
+    assert sp.jurisdiction == state_code
+    assert sp.tax_year == 2024
+
+
+@pytest.mark.parametrize("state_code", NO_TAX_STATES)
+def test_no_income_tax_stub_returns_zero_tax(state_code: str) -> None:
+    """No-income-tax stubs produce $0 state tax."""
+    pack_dir = BASE / "rule_packs" / "state" / state_code / "2024"
+    sp = RulePack.load(pack_dir)
+    inp = TaxReturnInput(
+        tax_year=2024,
+        filing_status=FilingStatus.SINGLE,
+        taxpayers=[
+            Taxpayer(
+                role=TaxpayerRole.PRIMARY,
+                first_name="A",
+                last_name="B",
+                w2s=[
+                    W2Data(
+                        employer_name="TestCo",
+                        wages=Decimal("85000"),
+                        federal_withheld=Decimal("12000"),
+                        state=state_code,
+                        state_withheld=Decimal("0"),
+                    )
+                ],
+            )
+        ],
+    )
+    run = CalculationEngine(FED, inp, state_packs={state_code: sp}).run()
+    assert len(run.state_outputs) == 1
+    st_out = run.state_outputs[0]
+    assert st_out.state == state_code
+    assert st_out.state_tax == Decimal("0")
 
 
 def test_state_pack_discovery() -> None:
