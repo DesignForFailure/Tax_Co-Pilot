@@ -22,9 +22,35 @@ constants:
     hoh: "21900"
     qss: "29200"
 
+  ss_taxability:
+    base_threshold:
+      single: "25000"
+      mfj: "32000"
+      mfs: "0"
+      hoh: "25000"
+      qss: "32000"
+    upper_threshold:
+      single: "34000"
+      mfj: "44000"
+      mfs: "0"
+      hoh: "34000"
+      qss: "44000"
+
+  adjustment_limits:
+    student_loan_interest_max: "2500"
+    educator_expenses_max: "300"
+    ira_limit: "7000"
+    hsa_limit:
+      single: "4150"
+      mfj: "8300"
+      mfs: "4150"
+      hoh: "4150"
+      qss: "8300"
+
 rules:
   - id: "fed.2024.gross_income.wages"
     description: "Total W-2 wages (Box 1)"
+    form_line: "1040 Line 1a"
     type: "sum"
     inputs:
       items: { ref: "input.w2.wages" }
@@ -33,6 +59,7 @@ rules:
 
   - id: "fed.2024.gross_income.interest"
     description: "Total taxable interest (1099-INT)"
+    form_line: "1040 Line 2b"
     type: "sum"
     inputs:
       items: { ref: "input.1099int.amount" }
@@ -41,6 +68,7 @@ rules:
 
   - id: "fed.2024.gross_income.dividends"
     description: "Total ordinary dividends (1099-DIV Box 1a)"
+    form_line: "1040 Line 3b"
     type: "sum"
     inputs:
       items: { ref: "input.1099div.ordinary" }
@@ -49,41 +77,247 @@ rules:
 
   - id: "fed.2024.gross_income.capital_gains"
     description: "Net capital gains (1099-B proceeds - basis)"
+    form_line: "Schedule D"
     type: "sum"
     inputs:
       items: { ref: "input.1099b.net_gain" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
+  - id: "fed.2024.gross_income.self_employment"
+    description: "Total self-employment income (1099-NEC Box 1)"
+    form_line: "Schedule 1 Line 3"
+    type: "sum"
+    inputs:
+      items: { ref: "input.1099nec.compensation" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.gross_income.capital_gains_limited"
+    description: "Net capital gains after loss limitation (-$3,000 max loss)"
+    form_line: "1040 Line 7"
+    type: "formula"
+    expression: "max(gains, neg_limit)"
+    inputs:
+      gains: { ref: "fed.2024.gross_income.capital_gains" }
+      neg_limit: { literal: "-3000" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.gross_income.other"
+    description: "Other income (Line 8 catch-all)"
+    form_line: "Schedule 1 Line 8"
+    type: "formula"
+    expression: "other"
+    inputs:
+      other: { ref: "input.other_income" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.gross_income.ss_half_benefits"
+    description: "50% of total Social Security benefits"
+    form_line: "SS Worksheet Line 2"
+    type: "formula"
+    expression: "benefits * half"
+    inputs:
+      benefits: { ref: "input.ssa.total_benefits" }
+      half: { literal: "0.5" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.gross_income.ss_base_threshold"
+    description: "SS taxability base threshold by filing status"
+    form_line: "SS Worksheet"
+    type: "lookup"
+    table: "constants.ss_taxability.base_threshold"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2024.gross_income.ss_upper_threshold"
+    description: "SS taxability upper threshold by filing status"
+    form_line: "SS Worksheet"
+    type: "lookup"
+    table: "constants.ss_taxability.upper_threshold"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2024.gross_income.ss_max_taxable"
+    description: "85% of total SS benefits (maximum taxable amount)"
+    form_line: "SS Worksheet Line 4"
+    type: "formula"
+    expression: "benefits * rate"
+    inputs:
+      benefits: { ref: "input.ssa.total_benefits" }
+      rate: { literal: "0.85" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.gross_income.ss_provisional"
+    description: "Provisional income for SS taxability (non-SS income + 50% benefits)"
+    form_line: "SS Worksheet Line 6"
+    type: "formula"
+    expression: "wages + interest + dividends + gains + se + other + half_ss"
+    inputs:
+      wages: { ref: "fed.2024.gross_income.wages" }
+      interest: { ref: "fed.2024.gross_income.interest" }
+      dividends: { ref: "fed.2024.gross_income.dividends" }
+      gains: { ref: "fed.2024.gross_income.capital_gains_limited" }
+      se: { ref: "fed.2024.gross_income.self_employment" }
+      other: { ref: "fed.2024.gross_income.other" }
+      half_ss: { ref: "fed.2024.gross_income.ss_half_benefits" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.gross_income.ss_lower_calc"
+    description: "SS taxability lower-tier amount (50% of provisional above base)"
+    form_line: "SS Worksheet Line 10"
+    type: "formula"
+    expression: "max(min((prov - base) * rate, (upper - base) * rate), zero)"
+    inputs:
+      prov: { ref: "fed.2024.gross_income.ss_provisional" }
+      base: { ref: "fed.2024.gross_income.ss_base_threshold" }
+      upper: { ref: "fed.2024.gross_income.ss_upper_threshold" }
+      rate: { literal: "0.50" }
+      zero: { literal: "0" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.gross_income.ss_upper_calc"
+    description: "SS taxability upper-tier amount (85% of provisional above upper threshold)"
+    form_line: "SS Worksheet Line 14"
+    type: "formula"
+    expression: "max((prov - upper) * rate, zero)"
+    inputs:
+      prov: { ref: "fed.2024.gross_income.ss_provisional" }
+      upper: { ref: "fed.2024.gross_income.ss_upper_threshold" }
+      rate: { literal: "0.85" }
+      zero: { literal: "0" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.gross_income.social_security"
+    description: "Taxable Social Security benefits"
+    form_line: "1040 Line 6b"
+    type: "formula"
+    expression: "min(max_taxable, lower + upper)"
+    inputs:
+      max_taxable: { ref: "fed.2024.gross_income.ss_max_taxable" }
+      lower: { ref: "fed.2024.gross_income.ss_lower_calc" }
+      upper: { ref: "fed.2024.gross_income.ss_upper_calc" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
   - id: "fed.2024.gross_income.total"
-    description: "Gross income (wages + interest + dividends + net gains)"
+    description: "Total income (all sources)"
+    form_line: "1040 Line 9"
     type: "sum"
     inputs:
       items:
         - { ref: "fed.2024.gross_income.wages" }
         - { ref: "fed.2024.gross_income.interest" }
         - { ref: "fed.2024.gross_income.dividends" }
-        - { ref: "fed.2024.gross_income.capital_gains" }
+        - { ref: "fed.2024.gross_income.capital_gains_limited" }
+        - { ref: "fed.2024.gross_income.self_employment" }
+        - { ref: "fed.2024.gross_income.social_security" }
+        - { ref: "fed.2024.gross_income.other" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.adjustments.hsa_limit"
+    description: "HSA contribution limit by filing status"
+    form_line: "Form 8889"
+    type: "lookup"
+    table: "constants.adjustment_limits.hsa_limit"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2024.adjustments.student_loan"
+    description: "Student loan interest deduction (capped at $2,500)"
+    form_line: "Schedule 1 Line 21"
+    type: "formula"
+    expression: "min(input, cap)"
+    inputs:
+      input: { ref: "input.adjustments.student_loan_interest" }
+      cap: { literal: "2500" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.adjustments.educator"
+    description: "Educator expenses deduction (capped at $300)"
+    form_line: "Schedule 1 Line 11"
+    type: "formula"
+    expression: "min(input, cap)"
+    inputs:
+      input: { ref: "input.adjustments.educator_expenses" }
+      cap: { literal: "300" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.adjustments.hsa"
+    description: "HSA deduction (capped by filing status)"
+    form_line: "Schedule 1 Line 13"
+    type: "formula"
+    expression: "min(input, limit)"
+    inputs:
+      input: { ref: "input.adjustments.hsa_contributions" }
+      limit: { ref: "fed.2024.adjustments.hsa_limit" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.adjustments.ira"
+    description: "IRA deduction (capped at $7,000)"
+    form_line: "Schedule 1 Line 20"
+    type: "formula"
+    expression: "min(input, cap)"
+    inputs:
+      input: { ref: "input.adjustments.ira_contributions" }
+      cap: { literal: "7000" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.adjustments.se_tax"
+    description: "Self-employment tax deduction (user provides deductible half)"
+    form_line: "Schedule 1 Line 15"
+    type: "formula"
+    expression: "input"
+    inputs:
+      input: { ref: "input.adjustments.self_employment_tax_deduction" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.adjustments.total"
+    description: "Total above-the-line adjustments"
+    form_line: "Schedule 1 Line 26"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "fed.2024.adjustments.student_loan" }
+        - { ref: "fed.2024.adjustments.educator" }
+        - { ref: "fed.2024.adjustments.hsa" }
+        - { ref: "fed.2024.adjustments.ira" }
+        - { ref: "fed.2024.adjustments.se_tax" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
   - id: "fed.2024.agi.total"
-    description: "Adjusted gross income (MVP: equals gross income)"
+    description: "Adjusted gross income (gross income minus adjustments)"
+    form_line: "1040 Line 11"
     type: "formula"
-    expression: "gross"
+    expression: "max(gross - adj, zero)"
     inputs:
       gross: { ref: "fed.2024.gross_income.total" }
+      adj: { ref: "fed.2024.adjustments.total" }
+      zero: { literal: "0" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
   - id: "fed.2024.standard_deduction"
     description: "Standard deduction for 2024"
+    form_line: "1040 Line 13"
     type: "lookup"
     table: "constants.standard_deduction"
     key: { ref: "input.filing_status" }
 
   - id: "fed.2024.taxable_income"
     description: "Taxable income = max(AGI - standard deduction, 0)"
+    form_line: "1040 Line 15"
     type: "formula"
     expression: "max(agi - deduction, 0)"
     inputs:
@@ -94,6 +328,7 @@ rules:
 
   - id: "fed.2024.tax.brackets"
     description: "Federal income tax using 2024 bracket tables"
+    form_line: "1040 Line 16"
     type: "bracket_table"
     input: { ref: "fed.2024.taxable_income" }
     key: { ref: "input.filing_status" }
@@ -143,6 +378,7 @@ rules:
 
   - id: "fed.2024.total_withholding"
     description: "Total federal withholding"
+    form_line: "1040 Line 25d"
     type: "sum"
     inputs:
       items: { ref: "input.withholding.federal" }
@@ -151,6 +387,7 @@ rules:
 
   - id: "fed.2024.refund_or_owed"
     description: "Refund (positive) or amount owed (negative)"
+    form_line: "1040 Line 34/37"
     type: "formula"
     expression: "withheld - tax"
     inputs:
