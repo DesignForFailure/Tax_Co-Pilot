@@ -137,21 +137,20 @@ class CalculationEngine:
         if not self.state_packs:
             return outs
 
-        # Normalize GA withholding input (extend as you add more states).
-        self.resolved["input.withholding.state.GA"] = sum(
-            (
-                w.state_withheld
-                for tp in self.inputs.taxpayers
-                for w in tp.w2s
-                if (w.state or "").upper() == "GA"
-            ),
-            Decimal("0"),
-        )
+        # Resolve withholding for every state in state_packs.
+        for state_code in self.state_packs:
+            sc = state_code.upper()
+            self.resolved[f"input.withholding.state.{sc}"] = sum(
+                (
+                    w.state_withheld
+                    for tp in self.inputs.taxpayers
+                    for w in tp.w2s
+                    if (w.state or "").upper() == sc
+                ),
+                Decimal("0"),
+            )
 
         for state_code, sp in self.state_packs.items():
-            # Temporarily swap the active rule pack so _evaluate_rule and
-            # _enforce_rule_namespace operate against the state pack's rules
-            # and namespace.  The finally block guarantees restoration.
             orig_pack = self.rp
             self.rp = sp
             try:
@@ -159,29 +158,34 @@ class CalculationEngine:
                     self._evaluate_rule(sp.rules[rule_id])
 
                 st = state_code.upper()
-                if st == "GA":
-                    outs.append(
-                        StateReturnOutput(
-                            state="GA",
-                            state_agi=self.resolved.get("ga.2024.agi", Decimal("0")),
-                            state_standard_deduction=self.resolved.get(
-                                "ga.2024.standard_deduction", Decimal("0")
-                            ),
-                            state_personal_exemption=self.resolved.get(
-                                "ga.2024.personal_exemption", Decimal("0")
-                            ),
-                            state_taxable_income=self.resolved.get(
-                                "ga.2024.taxable_income", Decimal("0")
-                            ),
-                            state_tax=self.resolved.get("ga.2024.tax", Decimal("0")),
-                            state_withholding=self.resolved.get(
-                                "ga.2024.withholding", Decimal("0")
-                            ),
-                            state_refund_or_owed=self.resolved.get(
-                                "ga.2024.refund_or_owed", Decimal("0")
-                            ),
-                        )
+                st_lower = state_code.lower()
+                yr = sp.tax_year
+                outs.append(
+                    StateReturnOutput(
+                        state=st,
+                        state_agi=self.resolved.get(
+                            f"{st_lower}.{yr}.agi", Decimal("0")
+                        ),
+                        state_standard_deduction=self.resolved.get(
+                            f"{st_lower}.{yr}.standard_deduction", Decimal("0")
+                        ),
+                        state_personal_exemption=self.resolved.get(
+                            f"{st_lower}.{yr}.personal_exemption", Decimal("0")
+                        ),
+                        state_taxable_income=self.resolved.get(
+                            f"{st_lower}.{yr}.taxable_income", Decimal("0")
+                        ),
+                        state_tax=self.resolved.get(
+                            f"{st_lower}.{yr}.tax", Decimal("0")
+                        ),
+                        state_withholding=self.resolved.get(
+                            f"{st_lower}.{yr}.withholding", Decimal("0")
+                        ),
+                        state_refund_or_owed=self.resolved.get(
+                            f"{st_lower}.{yr}.refund_or_owed", Decimal("0")
+                        ),
                     )
+                )
             finally:
                 self.rp = orig_pack
 
