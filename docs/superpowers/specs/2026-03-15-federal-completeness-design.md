@@ -125,7 +125,7 @@ New rules:
 - `fed.2024.adjustments.educator` (formula): `min(input, 300)`
 - `fed.2024.adjustments.hsa` (formula): `min(input, limit)` with limit from lookup
 - `fed.2024.adjustments.ira` (formula): `min(input, 7000)`
-- `fed.2024.adjustments.se_tax` (formula): `input * 0.5` (deductible half)
+- `fed.2024.adjustments.se_tax` (formula): pass-through (user provides deductible half directly)
 - `fed.2024.adjustments.total` (sum): sum of all adjustment rules
 - Update `fed.2024.agi.total`: expression changes from `"gross"` to `"max(gross - adj, 0)"`
 
