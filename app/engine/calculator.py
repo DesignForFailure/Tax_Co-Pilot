@@ -296,7 +296,10 @@ class CalculationEngine:
                     "rounding": rounding,
                     "precision": precision,
                 },
-                explanation=f"Sum of {len(values)} item(s) = {_format_usd(result)}",
+                explanation=(
+                    f"{rule.get('form_line', '')}: " if rule.get("form_line") else ""
+                )
+                + f"{len(values)} item(s) totaling {_format_usd(result)}",
             )
         )
 
@@ -328,7 +331,10 @@ class CalculationEngine:
                     "rounding": rounding,
                     "precision": precision,
                 },
-                explanation=self._explain_formula(expr, inputs, result),
+                explanation=(
+                    f"{rule.get('form_line', '')}: " if rule.get("form_line") else ""
+                )
+                + self._explain_formula(expr, inputs, result),
             )
         )
 
@@ -358,7 +364,10 @@ class CalculationEngine:
                 inputs={"table": table_path, "key": key},
                 intermediates=[],
                 result={"value": str(value), "units": "USD"},
-                explanation=f"Lookup {table_path}[{key}] = {_format_usd(value)}",
+                explanation=(
+                    f"{rule.get('form_line', '')}: " if rule.get("form_line") else ""
+                )
+                + f"{key} → {_format_usd(value)}",
             )
         )
 
@@ -420,8 +429,9 @@ class CalculationEngine:
             f"{i['bracket']} on {i['range']}: {_format_usd(_to_decimal(i['tax']))}"
             for i in intermediates
         ]
+        line_prefix = f"{rule.get('form_line', '')}: " if rule.get("form_line") else ""
         explanation = (
-            f"Tax on {_format_usd(income)} ({fs_key.upper()}): "
+            f"{line_prefix}Tax on {_format_usd(income)} ({fs_key.upper()}): "
             + (" + ".join(parts) if parts else "$0.00")
             + f" = {_format_usd(result)}"
         )
