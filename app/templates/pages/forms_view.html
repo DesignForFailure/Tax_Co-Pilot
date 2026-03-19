@@ -1,0 +1,107 @@
+{% extends "layouts/base.html" %}
+{% block title %}Form View{% endblock %}
+{% block content %}
+
+<h1 style="font-size: 24px; margin-bottom: 8px;">IRS Form View — Tax Year {{ packet.tax_year }}</h1>
+<p class="text-dim text-sm mb-4">Filing Status: {{ packet.filing_status|upper }}</p>
+
+<div style="display:flex;gap:10px;margin-bottom:16px;">
+    <a href="/runs/{{ run.id }}/export/forms" class="btn btn-sm btn-outline">Export Forms JSON</a>
+    <a href="/runs/{{ run.id }}" class="btn btn-sm btn-outline">Back to Summary</a>
+</div>
+
+{% if packet.consistency_errors %}
+<div class="card" style="border-left: 3px solid var(--negative, #e53e3e);">
+    <h2>Consistency Warnings</h2>
+    {% for err in packet.consistency_errors %}
+    <p class="text-dim text-sm">{{ err }}</p>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="card">
+    <h2>Form 1040 — U.S. Individual Income Tax Return</h2>
+    <table style="width:100%;border-collapse:collapse;">
+        <thead>
+            <tr style="border-bottom:2px solid var(--border);">
+                <th style="text-align:left;padding:8px;">Line</th>
+                <th style="text-align:left;padding:8px;">Description</th>
+                <th style="text-align:right;padding:8px;">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% set lines = [
+                ("1a", "Wages, salaries, tips", packet.form_1040.line_1a),
+                ("2a", "Tax-exempt interest", packet.form_1040.line_2a),
+                ("2b", "Taxable interest", packet.form_1040.line_2b),
+                ("3a", "Qualified dividends", packet.form_1040.line_3a),
+                ("3b", "Ordinary dividends", packet.form_1040.line_3b),
+                ("6a", "Social Security benefits", packet.form_1040.line_6a),
+                ("6b", "Taxable Social Security", packet.form_1040.line_6b),
+                ("7", "Capital gain or (loss)", packet.form_1040.line_7),
+                ("8", "Other income (Schedule 1)", packet.form_1040.line_8),
+                ("9", "Total income", packet.form_1040.line_9),
+                ("10", "Adjustments (Schedule 1)", packet.form_1040.line_10),
+                ("11", "Adjusted gross income", packet.form_1040.line_11),
+                ("13", "Standard deduction", packet.form_1040.line_13),
+                ("15", "Taxable income", packet.form_1040.line_15),
+                ("16", "Tax", packet.form_1040.line_16),
+                ("25d", "Federal tax withheld", packet.form_1040.line_25d),
+                ("26", "Estimated tax payments", packet.form_1040.line_26),
+                ("33", "Total payments", packet.form_1040.line_33),
+                ("34", "Overpaid (refund)", packet.form_1040.line_34),
+                ("37", "Amount owed", packet.form_1040.line_37),
+            ] %}
+            {% for num, desc, val in lines %}
+            <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:8px;font-weight:600;">{{ num }}</td>
+                <td style="padding:8px;">{{ desc }}</td>
+                <td style="padding:8px;text-align:right;font-variant-numeric:tabular-nums;">
+                    {% if val >= 0 %}${{ "{:,.0f}".format(val) }}{% else %}-${{ "{:,.0f}".format(val|abs) }}{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if packet.schedule_1.line_3 or packet.schedule_1.line_8 or packet.schedule_1.line_26 %}
+<div class="card">
+    <h2>Schedule 1 — Additional Income and Adjustments</h2>
+    <table style="width:100%;border-collapse:collapse;">
+        <thead>
+            <tr style="border-bottom:2px solid var(--border);">
+                <th style="text-align:left;padding:8px;">Line</th>
+                <th style="text-align:left;padding:8px;">Description</th>
+                <th style="text-align:right;padding:8px;">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% set s1_lines = [
+                ("3", "Business income (1099-NEC)", packet.schedule_1.line_3),
+                ("8", "Other income", packet.schedule_1.line_8),
+                ("10", "Total additional income", packet.schedule_1.line_10),
+                ("11", "Educator expenses", packet.schedule_1.line_11),
+                ("13", "HSA deduction", packet.schedule_1.line_13),
+                ("15", "SE tax deduction", packet.schedule_1.line_15),
+                ("20", "IRA deduction", packet.schedule_1.line_20),
+                ("21", "Student loan interest", packet.schedule_1.line_21),
+                ("26", "Total adjustments", packet.schedule_1.line_26),
+            ] %}
+            {% for num, desc, val in s1_lines %}
+            {% if val %}
+            <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:8px;font-weight:600;">{{ num }}</td>
+                <td style="padding:8px;">{{ desc }}</td>
+                <td style="padding:8px;text-align:right;font-variant-numeric:tabular-nums;">
+                    ${{ "{:,.0f}".format(val) }}
+                </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% endblock %}

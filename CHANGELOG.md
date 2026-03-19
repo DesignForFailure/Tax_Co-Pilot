@@ -9,6 +9,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Added
+- Form data models (`Form1040Lines`, `Schedule1Lines`, `FormPacket`) mapping engine outputs to IRS form line items (`app/models/forms.py`).
+- Form mapper service (`app/services/form_mapper.py`) with consistency checks between calculated outputs and form lines.
+- `form_line` field on `TraceNode` for structured form-line annotation on every trace entry.
+- Estimated tax payments input field and rules (`fed.2024.estimated_payments`, `fed.2024.total_payments`).
+- Tax-exempt interest field on `Form1099INTData` and qualified dividends helper on `TaxReturnInput`.
+- Above-the-line deductions, estimated payments, and other income sections on the calculate form.
+- `GET /runs/{id}/forms`: IRS form-oriented view of calculation results (`app/templates/pages/forms_view.html`).
+- `GET /runs/{id}/export/forms`: downloadable JSON export of form data.
+- "View Forms" button on the dashboard.
+- `estimated_tax_payments` and `total_payments` fields on `ReturnOutput`.
+- Comprehensive form mapping and consistency check tests (`tests/test_forms.py`).
+
+### Changed
+- `fed.2024.refund_or_owed` now uses total payments (withholding + estimated) instead of withholding alone.
+
 - `GET /whatif`, `POST /whatif`: What-if scenario comparison page using `WhatIfEngine` (MFJ vs MFS); shows diffs table, recommendation, and savings amount.
 - `GET /import-csv`, `POST /import-csv`: CSV import page with textarea input and record-type dropdown (W-2, 1099-B, 1099-INT, 1099-DIV); displays per-line parse errors and parsed record table.
 - `GET /runs/{run_id}/export/json`, `GET /runs/{run_id}/export/html`: Downloadable audit export endpoints using `generate_audit_html()` from `audit_export.py`.

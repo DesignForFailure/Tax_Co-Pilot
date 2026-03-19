@@ -115,6 +115,8 @@ class CalculationEngine:
             total_withholding=self.resolved.get("fed.2024.total_withholding", Decimal("0")),
             refund_or_owed=self.resolved.get("fed.2024.refund_or_owed", Decimal("0")),
             adjustments_total=self.resolved.get("fed.2024.adjustments.total", Decimal("0")),
+            estimated_tax_payments=self.resolved.get("fed.2024.estimated_payments", Decimal("0")),
+            total_payments=self.resolved.get("fed.2024.total_payments", Decimal("0")),
         )
 
         state_outputs = self._run_states()
@@ -217,6 +219,7 @@ class CalculationEngine:
         self.resolved["input.adjustments.self_employment_tax_deduction"] = (
             self.inputs.adjustments.self_employment_tax_deduction
         )
+        self.resolved["input.estimated_payments"] = self.inputs.estimated_tax_payments
 
     # ─── Rule evaluation dispatch ───────────────────────────────
 
@@ -304,6 +307,7 @@ class CalculationEngine:
                     f"{rule.get('form_line', '')}: " if rule.get("form_line") else ""
                 )
                 + f"{len(values)} item(s) totaling {_format_usd(result)}",
+                form_line=rule.get("form_line", ""),
             )
         )
 
@@ -339,6 +343,7 @@ class CalculationEngine:
                     f"{rule.get('form_line', '')}: " if rule.get("form_line") else ""
                 )
                 + self._explain_formula(expr, inputs, result),
+                form_line=rule.get("form_line", ""),
             )
         )
 
@@ -372,6 +377,7 @@ class CalculationEngine:
                     f"{rule.get('form_line', '')}: " if rule.get("form_line") else ""
                 )
                 + f"{key} → {_format_usd(value)}",
+                form_line=rule.get("form_line", ""),
             )
         )
 
@@ -455,6 +461,7 @@ class CalculationEngine:
                     "precision": precision,
                 },
                 explanation=explanation,
+                form_line=rule.get("form_line", ""),
             )
         )
 

@@ -132,6 +132,8 @@ def test_trace_completeness() -> None:
         "fed.2024.taxable_income",
         "fed.2024.tax.brackets",
         "fed.2024.total_withholding",
+        "fed.2024.estimated_payments",
+        "fed.2024.total_payments",
         "fed.2024.refund_or_owed",
     }
     assert expected == ids

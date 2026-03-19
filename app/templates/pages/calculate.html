@@ -114,6 +114,39 @@
         <div id="s_1099b_container" class="dynamic-section"></div>
     </div>
 
+    {# ─── Other Income ────────────────────────────────────────── #}
+    <div class="card">
+        <h2>Other Income</h2>
+        <div class="form-row">
+            <div><label>Other Income (Schedule 1)</label><input type="text" name="other_income" placeholder="0"></div>
+        </div>
+    </div>
+
+    {# ─── Above-the-Line Deductions ──────────────────────────── #}
+    <div class="card">
+        <h2>Above-the-Line Deductions</h2>
+        <p class="text-dim text-sm" style="margin-bottom:12px;">These reduce your AGI. Leave blank or 0 if not applicable.</p>
+        <div class="form-row">
+            <div><label>Student Loan Interest</label><input type="text" name="adj_student_loan" placeholder="0"></div>
+            <div><label>Educator Expenses</label><input type="text" name="adj_educator" placeholder="0"></div>
+        </div>
+        <div class="form-row">
+            <div><label>HSA Contributions</label><input type="text" name="adj_hsa" placeholder="0"></div>
+            <div><label>IRA Contributions</label><input type="text" name="adj_ira" placeholder="0"></div>
+        </div>
+        <div class="form-row">
+            <div><label>SE Tax Deduction</label><input type="text" name="adj_se_tax" placeholder="0"></div>
+        </div>
+    </div>
+
+    {# ─── Estimated Payments ─────────────────────────────────── #}
+    <div class="card">
+        <h2>Estimated Tax Payments</h2>
+        <div class="form-row">
+            <div><label>Estimated Payments (1040 Line 26)</label><input type="text" name="estimated_payments" placeholder="0"></div>
+        </div>
+    </div>
+
     <button class="btn" type="submit">Calculate</button>
 </form>
 
