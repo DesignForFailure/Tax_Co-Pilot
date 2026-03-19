@@ -69,6 +69,24 @@ These files contain strict, non-negotiable rules for AI agent work:
 - **Definition of done:** Every task must run `ruff check .`, `mypy .`, `pytest` and report results. Do not submit changes that introduce new lint, typing, or test failures.
 - **Strict typing:** All new/modified code must satisfy mypy. Avoid `Any` types.
 
+## Repository Documentation (Canonical)
+
+**STRICT RULE: The directory tree in README.md ("Actual Current Repository Structure") is canonical and must be kept in sync with the actual repository structure WITHOUT EXCEPTION.**
+
+When any of the following occur, you MUST update the tree in README.md:
+- New directories or files are added to the repository
+- Files or directories are deleted
+- Directory structure is reorganized
+- New top-level files (like AGENTS.md) are added
+
+Update process:
+1. Run: `find . -not -path '*/\.git/*' -not -path '*/__pycache__/*' -not -path '*/.pytest_cache/*' -type f | sort` (or equivalent tree command)
+2. Generate a clean tree representation
+3. Update the tree section in README.md immediately
+4. Commit the change with message: "docs: update repository structure tree"
+
+This is NOT optional. The tree is the source of truth for repository structure documentation. Failure to keep it updated will result in stale documentation and confusion for new contributors.
+
 ## Encryption Configuration
 
 Controlled via environment variables:
