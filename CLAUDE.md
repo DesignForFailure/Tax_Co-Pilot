@@ -71,21 +71,22 @@ These files contain strict, non-negotiable rules for AI agent work:
 
 ## Repository Documentation (Canonical)
 
-**STRICT RULE: The directory tree in README.md ("Actual Current Repository Structure") is canonical and must be kept in sync with the actual repository structure WITHOUT EXCEPTION.**
+**STRICT RULE: The directory tree in README.md ("Actual Current Repository Structure") is canonical and must be kept in sync with the actual repository structure WITHOUT EXCEPTION. The tree must include every single file and every single directory at every level of the repository — no file or folder may be omitted, collapsed, or summarized.**
 
 When any of the following occur, you MUST update the tree in README.md:
 - New directories or files are added to the repository
 - Files or directories are deleted
 - Directory structure is reorganized
 - New top-level files (like AGENTS.md) are added
+- Hidden files or directories (dotfiles, `.agent_tools/`, `.github/`, etc.) are added or removed
 
 Update process:
-1. Run: `find . -not -path '*/\.git/*' -not -path '*/__pycache__/*' -not -path '*/.pytest_cache/*' -type f | sort` (or equivalent tree command)
-2. Generate a clean tree representation
-3. Update the tree section in README.md immediately
+1. Run: `find . -not -path '*/.git/*' -not -path '*/__pycache__/*' -not -path '*/.pytest_cache/*' -not -path '*/.mypy_cache/*' -not -path '*/.ruff_cache/*' | sort` to get the complete list of every file and directory at every level, including hidden files and folders.
+2. Generate a full tree representation that includes **every file and every directory** — nothing collapsed, nothing omitted. Hidden files and directories (e.g., `.editorconfig`, `.agent_tools/`, `.github/`) must be included.
+3. Update the tree section in README.md immediately with the complete tree.
 4. Commit the change with message: "docs: update repository structure tree"
 
-This is NOT optional. The tree is the source of truth for repository structure documentation. Failure to keep it updated will result in stale documentation and confusion for new contributors.
+This is NOT optional. The tree is the source of truth for repository structure documentation. Failure to keep it fully updated (including all files at all levels, including hidden files and folders) will result in stale documentation and confusion for new contributors.
 
 ## Encryption Configuration
 
