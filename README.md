@@ -129,71 +129,15 @@ This project follows **Semantic Versioning (SemVer)**.
 ## Actual Current Repository Structure
 
 ```text
-Tax_Co-Pilot/
+.
 ├── .editorconfig
-├── .github/
-│   └── workflows/
-│       └── ci.yml
 ├── .gitignore
+├── .github
+│   └── workflows
 ├── .pre-commit-config.yaml
-├── app/
-│   ├── __init__.py
-│   ├── config.py
-│   ├── engine/
-│   │   ├── __init__.py
-│   │   ├── calculator.py
-│   │   ├── rule_loader.py
-│   │   └── whatif.py
-│   ├── models/
-│   │   ├── __init__.py
-│   │   ├── domain.py
-│   │   └── forms.py
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── audit_export.py
-│   │   ├── csv_import.py
-│   │   ├── database.py
-│   │   ├── encryption.py
-│   │   └── form_mapper.py
-│   └── templates/
-│       ├── layouts/
-│       │   └── base.html
-│       └── pages/
-│           ├── calculate.html
-│           ├── dashboard.html
-│           ├── import_csv.html
-│           ├── legal.html
-│           ├── run_compare.html
-│           ├── runs.html
-│           ├── forms_view.html
-│           ├── unlock.html
-│           └── whatif.html
-├── docs/
-│   ├── DISCLAIMER.md
-│   ├── ENCRYPTION.md
-│   ├── EXPORT_CONTROL.md
-│   └── NOTICE.md
-├── rule_packs/
-│   ├── federal/2024/
-│   │   ├── federal_2024_manifest.yaml
-│   │   └── federal_2024_rules.yaml
-│   └── state/GA/2024/
-│       ├── state_GA_2024_manifest.yaml
-│       └── state_GA_2024_rules.yaml
-├── tests/
-│   ├── __init__.py
-│   ├── test_calculate_name_validation.py
-│   ├── test_calculator_resolve_ref.py
-│   ├── test_encoding_guard.py
-│   ├── test_encrypted_database.py
-│   ├── test_encryption.py
-│   ├── test_forms.py
-│   ├── test_golden.py
-│   ├── test_golden2.py
-│   ├── test_golden_m1.py
-│   ├── test_milestone6_routes.py
-│   └── test_state_expansion.py
+├── AGENTS.md
 ├── CHANGELOG.md
+├── CLAUDE.md
 ├── CODE_OF_CONDUCT.md
 ├── CONTRIBUTING.md
 ├── LICENSE
@@ -201,11 +145,40 @@ Tax_Co-Pilot/
 ├── README.txt
 ├── ROADMAP.md
 ├── SECURITY.md
+├── app
+│   ├── __init__.py
+│   ├── config.py
+│   ├── engine
+│   ├── models
+│   ├── services
+│   └── templates
+├── docs
+│   ├── DISCLAIMER.md
+│   ├── ENCRYPTION.md
+│   ├── EXPORT_CONTROL.md
+│   ├── NOTICE.md
+│   └── STATE_AUTHORING_GUIDE.md
 ├── main.py
 ├── pyproject.toml
-├── requirements.txt
 ├── requirements-dev.txt
-└── run.sh
+├── requirements.txt
+├── rule_packs
+│   ├── federal
+│   └── state
+├── run.sh
+└── tests
+    ├── __init__.py
+    ├── test_calculate_name_validation.py
+    ├── test_calculator_resolve_ref.py
+    ├── test_encoding_guard.py
+    ├── test_encrypted_database.py
+    ├── test_encryption.py
+    ├── test_forms.py
+    ├── test_golden.py
+    ├── test_golden2.py
+    ├── test_golden_m1.py
+    ├── test_milestone6_routes.py
+    └── test_state_expansion.py
 ```
 
 ---
