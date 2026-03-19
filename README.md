@@ -130,10 +130,18 @@ This project follows **Semantic Versioning (SemVer)**.
 
 ```text
 .
+├── .agent_tools
+│   ├── 00_master_directives.md
+│   ├── 01_style_guide.md
+│   ├── 02_architecture.md
+│   ├── 03_testing_rules.md
+│   ├── 04_doc_updater.md
+│   └── 05_session_log.md
 ├── .editorconfig
-├── .gitignore
 ├── .github
 │   └── workflows
+│       └── ci.yml
+├── .gitignore
 ├── .pre-commit-config.yaml
 ├── AGENTS.md
 ├── CHANGELOG.md
@@ -149,22 +157,104 @@ This project follows **Semantic Versioning (SemVer)**.
 │   ├── __init__.py
 │   ├── config.py
 │   ├── engine
+│   │   ├── __init__.py
+│   │   ├── calculator.py
+│   │   ├── rule_loader.py
+│   │   └── whatif.py
 │   ├── models
+│   │   ├── __init__.py
+│   │   ├── domain.py
+│   │   └── forms.py
 │   ├── services
+│   │   ├── __init__.py
+│   │   ├── audit_export.py
+│   │   ├── csv_import.py
+│   │   ├── database.py
+│   │   ├── encryption.py
+│   │   └── form_mapper.py
 │   └── templates
+│       ├── layouts
+│       │   └── base.html
+│       └── pages
+│           ├── calculate.html
+│           ├── dashboard.html
+│           ├── forms_view.html
+│           ├── import_csv.html
+│           ├── legal.html
+│           ├── run_compare.html
+│           ├── runs.html
+│           ├── unlock.html
+│           └── whatif.html
 ├── docs
 │   ├── DISCLAIMER.md
 │   ├── ENCRYPTION.md
 │   ├── EXPORT_CONTROL.md
 │   ├── NOTICE.md
-│   └── STATE_AUTHORING_GUIDE.md
+│   ├── STATE_AUTHORING_GUIDE.md
+│   └── superpowers
+│       ├── plans
+│       │   ├── 2026-03-15-federal-completeness.md
+│       │   ├── 2026-03-16-state-expansion.md
+│       │   ├── 2026-03-18-forms-support.md
+│       │   ├── 2026-03-18-multi-year-support.md
+│       │   └── 2026-03-18-qa-remediation.md
+│       └── specs
+│           ├── 2026-03-15-federal-completeness-design.md
+│           └── 2026-03-16-state-expansion-design.md
 ├── main.py
 ├── pyproject.toml
 ├── requirements-dev.txt
 ├── requirements.txt
 ├── rule_packs
 │   ├── federal
+│   │   └── 2024
+│   │       ├── federal_2024_manifest.yaml
+│   │       └── federal_2024_rules.yaml
 │   └── state
+│       ├── AK
+│       │   └── 2024
+│       │       ├── state_AK_2024_manifest.yaml
+│       │       └── state_AK_2024_rules.yaml
+│       ├── FL
+│       │   └── 2024
+│       │       ├── state_FL_2024_manifest.yaml
+│       │       └── state_FL_2024_rules.yaml
+│       ├── GA
+│       │   └── 2024
+│       │       ├── state_GA_2024_manifest.yaml
+│       │       └── state_GA_2024_rules.yaml
+│       ├── NH
+│       │   └── 2024
+│       │       ├── state_NH_2024_manifest.yaml
+│       │       └── state_NH_2024_rules.yaml
+│       ├── NV
+│       │   └── 2024
+│       │       ├── state_NV_2024_manifest.yaml
+│       │       └── state_NV_2024_rules.yaml
+│       ├── SD
+│       │   └── 2024
+│       │       ├── state_SD_2024_manifest.yaml
+│       │       └── state_SD_2024_rules.yaml
+│       ├── TN
+│       │   └── 2024
+│       │       ├── state_TN_2024_manifest.yaml
+│       │       └── state_TN_2024_rules.yaml
+│       ├── TX
+│       │   └── 2024
+│       │       ├── state_TX_2024_manifest.yaml
+│       │       └── state_TX_2024_rules.yaml
+│       ├── WA
+│       │   └── 2024
+│       │       ├── state_WA_2024_manifest.yaml
+│       │       └── state_WA_2024_rules.yaml
+│       ├── WY
+│       │   └── 2024
+│       │       ├── state_WY_2024_manifest.yaml
+│       │       └── state_WY_2024_rules.yaml
+│       └── _template
+│           └── 2024
+│               ├── state_TEMPLATE_2024_manifest.yaml
+│               └── state_TEMPLATE_2024_rules.yaml
 ├── run.sh
 └── tests
     ├── __init__.py
