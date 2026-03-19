@@ -72,6 +72,7 @@ class W2Data(BaseModel):
 class Form1099INTData(BaseModel):
     payer_name: str = ""
     interest_income: Decimal = Decimal("0")  # Box 1
+    tax_exempt_interest: Decimal = Decimal("0")  # Box 8
     federal_withheld: Decimal = Decimal("0")
 
 
@@ -149,6 +150,7 @@ class TaxReturnInput(BaseModel):
     taxpayers: list[Taxpayer] = Field(default_factory=list)
     other_income: Decimal = Decimal("0")
     adjustments: AdjustmentsData = Field(default_factory=AdjustmentsData)
+    estimated_tax_payments: Decimal = Decimal("0")
 
     def total_wages(self) -> Decimal:
         return sum((w.wages for tp in self.taxpayers for w in tp.w2s), Decimal("0"))
@@ -205,6 +207,18 @@ class TaxReturnInput(BaseModel):
             + a.self_employment_tax_deduction
         )
 
+    def total_qualified_dividends(self) -> Decimal:
+        return sum(
+            (f.qualified_dividends for tp in self.taxpayers for f in tp.form_1099_divs),
+            Decimal("0"),
+        )
+
+    def total_tax_exempt_interest(self) -> Decimal:
+        return sum(
+            (f.tax_exempt_interest for tp in self.taxpayers for f in tp.form_1099_ints),
+            Decimal("0"),
+        )
+
 
 # ─── Trace / Audit Models ────────────────────────────────────
 
@@ -220,6 +234,7 @@ class TraceNode(BaseModel):
     intermediates: list[dict[str, Any]] = Field(default_factory=list)
     result: dict[str, Any]
     explanation: str
+    form_line: str = ""
 
 
 class ReturnOutput(BaseModel):
@@ -233,6 +248,8 @@ class ReturnOutput(BaseModel):
     total_withholding: Decimal
     refund_or_owed: Decimal  # positive = refund, negative = owed
     adjustments_total: Decimal = Decimal("0")
+    estimated_tax_payments: Decimal = Decimal("0")
+    total_payments: Decimal = Decimal("0")
 
 
 class StateReturnOutput(BaseModel):

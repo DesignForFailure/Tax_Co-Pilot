@@ -385,13 +385,33 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
+  - id: "fed.2024.estimated_payments"
+    description: "Estimated tax payments made during the year"
+    form_line: "1040 Line 26"
+    type: "sum"
+    inputs:
+      items: { ref: "input.estimated_payments" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.total_payments"
+    description: "Total payments (withholding + estimated)"
+    form_line: "1040 Line 33"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "fed.2024.total_withholding" }
+        - { ref: "fed.2024.estimated_payments" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
   - id: "fed.2024.refund_or_owed"
     description: "Refund (positive) or amount owed (negative)"
     form_line: "1040 Line 34/37"
     type: "formula"
-    expression: "withheld - tax"
+    expression: "payments - tax"
     inputs:
-      withheld: { ref: "fed.2024.total_withholding" }
+      payments: { ref: "fed.2024.total_payments" }
       tax: { ref: "fed.2024.tax.brackets" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0

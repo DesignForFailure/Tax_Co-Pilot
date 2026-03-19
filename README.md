@@ -146,13 +146,15 @@ Tax_Co-Pilot/
 │   │   └── whatif.py
 │   ├── models/
 │   │   ├── __init__.py
-│   │   └── domain.py
+│   │   ├── domain.py
+│   │   └── forms.py
 │   ├── services/
 │   │   ├── __init__.py
 │   │   ├── audit_export.py
 │   │   ├── csv_import.py
 │   │   ├── database.py
-│   │   └── encryption.py
+│   │   ├── encryption.py
+│   │   └── form_mapper.py
 │   └── templates/
 │       ├── layouts/
 │       │   └── base.html
@@ -163,6 +165,7 @@ Tax_Co-Pilot/
 │           ├── legal.html
 │           ├── run_compare.html
 │           ├── runs.html
+│           ├── forms_view.html
 │           ├── unlock.html
 │           └── whatif.html
 ├── docs/
@@ -184,9 +187,12 @@ Tax_Co-Pilot/
 │   ├── test_encoding_guard.py
 │   ├── test_encrypted_database.py
 │   ├── test_encryption.py
+│   ├── test_forms.py
 │   ├── test_golden.py
 │   ├── test_golden2.py
-│   └── test_milestone6_routes.py
+│   ├── test_golden_m1.py
+│   ├── test_milestone6_routes.py
+│   └── test_state_expansion.py
 ├── CHANGELOG.md
 ├── CODE_OF_CONDUCT.md
 ├── CONTRIBUTING.md

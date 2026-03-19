@@ -51,6 +51,7 @@ from app.engine.calculator import CalculationEngine
 from app.engine.rule_loader import RulePack
 from app.engine.whatif import WhatIfEngine
 from app.models.domain import (
+    AdjustmentsData,
     FilingStatus,
     Form1099BData,
     Form1099DIVData,
@@ -458,10 +459,21 @@ def _parse_tax_input_from_form(fd: FormData) -> TaxReturnInput:
         if s_first or s_last or has_spouse_income:
             taxpayers.append(_parse_taxpayer(fd, "s", TaxpayerRole.SPOUSE))
 
+    adjustments = AdjustmentsData(
+        student_loan_interest=_form_money(fd, "adj_student_loan"),
+        educator_expenses=_form_money(fd, "adj_educator"),
+        hsa_contributions=_form_money(fd, "adj_hsa"),
+        ira_contributions=_form_money(fd, "adj_ira"),
+        self_employment_tax_deduction=_form_money(fd, "adj_se_tax"),
+    )
+
     return TaxReturnInput(
         tax_year=tax_year,
         filing_status=filing_status,
         taxpayers=taxpayers,
+        adjustments=adjustments,
+        estimated_tax_payments=_form_money(fd, "estimated_payments"),
+        other_income=_form_money(fd, "other_income"),
     )
 
 
@@ -675,6 +687,50 @@ def export_run_html(run_id: str) -> Response:
         io.BytesIO(html_content.encode("utf-8")),
         media_type="text/html",
         headers={"Content-Disposition": f'attachment; filename="audit_{run_id}.html"'},
+    )
+
+
+# ─── Form-Oriented View ──────────────────────────────────────
+
+
+@app.get("/runs/{run_id}/forms", response_class=HTMLResponse)
+def view_run_forms(request: Request, run_id: str) -> Response:
+    run_data = get_return_run(run_id)
+    if not run_data:
+        return HTMLResponse("Run not found", status_code=404)
+    run_data["input_snapshot"] = json.loads(run_data["input_snapshot_json"])
+    run_data["output"] = json.loads(run_data["output_json"])
+    run_data["trace"] = json.loads(run_data["trace_json"])
+    run = ReturnRun(**{k: v for k, v in run_data.items() if not k.endswith("_json")})
+
+    from app.services.form_mapper import map_return_run
+
+    packet = map_return_run(run)
+    return templates.TemplateResponse(
+        "pages/forms_view.html", {"request": request, "run": run, "packet": packet}
+    )
+
+
+@app.get("/runs/{run_id}/export/forms")
+def export_run_forms(run_id: str) -> Response:
+    run_data = get_return_run(run_id)
+    if not run_data:
+        return HTMLResponse("Run not found", status_code=404)
+    run_data["input_snapshot"] = json.loads(run_data["input_snapshot_json"])
+    run_data["output"] = json.loads(run_data["output_json"])
+    run_data["trace"] = json.loads(run_data["trace_json"])
+    run = ReturnRun(**{k: v for k, v in run_data.items() if not k.endswith("_json")})
+
+    from app.services.form_mapper import map_return_run
+
+    packet = map_return_run(run)
+    json_bytes = json.dumps(
+        json.loads(packet.model_dump_json()), indent=2, ensure_ascii=False
+    ).encode("utf-8")
+    return StreamingResponse(
+        io.BytesIO(json_bytes),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="forms_{run_id}.json"'},
     )
 
 
