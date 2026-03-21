@@ -26,7 +26,7 @@ Security/QA notes:
 - Sets a busy timeout to reduce "database is locked" errors.
 
 Storage security (with encryption):
-- Supports optional encryption-at-rest via SQLCipher (AES-256) or Python fallback.
+- Supports optional encryption-at-rest via SQLCipher (AES-256).
 - Password-protected database with PBKDF2 key derivation.
 - Transparent encryption (no schema changes required for SQLCipher).
 
@@ -103,7 +103,7 @@ def get_connection(password: str | None = None) -> sqlite3.Connection:
     if config.enabled:
         db_state = detect_encryption_state(DB_PATH)
 
-        if db_state in (DatabaseState.ENCRYPTED_SQLCIPHER, DatabaseState.ENCRYPTED_PYTHON):
+        if db_state == DatabaseState.ENCRYPTED_SQLCIPHER:
             # Database is encrypted, password required
             if not password:
                 raise ValueError(
@@ -116,6 +116,11 @@ def get_connection(password: str | None = None) -> sqlite3.Connection:
                 provider_type=config.provider, kdf_iterations=config.key_derivation_iterations
             )
             return provider.create_connection(DB_PATH, password, timeout=5.0)
+        elif db_state == DatabaseState.ENCRYPTED_PYTHON:
+            raise ValueError(
+                "Python-layer encrypted databases are not supported in runtime reads/writes. "
+                "Use SQLCipher encryption."
+            )
 
         elif db_state == DatabaseState.UNENCRYPTED:
             # Database exists but is unencrypted
@@ -176,10 +181,16 @@ def init_db() -> None:
             input_snapshot_json TEXT NOT NULL,
             output_json TEXT NOT NULL,
             trace_json TEXT NOT NULL,
+            state_outputs_json TEXT NOT NULL DEFAULT '[]',
             created_at TEXT NOT NULL
         );
         """
     )
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(return_runs)").fetchall()}
+    if "state_outputs_json" not in columns:
+        conn.execute(
+            "ALTER TABLE return_runs ADD COLUMN state_outputs_json TEXT NOT NULL DEFAULT '[]'"
+        )
     conn.close()
 
 
@@ -197,8 +208,8 @@ def save_return_run(run_data: dict) -> None:
         """INSERT INTO return_runs
            (id, tax_year, filing_status, scenario_name,
             rule_pack_version, rule_pack_checksum,
-            input_snapshot_json, output_json, trace_json, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            input_snapshot_json, output_json, trace_json, state_outputs_json, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             run_data["id"],
             run_data["tax_year"],
@@ -209,6 +220,7 @@ def save_return_run(run_data: dict) -> None:
             json.dumps(run_data["input_snapshot"], ensure_ascii=False),
             json.dumps(run_data["output"], ensure_ascii=False),
             json.dumps(run_data["trace"], ensure_ascii=False),
+            json.dumps(run_data.get("state_outputs", []), ensure_ascii=False),
             run_data["created_at"],
         ),
     )

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """IRS form data models for mapping engine outputs to form-oriented views.
 
 Each model represents an IRS form with fields named by line number.

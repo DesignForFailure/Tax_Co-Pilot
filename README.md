@@ -118,7 +118,7 @@ This project follows **Semantic Versioning (SemVer)**.
 - **Backend:** FastAPI
 - **ASGI Server:** Uvicorn
 - **Database:** SQLite (with optional AES-256 encryption via SQLCipher)
-- **Encryption:** SQLCipher (primary) / Python Fernet (fallback); PBKDF2-HMAC-SHA256 key derivation
+- **Encryption:** SQLCipher (runtime); PBKDF2-HMAC-SHA256 key derivation
 - **UI:** Server-rendered HTML templates (Jinja2)
 - **Numeric Type:** Decimal
 - **Rule Packs:** YAML (versioned)
@@ -130,12 +130,21 @@ This project follows **Semantic Versioning (SemVer)**.
 
 ```text
 Tax_Co-Pilot/
+├── .agent_tools/
+│   ├── 00_master_directives.md
+│   ├── 01_style_guide.md
+│   ├── 02_architecture.md
+│   ├── 03_testing_rules.md
+│   ├── 04_doc_updater.md
+│   └── 05_session_log.md
 ├── .editorconfig
 ├── .github/
 │   └── workflows/
 │       └── ci.yml
 ├── .gitignore
 ├── .pre-commit-config.yaml
+├── AGENTS.md
+├── CLAUDE.md
 ├── app/
 │   ├── __init__.py
 │   ├── config.py
@@ -172,7 +181,11 @@ Tax_Co-Pilot/
 │   ├── DISCLAIMER.md
 │   ├── ENCRYPTION.md
 │   ├── EXPORT_CONTROL.md
-│   └── NOTICE.md
+│   ├── NOTICE.md
+│   ├── STATE_AUTHORING_GUIDE.md
+│   └── superpowers/
+│       ├── plans/
+│       └── specs/
 ├── rule_packs/
 │   ├── federal/
 │   │   ├── 2023/
@@ -182,13 +195,29 @@ Tax_Co-Pilot/
 │   │       ├── federal_2024_manifest.yaml
 │   │       └── federal_2024_rules.yaml
 │   └── state/
-│       └── GA/
-│           ├── 2023/
-│           │   ├── state_GA_2023_manifest.yaml
-│           │   └── state_GA_2023_rules.yaml
+│       ├── _template/
+│       │   └── 2024/
+│       ├── AK/
+│       │   └── 2024/
+│       ├── FL/
+│       │   └── 2024/
+│       ├── GA/
+│       │   ├── 2023/
+│       │   └── 2024/
+│       ├── NH/
+│       │   └── 2024/
+│       ├── NV/
+│       │   └── 2024/
+│       ├── SD/
+│       │   └── 2024/
+│       ├── TN/
+│       │   └── 2024/
+│       ├── TX/
+│       │   └── 2024/
+│       ├── WA/
+│       │   └── 2024/
+│       └── WY/
 │           └── 2024/
-│               ├── state_GA_2024_manifest.yaml
-│               └── state_GA_2024_rules.yaml
 ├── tests/
 │   ├── __init__.py
 │   ├── test_calculate_name_validation.py
@@ -212,10 +241,11 @@ Tax_Co-Pilot/
 ├── README.txt
 ├── ROADMAP.md
 ├── SECURITY.md
+├── data/
 ├── main.py
 ├── pyproject.toml
-├── requirements.txt
 ├── requirements-dev.txt
+├── requirements.txt
 └── run.sh
 ```
 
@@ -266,7 +296,7 @@ Tax_Co-Pilot is licensed under the **GNU Affero General Public License v3.0 or l
 
 Database encryption at rest is powered by **[SQLCipher](https://www.zetetic.net/sqlcipher/)** (AES-256), Copyright © 2008-2024 Zetetic LLC, licensed under the **BSD-3-Clause** license. SQLCipher is built on [SQLite](https://www.sqlite.org/), which is in the public domain.
 
-The Python **[cryptography](https://github.com/pyca/cryptography)** library provides Fernet fallback encryption and is licensed under **Apache-2.0 OR BSD-3-Clause**. It includes **[OpenSSL](https://www.openssl.org/)** (Apache-2.0).
+The Python **[cryptography](https://github.com/pyca/cryptography)** library is used for legacy/compatibility encryption tooling and is licensed under **Apache-2.0 OR BSD-3-Clause**. It includes **[OpenSSL](https://www.openssl.org/)** (Apache-2.0).
 
 ### Key Frameworks
 

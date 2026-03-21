@@ -55,11 +55,17 @@ def generate_audit_html(run: ReturnRun) -> str:
 
     state_bits = ""
     if run.state_outputs:
-        so = run.state_outputs[0]
-        state_bits = (
-            f"<p><strong>Georgia</strong>: taxable {esc(str(so.state_taxable_income))}, "
-            f"tax {esc(str(so.state_tax))}</p>"
-        )
+        state_rows = [
+            (
+                f"<li><strong>{esc(so.state)}</strong>: "
+                f"taxable {esc(str(so.state_taxable_income))}, "
+                f"tax {esc(str(so.state_tax))}, "
+                f"withholding {esc(str(so.state_withholding))}, "
+                f"refund/owed {esc(str(so.state_refund_or_owed))}</li>"
+            )
+            for so in run.state_outputs
+        ]
+        state_bits = "<h2>State Outputs</h2><ul>" + "".join(state_rows) + "</ul>"
 
     return f"""
 <!doctype html>

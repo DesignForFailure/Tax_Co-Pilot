@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Map ReturnRun trace data to IRS form-oriented models.
 
 Reads the form_line annotation on each TraceNode and populates
@@ -94,8 +94,9 @@ def map_return_run(run: ReturnRun) -> FormPacket:
     )
 
     # Refund (Line 34) vs Amount Owed (Line 37)
-    # Use post-credit tax (line_22) when credits apply, otherwise line_16
-    tax_amount = form_1040.line_22 if form_1040.line_22 > 0 else form_1040.line_16
+    # Use post-credit tax whenever credits are present. This includes scenarios
+    # where credits reduce line_22 to zero.
+    tax_amount = form_1040.line_22 if form_1040.line_21 > 0 else form_1040.line_16
     if form_1040.line_33 > tax_amount:
         form_1040.line_34 = form_1040.line_33 - tax_amount
         form_1040.line_37 = Decimal("0")

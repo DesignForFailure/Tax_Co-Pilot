@@ -22,6 +22,7 @@ MVP: compare filing statuses (MFJ vs MFS) by re-running the same input snapshot.
 from __future__ import annotations
 
 from copy import deepcopy
+from decimal import Decimal
 
 from app.engine.calculator import CalculationEngine
 from app.engine.rule_loader import RulePack
@@ -37,17 +38,29 @@ class WhatIfEngine:
     def __init__(self, federal_pack: RulePack):
         self.fed = federal_pack
 
+    def _run_mfs_household(self, base: TaxReturnInput) -> tuple[Decimal, Decimal]:
+        """Run MFS as one return per taxpayer and aggregate totals."""
+        total_tax = Decimal("0")
+        total_refund_or_owed = Decimal("0")
+
+        for tp in base.taxpayers:
+            mfs_inp = deepcopy(base)
+            mfs_inp.filing_status = FilingStatus.MFS
+            mfs_inp.taxpayers = [deepcopy(tp)]
+            mfs_run = CalculationEngine(self.fed, mfs_inp).run()
+            total_tax += mfs_run.output.federal_tax
+            total_refund_or_owed += mfs_run.output.refund_or_owed
+
+        return total_tax, total_refund_or_owed
+
     def compare_filing_status(self, base: TaxReturnInput) -> ScenarioComparison:
         a_inp = deepcopy(base)
         a_inp.filing_status = FilingStatus.MFJ
-        b_inp = deepcopy(base)
-        b_inp.filing_status = FilingStatus.MFS
 
         a_run = CalculationEngine(self.fed, a_inp).run()
-        b_run = CalculationEngine(self.fed, b_inp).run()
 
         a_tax = a_run.output.federal_tax
-        b_tax = b_run.output.federal_tax
+        b_tax, b_refund_or_owed = self._run_mfs_household(base)
 
         scenario_a = ScenarioRun(
             scenario_name="mfj",
@@ -59,7 +72,7 @@ class WhatIfEngine:
             scenario_name="mfs",
             filing_status=FilingStatus.MFS,
             total_tax=b_tax,
-            refund_or_owed=b_run.output.refund_or_owed,
+            refund_or_owed=b_refund_or_owed,
         )
 
         savings = b_tax - a_tax
@@ -70,7 +83,7 @@ class WhatIfEngine:
             {
                 "metric": "refund_or_owed",
                 "mfj": str(a_run.output.refund_or_owed),
-                "mfs": str(b_run.output.refund_or_owed),
+                "mfs": str(b_refund_or_owed),
             },
         ]
 
