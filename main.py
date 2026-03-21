@@ -56,6 +56,7 @@ from app.models.domain import (
     Form1099BData,
     Form1099DIVData,
     Form1099INTData,
+    ItemizedDeductionData,
     ReturnRun,
     Taxpayer,
     TaxpayerRole,
@@ -497,6 +498,18 @@ def _parse_tax_input_from_form(fd: FormData) -> TaxReturnInput:
         self_employment_tax_deduction=_form_money(fd, "adj_se_tax"),
     )
 
+    itemized = ItemizedDeductionData(
+        medical_expenses=_form_money(fd, "item_medical"),
+        state_local_taxes=_form_money(fd, "item_state_taxes"),
+        real_estate_taxes=_form_money(fd, "item_property_taxes"),
+        mortgage_interest=_form_money(fd, "item_mortgage"),
+        charitable_cash=_form_money(fd, "item_charitable_cash"),
+        charitable_noncash=_form_money(fd, "item_charitable_noncash"),
+    )
+
+    raw_children = str(fd.get("qualifying_children", "0")).strip()
+    qualifying_children = min(int(raw_children), 20) if raw_children.isdigit() else 0
+
     return TaxReturnInput(
         tax_year=tax_year,
         filing_status=filing_status,
@@ -504,6 +517,8 @@ def _parse_tax_input_from_form(fd: FormData) -> TaxReturnInput:
         adjustments=adjustments,
         estimated_tax_payments=_form_money(fd, "estimated_payments"),
         other_income=_form_money(fd, "other_income"),
+        itemized_deductions=itemized,
+        qualifying_children=qualifying_children,
     )
 
 

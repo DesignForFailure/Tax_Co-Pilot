@@ -47,6 +47,21 @@ constants:
       hoh: "3850"
       qss: "7750"
 
+  itemized_limits:
+    salt_cap:
+      single: "10000"
+      mfj: "10000"
+      mfs: "5000"
+      hoh: "10000"
+      qss: "10000"
+
+  ctc_phaseout_threshold:
+    single: "200000"
+    mfj: "400000"
+    mfs: "200000"
+    hoh: "200000"
+    qss: "400000"
+
 rules:
   - id: "fed.2023.gross_income.wages"
     description: "Total W-2 wages (Box 1)"
@@ -315,14 +330,113 @@ rules:
     table: "constants.standard_deduction"
     key: { ref: "input.filing_status" }
 
+  - id: "fed.2023.itemized.salt_cap"
+    description: "SALT deduction cap by filing status"
+    form_line: "Schedule A"
+    type: "lookup"
+    table: "constants.itemized_limits.salt_cap"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2023.itemized.salt_total"
+    description: "State/local taxes + property taxes, capped at SALT limit"
+    form_line: "Schedule A Line 7"
+    type: "formula"
+    expression: "min(state_taxes + property_taxes, cap)"
+    inputs:
+      state_taxes: { ref: "input.itemized.state_local_taxes" }
+      property_taxes: { ref: "input.itemized.real_estate_taxes" }
+      cap: { ref: "fed.2023.itemized.salt_cap" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.itemized.medical_floor"
+    description: "7.5% of AGI floor for medical deduction"
+    form_line: "Schedule A Line 3"
+    type: "formula"
+    expression: "agi * rate"
+    inputs:
+      agi: { ref: "fed.2023.agi.total" }
+      rate: { literal: "0.075" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.itemized.medical"
+    description: "Medical deduction (expenses above 7.5% AGI floor)"
+    form_line: "Schedule A Line 4"
+    type: "formula"
+    expression: "max(expenses - floor, zero)"
+    inputs:
+      expenses: { ref: "input.itemized.medical_expenses" }
+      floor: { ref: "fed.2023.itemized.medical_floor" }
+      zero: { literal: "0" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.itemized.mortgage_interest"
+    description: "Home mortgage interest deduction"
+    form_line: "Schedule A Line 10"
+    type: "formula"
+    expression: "input"
+    inputs:
+      input: { ref: "input.itemized.mortgage_interest" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.itemized.charitable_agi_cap"
+    description: "60% of AGI cap for cash charitable contributions"
+    form_line: "Schedule A"
+    type: "formula"
+    expression: "agi * rate"
+    inputs:
+      agi: { ref: "fed.2023.agi.total" }
+      rate: { literal: "0.60" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.itemized.charitable"
+    description: "Charitable contributions (cash capped at 60% AGI + noncash)"
+    form_line: "Schedule A Line 14"
+    type: "formula"
+    expression: "min(cash, agi_cap) + noncash"
+    inputs:
+      cash: { ref: "input.itemized.charitable_cash" }
+      noncash: { ref: "input.itemized.charitable_noncash" }
+      agi_cap: { ref: "fed.2023.itemized.charitable_agi_cap" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.itemized.total"
+    description: "Total itemized deductions (Schedule A Line 17)"
+    form_line: "Schedule A Line 17"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "fed.2023.itemized.medical" }
+        - { ref: "fed.2023.itemized.salt_total" }
+        - { ref: "fed.2023.itemized.mortgage_interest" }
+        - { ref: "fed.2023.itemized.charitable" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.deductions.applied"
+    description: "Greater of standard or itemized deduction"
+    form_line: "1040 Line 12"
+    type: "formula"
+    expression: "max(standard, itemized)"
+    inputs:
+      standard: { ref: "fed.2023.standard_deduction" }
+      itemized: { ref: "fed.2023.itemized.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
   - id: "fed.2023.taxable_income"
-    description: "Taxable income = max(AGI - standard deduction, 0)"
+    description: "Taxable income = max(AGI - applied deduction, 0)"
     form_line: "1040 Line 15"
     type: "formula"
     expression: "max(agi - deduction, 0)"
     inputs:
       agi: { ref: "fed.2023.agi.total" }
-      deduction: { ref: "fed.2023.standard_deduction" }
+      deduction: { ref: "fed.2023.deductions.applied" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
@@ -376,6 +490,71 @@ rules:
         - { lower: "462500", upper: "693750", rate: "0.35" }
         - { lower: "693750", upper: null, rate: "0.37" }
 
+  - id: "fed.2023.credits.ctc.base"
+    description: "Child tax credit base amount ($2,000 per qualifying child)"
+    form_line: "1040 Line 19"
+    type: "formula"
+    expression: "children * credit"
+    inputs:
+      children: { ref: "input.qualifying_children" }
+      credit: { literal: "2000" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.credits.ctc.threshold"
+    description: "CTC phaseout AGI threshold by filing status"
+    form_line: "CTC Worksheet"
+    type: "lookup"
+    table: "constants.ctc_phaseout_threshold"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2023.credits.ctc.phaseout"
+    description: "CTC phaseout reduction ($50 per $1,000 of AGI over threshold)"
+    form_line: "CTC Worksheet"
+    type: "formula"
+    expression: "max((agi - threshold) * rate, zero)"
+    inputs:
+      agi: { ref: "fed.2023.agi.total" }
+      threshold: { ref: "fed.2023.credits.ctc.threshold" }
+      rate: { literal: "0.05" }
+      zero: { literal: "0" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.credits.ctc.final"
+    description: "Child tax credit after phaseout"
+    form_line: "1040 Line 19"
+    type: "formula"
+    expression: "max(base - phaseout, zero)"
+    inputs:
+      base: { ref: "fed.2023.credits.ctc.base" }
+      phaseout: { ref: "fed.2023.credits.ctc.phaseout" }
+      zero: { literal: "0" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.credits.total"
+    description: "Total nonrefundable credits"
+    form_line: "1040 Line 21"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "fed.2023.credits.ctc.final" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.tax.after_credits"
+    description: "Federal tax after credits (cannot go below zero)"
+    form_line: "1040 Line 22"
+    type: "formula"
+    expression: "max(tax - credits, zero)"
+    inputs:
+      tax: { ref: "fed.2023.tax.brackets" }
+      credits: { ref: "fed.2023.credits.total" }
+      zero: { literal: "0" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
   - id: "fed.2023.total_withholding"
     description: "Total federal withholding"
     form_line: "1040 Line 25d"
@@ -412,6 +591,6 @@ rules:
     expression: "payments - tax"
     inputs:
       payments: { ref: "fed.2023.total_payments" }
-      tax: { ref: "fed.2023.tax.brackets" }
+      tax: { ref: "fed.2023.tax.after_credits" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0

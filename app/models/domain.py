@@ -121,6 +121,17 @@ class AdjustmentsData(BaseModel):
     self_employment_tax_deduction: Decimal = Decimal("0")
 
 
+class ItemizedDeductionData(BaseModel):
+    """Schedule A itemized deductions."""
+
+    medical_expenses: Decimal = Decimal("0")
+    state_local_taxes: Decimal = Decimal("0")
+    real_estate_taxes: Decimal = Decimal("0")
+    mortgage_interest: Decimal = Decimal("0")
+    charitable_cash: Decimal = Decimal("0")
+    charitable_noncash: Decimal = Decimal("0")
+
+
 # ─── Taxpayer ─────────────────────────────────────────────────
 
 
@@ -151,6 +162,8 @@ class TaxReturnInput(BaseModel):
     other_income: Decimal = Decimal("0")
     adjustments: AdjustmentsData = Field(default_factory=AdjustmentsData)
     estimated_tax_payments: Decimal = Decimal("0")
+    itemized_deductions: ItemizedDeductionData = Field(default_factory=ItemizedDeductionData)
+    qualifying_children: int = 0
 
     def total_wages(self) -> Decimal:
         return sum((w.wages for tp in self.taxpayers for w in tp.w2s), Decimal("0"))
@@ -250,6 +263,11 @@ class ReturnOutput(BaseModel):
     adjustments_total: Decimal = Decimal("0")
     estimated_tax_payments: Decimal = Decimal("0")
     total_payments: Decimal = Decimal("0")
+    itemized_deductions: Decimal = Decimal("0")
+    deduction_applied: Decimal = Decimal("0")
+    child_tax_credit: Decimal = Decimal("0")
+    total_credits: Decimal = Decimal("0")
+    tax_before_credits: Decimal = Decimal("0")
 
 
 class StateReturnOutput(BaseModel):

@@ -16,8 +16,11 @@
         ("Gross Income", run.output.gross_income),
         ("AGI", run.output.agi),
         ("Standard Deduction", run.output.standard_deduction),
+        ("Deduction Applied (" + ("Itemized" if run.output.deduction_applied > run.output.standard_deduction else "Standard") + ")", run.output.deduction_applied),
         ("Taxable Income", run.output.taxable_income),
-        ("Federal Tax", run.output.federal_tax),
+        ("Tax Before Credits", run.output.tax_before_credits),
+        ("Child Tax Credit", run.output.child_tax_credit),
+        ("Federal Tax (After Credits)", run.output.federal_tax),
         ("Withholding", run.output.total_withholding),
     ] %}
     <div class="summary-item">

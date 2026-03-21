@@ -32,11 +32,15 @@ class Form1040Lines(BaseModel):
     line_11: Decimal = Decimal("0")   # Adjusted gross income
 
     # Deductions
+    line_12: Decimal = Decimal("0")   # Applied deduction (standard or itemized)
     line_13: Decimal = Decimal("0")   # Standard deduction or itemized deductions
     line_15: Decimal = Decimal("0")   # Taxable income
 
     # Tax
-    line_16: Decimal = Decimal("0")   # Tax
+    line_16: Decimal = Decimal("0")   # Tax (before credits)
+    line_19: Decimal = Decimal("0")   # Child tax credit
+    line_21: Decimal = Decimal("0")   # Total credits
+    line_22: Decimal = Decimal("0")   # Tax after credits
 
     # Payments
     line_25d: Decimal = Decimal("0")  # Federal income tax withheld
@@ -65,6 +69,16 @@ class Schedule1Lines(BaseModel):
     line_26: Decimal = Decimal("0")   # Total adjustments to income
 
 
+class ScheduleALines(BaseModel):
+    """Schedule A — Itemized Deductions."""
+
+    line_4: Decimal = Decimal("0")    # Medical deduction (after floor)
+    line_7: Decimal = Decimal("0")    # SALT total (after cap)
+    line_10: Decimal = Decimal("0")   # Mortgage interest
+    line_14: Decimal = Decimal("0")   # Charitable contributions
+    line_17: Decimal = Decimal("0")   # Total itemized deductions
+
+
 class FormPacket(BaseModel):
     """Complete set of form data for a tax return."""
 
@@ -72,4 +86,5 @@ class FormPacket(BaseModel):
     filing_status: str
     form_1040: Form1040Lines
     schedule_1: Schedule1Lines
+    schedule_a: ScheduleALines = Field(default_factory=ScheduleALines)
     consistency_errors: list[str] = Field(default_factory=list)
