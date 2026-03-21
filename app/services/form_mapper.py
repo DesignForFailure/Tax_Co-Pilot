@@ -12,7 +12,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from app.models.domain import ReturnRun
-from app.models.forms import Form1040Lines, FormPacket, Schedule1Lines
+from app.models.forms import Form1040Lines, FormPacket, Schedule1Lines, ScheduleALines
 
 # Maps form_line annotation strings to (form_name, field_name) targets.
 _FORM_LINE_MAP: dict[str, tuple[str, str]] = {
@@ -37,6 +37,15 @@ _FORM_LINE_MAP: dict[str, tuple[str, str]] = {
     "Schedule 1 Line 20": ("schedule_1", "line_20"),
     "Schedule 1 Line 21": ("schedule_1", "line_21"),
     "Schedule 1 Line 26": ("schedule_1", "line_26"),
+    "1040 Line 12": ("form_1040", "line_12"),
+    "1040 Line 19": ("form_1040", "line_19"),
+    "1040 Line 21": ("form_1040", "line_21"),
+    "1040 Line 22": ("form_1040", "line_22"),
+    "Schedule A Line 4": ("schedule_a", "line_4"),
+    "Schedule A Line 7": ("schedule_a", "line_7"),
+    "Schedule A Line 10": ("schedule_a", "line_10"),
+    "Schedule A Line 14": ("schedule_a", "line_14"),
+    "Schedule A Line 17": ("schedule_a", "line_17"),
 }
 
 
@@ -44,9 +53,11 @@ def map_return_run(run: ReturnRun) -> FormPacket:
     """Map a ReturnRun to a FormPacket of IRS form line items."""
     form_1040 = Form1040Lines()
     schedule_1 = Schedule1Lines()
-    forms: dict[str, Form1040Lines | Schedule1Lines] = {
+    schedule_a = ScheduleALines()
+    forms: dict[str, Form1040Lines | Schedule1Lines | ScheduleALines] = {
         "form_1040": form_1040,
         "schedule_1": schedule_1,
+        "schedule_a": schedule_a,
     }
 
     for trace in run.trace:
@@ -83,12 +94,14 @@ def map_return_run(run: ReturnRun) -> FormPacket:
     )
 
     # Refund (Line 34) vs Amount Owed (Line 37)
-    if form_1040.line_33 > form_1040.line_16:
-        form_1040.line_34 = form_1040.line_33 - form_1040.line_16
+    # Use post-credit tax (line_22) when credits apply, otherwise line_16
+    tax_amount = form_1040.line_22 if form_1040.line_22 > 0 else form_1040.line_16
+    if form_1040.line_33 > tax_amount:
+        form_1040.line_34 = form_1040.line_33 - tax_amount
         form_1040.line_37 = Decimal("0")
     else:
         form_1040.line_34 = Decimal("0")
-        form_1040.line_37 = form_1040.line_16 - form_1040.line_33
+        form_1040.line_37 = tax_amount - form_1040.line_33
 
     errors = _check_consistency(form_1040, schedule_1)
 
@@ -97,6 +110,7 @@ def map_return_run(run: ReturnRun) -> FormPacket:
         filing_status=run.filing_status.value,
         form_1040=form_1040,
         schedule_1=schedule_1,
+        schedule_a=schedule_a,
         consistency_errors=errors,
     )
 
@@ -123,6 +137,12 @@ def _check_consistency(f: Form1040Lines, s: Schedule1Lines) -> list[str]:
         errors.append(
             f"Line 33 (total payments={f.line_33}) != "
             f"Line 25d ({f.line_25d}) + Line 26 ({f.line_26})"
+        )
+
+    if f.line_22 > f.line_16:
+        errors.append(
+            f"Line 22 (tax after credits={f.line_22}) exceeds "
+            f"Line 16 (tax before credits={f.line_16})"
         )
 
     if f.line_34 > 0 and f.line_37 > 0:

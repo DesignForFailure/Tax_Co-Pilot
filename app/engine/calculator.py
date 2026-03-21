@@ -112,12 +112,17 @@ class CalculationEngine:
             agi=self.resolved.get(f"fed.{yr}.agi.total", Decimal("0")),
             standard_deduction=self.resolved.get(f"fed.{yr}.standard_deduction", Decimal("0")),
             taxable_income=self.resolved.get(f"fed.{yr}.taxable_income", Decimal("0")),
-            federal_tax=self.resolved.get(f"fed.{yr}.tax.brackets", Decimal("0")),
+            federal_tax=self.resolved.get(f"fed.{yr}.tax.after_credits", Decimal("0")),
             total_withholding=self.resolved.get(f"fed.{yr}.total_withholding", Decimal("0")),
             refund_or_owed=self.resolved.get(f"fed.{yr}.refund_or_owed", Decimal("0")),
             adjustments_total=self.resolved.get(f"fed.{yr}.adjustments.total", Decimal("0")),
             estimated_tax_payments=self.resolved.get(f"fed.{yr}.estimated_payments", Decimal("0")),
             total_payments=self.resolved.get(f"fed.{yr}.total_payments", Decimal("0")),
+            itemized_deductions=self.resolved.get(f"fed.{yr}.itemized.total", Decimal("0")),
+            deduction_applied=self.resolved.get(f"fed.{yr}.deductions.applied", Decimal("0")),
+            child_tax_credit=self.resolved.get(f"fed.{yr}.credits.ctc.final", Decimal("0")),
+            total_credits=self.resolved.get(f"fed.{yr}.credits.total", Decimal("0")),
+            tax_before_credits=self.resolved.get(f"fed.{yr}.tax.brackets", Decimal("0")),
         )
 
         state_outputs = self._run_states()
@@ -221,6 +226,31 @@ class CalculationEngine:
             self.inputs.adjustments.self_employment_tax_deduction
         )
         self.resolved["input.estimated_payments"] = self.inputs.estimated_tax_payments
+
+        # Itemized deduction inputs
+        self.resolved["input.itemized.medical_expenses"] = (
+            self.inputs.itemized_deductions.medical_expenses
+        )
+        self.resolved["input.itemized.state_local_taxes"] = (
+            self.inputs.itemized_deductions.state_local_taxes
+        )
+        self.resolved["input.itemized.real_estate_taxes"] = (
+            self.inputs.itemized_deductions.real_estate_taxes
+        )
+        self.resolved["input.itemized.mortgage_interest"] = (
+            self.inputs.itemized_deductions.mortgage_interest
+        )
+        self.resolved["input.itemized.charitable_cash"] = (
+            self.inputs.itemized_deductions.charitable_cash
+        )
+        self.resolved["input.itemized.charitable_noncash"] = (
+            self.inputs.itemized_deductions.charitable_noncash
+        )
+
+        # Dependents
+        self.resolved["input.qualifying_children"] = Decimal(
+            self.inputs.qualifying_children
+        )
 
     # ─── Rule evaluation dispatch ───────────────────────────────
 

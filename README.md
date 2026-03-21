@@ -200,6 +200,7 @@ Tax_Co-Pilot/
 │   ├── test_golden.py
 │   ├── test_golden2.py
 │   ├── test_golden_m1.py
+│   ├── test_itemized_credits.py
 │   ├── test_milestone6_routes.py
 │   ├── test_multi_year.py
 │   └── test_state_expansion.py

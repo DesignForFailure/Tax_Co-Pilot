@@ -9,6 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Added
+- `ItemizedDeductionData` model for Schedule A inputs (medical, SALT, mortgage, charitable).
+- `qualifying_children` field on `TaxReturnInput` for Child Tax Credit.
+- 15 new federal rules per year: itemized deduction calculation (medical 7.5% AGI floor, SALT $10k cap, charitable 60% AGI cap), deduction election (`max(standard, itemized)`), Child Tax Credit with phaseout, post-credit tax.
+- New `ReturnOutput` fields: `itemized_deductions`, `deduction_applied`, `child_tax_credit`, `total_credits`, `tax_before_credits`.
+- Itemized Deductions (Schedule A) and Dependents sections on the calculate form.
+- `ScheduleALines` form model and Schedule A form line mapping.
+- 12 golden tests covering itemized deductions, SALT cap, medical floor, charitable cap, CTC basic/phaseout/combined (`tests/test_itemized_credits.py`).
 - 2023 federal rule pack (`rule_packs/federal/2023/`) with IRS bracket tables, standard deductions, and adjustment limits.
 - 2023 Georgia state rule pack (`rule_packs/state/GA/2023/`) with graduated bracket system (5.75% top rate).
 - Dynamic rule pack loading: discovers available years by scanning `rule_packs/federal/`, caches loaded packs.
@@ -28,6 +35,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Comprehensive form mapping and consistency check tests (`tests/test_forms.py`).
 
 ### Changed
+- `fed.{year}.taxable_income` now uses `deductions.applied` (max of standard/itemized) instead of `standard_deduction`.
+- `fed.{year}.refund_or_owed` now uses `tax.after_credits` instead of `tax.brackets`.
+- `ReturnOutput.federal_tax` now reflects post-credit tax (unchanged when no credits apply).
+- Dashboard shows deduction type, tax before/after credits, and CTC amount.
+- Form mapper refund/owed calculation uses post-credit tax when credits apply.
 - `main.py` rule pack loading: replaced hardcoded 2024 federal/state pack with year-aware dynamic loading and caching.
 - Calculate form: tax year field changed from `<input readonly>` to `<select>` dropdown.
 - `calculator.py` output mapping: now uses rule pack's `tax_year` for dynamic rule ID prefix instead of hardcoded `fed.2024`.

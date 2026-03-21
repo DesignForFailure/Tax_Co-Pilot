@@ -146,6 +146,32 @@
         </div>
     </div>
 
+    {# ─── Itemized Deductions (Schedule A) ───────────────────── #}
+    <div class="card">
+        <h2>Itemized Deductions (Schedule A)</h2>
+        <p class="text-dim text-sm" style="margin-bottom:12px;">Leave blank to use the standard deduction. The higher of standard or itemized will be applied automatically.</p>
+        <div class="form-row">
+            <div><label>Medical/Dental Expenses</label><input type="text" name="item_medical" placeholder="0"></div>
+            <div><label>State &amp; Local Income Taxes</label><input type="text" name="item_state_taxes" placeholder="0"></div>
+        </div>
+        <div class="form-row">
+            <div><label>Real Estate Taxes</label><input type="text" name="item_property_taxes" placeholder="0"></div>
+            <div><label>Home Mortgage Interest</label><input type="text" name="item_mortgage" placeholder="0"></div>
+        </div>
+        <div class="form-row">
+            <div><label>Charitable (Cash)</label><input type="text" name="item_charitable_cash" placeholder="0"></div>
+            <div><label>Charitable (Non-Cash)</label><input type="text" name="item_charitable_noncash" placeholder="0"></div>
+        </div>
+    </div>
+
+    {# ─── Dependents ─────────────────────────────────────────── #}
+    <div class="card">
+        <h2>Dependents</h2>
+        <div class="form-row">
+            <div><label>Qualifying Children (for Child Tax Credit)</label><input type="number" name="qualifying_children" value="0" min="0" max="20"></div>
+        </div>
+    </div>
+
     {# ─── Estimated Payments ─────────────────────────────────── #}
     <div class="card">
         <h2>Estimated Tax Payments</h2>
