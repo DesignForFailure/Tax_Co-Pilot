@@ -106,17 +106,18 @@ class CalculationEngine:
         for rule_id in self.rp.rule_order:
             self._evaluate_rule(self.rp.rules[rule_id])
 
+        yr = self.rp.tax_year
         output = ReturnOutput(
-            gross_income=self.resolved.get("fed.2024.gross_income.total", Decimal("0")),
-            agi=self.resolved.get("fed.2024.agi.total", Decimal("0")),
-            standard_deduction=self.resolved.get("fed.2024.standard_deduction", Decimal("0")),
-            taxable_income=self.resolved.get("fed.2024.taxable_income", Decimal("0")),
-            federal_tax=self.resolved.get("fed.2024.tax.brackets", Decimal("0")),
-            total_withholding=self.resolved.get("fed.2024.total_withholding", Decimal("0")),
-            refund_or_owed=self.resolved.get("fed.2024.refund_or_owed", Decimal("0")),
-            adjustments_total=self.resolved.get("fed.2024.adjustments.total", Decimal("0")),
-            estimated_tax_payments=self.resolved.get("fed.2024.estimated_payments", Decimal("0")),
-            total_payments=self.resolved.get("fed.2024.total_payments", Decimal("0")),
+            gross_income=self.resolved.get(f"fed.{yr}.gross_income.total", Decimal("0")),
+            agi=self.resolved.get(f"fed.{yr}.agi.total", Decimal("0")),
+            standard_deduction=self.resolved.get(f"fed.{yr}.standard_deduction", Decimal("0")),
+            taxable_income=self.resolved.get(f"fed.{yr}.taxable_income", Decimal("0")),
+            federal_tax=self.resolved.get(f"fed.{yr}.tax.brackets", Decimal("0")),
+            total_withholding=self.resolved.get(f"fed.{yr}.total_withholding", Decimal("0")),
+            refund_or_owed=self.resolved.get(f"fed.{yr}.refund_or_owed", Decimal("0")),
+            adjustments_total=self.resolved.get(f"fed.{yr}.adjustments.total", Decimal("0")),
+            estimated_tax_payments=self.resolved.get(f"fed.{yr}.estimated_payments", Decimal("0")),
+            total_payments=self.resolved.get(f"fed.{yr}.total_payments", Decimal("0")),
         )
 
         state_outputs = self._run_states()

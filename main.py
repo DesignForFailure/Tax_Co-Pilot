@@ -130,27 +130,54 @@ async def security_headers(request: Request, call_next: Any) -> Response:
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 
-RULE_PACK_DIR = BASE_DIR / "rule_packs" / "federal" / "2024"
-rule_pack = RulePack.load(RULE_PACK_DIR)
-
+FEDERAL_PACKS_DIR = BASE_DIR / "rule_packs" / "federal"
 STATE_PACKS_DIR = BASE_DIR / "rule_packs" / "state"
 
-
-def _load_state_packs(year: int) -> dict[str, RulePack]:
-    """Discover and load all state rule packs for the given tax year."""
-    packs: dict[str, RulePack] = {}
-    if not STATE_PACKS_DIR.exists():
-        return packs
-    for state_dir in sorted(STATE_PACKS_DIR.iterdir()):
-        if not state_dir.is_dir() or state_dir.name.startswith("_"):
-            continue
-        year_dir = state_dir / str(year)
-        if year_dir.exists():
-            packs[state_dir.name.upper()] = RulePack.load(year_dir)
-    return packs
+# Cache: year -> loaded RulePack / state dict
+_federal_cache: dict[int, RulePack] = {}
+_state_cache: dict[int, dict[str, RulePack]] = {}
 
 
-state_packs = _load_state_packs(2024)
+def _discover_available_years() -> list[int]:
+    """Scan rule_packs/federal/ for available tax years."""
+    years: list[int] = []
+    if not FEDERAL_PACKS_DIR.exists():
+        return years
+    for year_dir in sorted(FEDERAL_PACKS_DIR.iterdir()):
+        if year_dir.is_dir() and year_dir.name.isdigit():
+            years.append(int(year_dir.name))
+    return years
+
+
+def _get_federal_pack(year: int) -> RulePack:
+    """Load and cache a federal rule pack for the given year."""
+    if year not in _federal_cache:
+        pack_dir = FEDERAL_PACKS_DIR / str(year)
+        _federal_cache[year] = RulePack.load(pack_dir)
+    return _federal_cache[year]
+
+
+def _get_state_packs(year: int) -> dict[str, RulePack]:
+    """Load and cache all state rule packs for the given year."""
+    if year not in _state_cache:
+        packs: dict[str, RulePack] = {}
+        if STATE_PACKS_DIR.exists():
+            for state_dir in sorted(STATE_PACKS_DIR.iterdir()):
+                if not state_dir.is_dir() or state_dir.name.startswith("_"):
+                    continue
+                year_dir = state_dir / str(year)
+                if year_dir.exists():
+                    packs[state_dir.name.upper()] = RulePack.load(year_dir)
+        _state_cache[year] = packs
+    return _state_cache[year]
+
+
+available_years = _discover_available_years()
+
+# Pre-warm caches for all discovered years
+for _yr in available_years:
+    _get_federal_pack(_yr)
+    _get_state_packs(_yr)
 
 
 def _parse_money(
@@ -296,7 +323,10 @@ def dashboard(request: Request) -> Response:
 @app.get("/calculate", response_class=HTMLResponse)
 def calculate_form(request: Request) -> HTMLResponse:
     csrf = _get_csrf_token(request)
-    resp = templates.TemplateResponse("pages/calculate.html", {"request": request, "csrf": csrf})
+    resp = templates.TemplateResponse(
+        "pages/calculate.html",
+        {"request": request, "csrf": csrf, "available_years": available_years},
+    )
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return resp
 
@@ -493,11 +523,13 @@ async def calculate_submit(request: Request) -> RedirectResponse:
         for w in tp.w2s
         if w.state
     }
+    fed_pack = _get_federal_pack(inputs.tax_year)
+    year_state_packs = _get_state_packs(inputs.tax_year)
     active_state_packs = {
-        s: state_packs[s] for s in states_needed if s in state_packs
+        s: year_state_packs[s] for s in states_needed if s in year_state_packs
     }
     run = CalculationEngine(
-        rule_pack, inputs, state_packs=active_state_packs
+        fed_pack, inputs, state_packs=active_state_packs
     ).run()
     run_dict = json.loads(run.model_dump_json())
     save_return_run(run_dict)
@@ -603,7 +635,7 @@ async def whatif_submit(request: Request) -> Response:
     fd = await request.form()
     _verify_csrf(request, str(fd.get("csrf_token", "")))
     inputs = _parse_tax_input_from_form(fd)
-    engine = WhatIfEngine(rule_pack)
+    engine = WhatIfEngine(_get_federal_pack(inputs.tax_year))
     comparison = engine.compare_filing_status(inputs)
     csrf = _get_csrf_token(request)
     resp = templates.TemplateResponse(

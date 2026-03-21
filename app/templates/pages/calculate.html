@@ -12,7 +12,14 @@
     <div class="card">
         <h2>Filing Information</h2>
         <div class="form-row">
-            <div><label>Tax Year</label><input type="number" name="tax_year" value="2024" readonly></div>
+            <div>
+                <label>Tax Year</label>
+                <select name="tax_year">
+                    {% for yr in available_years|sort(reverse=true) %}
+                    <option value="{{ yr }}" {% if yr == 2024 %}selected{% endif %}>{{ yr }}</option>
+                    {% endfor %}
+                </select>
+            </div>
             <div>
                 <label>Filing Status</label>
                 <select name="filing_status" id="filing_status" onchange="toggleSpouse()">
