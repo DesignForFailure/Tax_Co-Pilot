@@ -1,0 +1,115 @@
+# Tax_Co-Pilot - Local-first personal tax software system
+# Copyright (C) 2026  Tax_Co-Pilot Contributors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+constants:
+  standard_deduction:
+    single: "5400"
+    mfj: "7100"
+    mfs: "3550"
+    hoh: "5400"
+  personal_exemption:
+    single: "2700"
+    mfj: "7400"
+    mfs: "2700"
+    hoh: "2700"
+
+rules:
+  - id: "ga.2023.agi"
+    description: "Georgia AGI (starts from federal AGI)"
+    type: "formula"
+    expression: "federal_agi"
+    inputs:
+      federal_agi: { ref: "fed.2023.agi.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "ga.2023.standard_deduction"
+    description: "Georgia standard deduction"
+    type: "lookup"
+    table: "constants.standard_deduction"
+    key: { ref: "input.filing_status" }
+
+  - id: "ga.2023.personal_exemption"
+    description: "Georgia personal exemption"
+    type: "lookup"
+    table: "constants.personal_exemption"
+    key: { ref: "input.filing_status" }
+
+  - id: "ga.2023.taxable_income"
+    description: "Georgia taxable income = max(AGI - standard deduction - personal exemption, 0)"
+    type: "formula"
+    expression: "max(agi - deduction - exemption, 0)"
+    inputs:
+      agi: { ref: "ga.2023.agi" }
+      deduction: { ref: "ga.2023.standard_deduction" }
+      exemption: { ref: "ga.2023.personal_exemption" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ga.2023.tax"
+    description: "Georgia income tax (2023 graduated brackets, top rate 5.75%)"
+    type: "bracket_table"
+    input: { ref: "ga.2023.taxable_income" }
+    key: { ref: "input.filing_status" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+    tables:
+      single:
+        - { lower: "0", upper: "750", rate: "0.01" }
+        - { lower: "750", upper: "2250", rate: "0.02" }
+        - { lower: "2250", upper: "3750", rate: "0.03" }
+        - { lower: "3750", upper: "5250", rate: "0.04" }
+        - { lower: "5250", upper: "7000", rate: "0.05" }
+        - { lower: "7000", upper: null, rate: "0.0575" }
+      mfj:
+        - { lower: "0", upper: "1000", rate: "0.01" }
+        - { lower: "1000", upper: "3000", rate: "0.02" }
+        - { lower: "3000", upper: "5000", rate: "0.03" }
+        - { lower: "5000", upper: "7000", rate: "0.04" }
+        - { lower: "7000", upper: "10000", rate: "0.05" }
+        - { lower: "10000", upper: null, rate: "0.0575" }
+      mfs:
+        - { lower: "0", upper: "500", rate: "0.01" }
+        - { lower: "500", upper: "1500", rate: "0.02" }
+        - { lower: "1500", upper: "2500", rate: "0.03" }
+        - { lower: "2500", upper: "3500", rate: "0.04" }
+        - { lower: "3500", upper: "5000", rate: "0.05" }
+        - { lower: "5000", upper: null, rate: "0.0575" }
+      hoh:
+        - { lower: "0", upper: "750", rate: "0.01" }
+        - { lower: "750", upper: "2250", rate: "0.02" }
+        - { lower: "2250", upper: "3750", rate: "0.03" }
+        - { lower: "3750", upper: "5250", rate: "0.04" }
+        - { lower: "5250", upper: "7000", rate: "0.05" }
+        - { lower: "7000", upper: null, rate: "0.0575" }
+
+  - id: "ga.2023.withholding"
+    description: "Total Georgia tax withheld"
+    type: "sum"
+    inputs:
+      items: { ref: "input.withholding.state.GA" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "ga.2023.refund_or_owed"
+    description: "Georgia refund (positive) or amount owed (negative)"
+    type: "formula"
+    expression: "withholding - tax"
+    inputs:
+      withholding: { ref: "ga.2023.withholding" }
+      tax: { ref: "ga.2023.tax" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0

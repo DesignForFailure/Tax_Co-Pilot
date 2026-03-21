@@ -9,6 +9,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Added
+- 2023 federal rule pack (`rule_packs/federal/2023/`) with IRS bracket tables, standard deductions, and adjustment limits.
+- 2023 Georgia state rule pack (`rule_packs/state/GA/2023/`) with graduated bracket system (5.75% top rate).
+- Dynamic rule pack loading: discovers available years by scanning `rule_packs/federal/`, caches loaded packs.
+- Tax year dropdown on calculate form (was readonly, now selectable).
+- `_discover_available_years()`, `_get_federal_pack()`, `_get_state_packs()` helpers in `main.py`.
+- 2023 golden tests and trace completeness tests (`tests/test_multi_year.py`).
 - Form data models (`Form1040Lines`, `Schedule1Lines`, `FormPacket`) mapping engine outputs to IRS form line items (`app/models/forms.py`).
 - Form mapper service (`app/services/form_mapper.py`) with consistency checks between calculated outputs and form lines.
 - `form_line` field on `TraceNode` for structured form-line annotation on every trace entry.
@@ -22,6 +28,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Comprehensive form mapping and consistency check tests (`tests/test_forms.py`).
 
 ### Changed
+- `main.py` rule pack loading: replaced hardcoded 2024 federal/state pack with year-aware dynamic loading and caching.
+- Calculate form: tax year field changed from `<input readonly>` to `<select>` dropdown.
+- `calculator.py` output mapping: now uses rule pack's `tax_year` for dynamic rule ID prefix instead of hardcoded `fed.2024`.
 - `fed.2024.refund_or_owed` now uses total payments (withholding + estimated) instead of withholding alone.
 
 - `GET /whatif`, `POST /whatif`: What-if scenario comparison page using `WhatIfEngine` (MFJ vs MFS); shows diffs table, recommendation, and savings amount.

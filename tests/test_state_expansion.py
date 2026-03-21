@@ -258,10 +258,10 @@ def test_ga_all_filing_statuses(filing_status: FilingStatus) -> None:
 
 
 def test_state_pack_discovery() -> None:
-    """_load_state_packs finds all 10 state packs."""
-    from main import _load_state_packs
+    """_get_state_packs finds all 10 state packs."""
+    from main import _get_state_packs
 
-    packs = _load_state_packs(2024)
+    packs = _get_state_packs(2024)
     assert "GA" in packs
     assert packs["GA"].jurisdiction == "GA"
     # Should find GA + 9 no-income-tax stubs = 10
@@ -271,9 +271,9 @@ def test_state_pack_discovery() -> None:
 
 
 def test_state_pack_discovery_skips_template() -> None:
-    """_load_state_packs skips _template directory."""
-    from main import _load_state_packs
+    """_get_state_packs skips _template directory."""
+    from main import _get_state_packs
 
-    packs = _load_state_packs(2024)
+    packs = _get_state_packs(2024)
     assert "_TEMPLATE" not in packs
     assert "_template" not in packs
