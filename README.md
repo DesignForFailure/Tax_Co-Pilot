@@ -118,7 +118,7 @@ This project follows **Semantic Versioning (SemVer)**.
 - **Backend:** FastAPI
 - **ASGI Server:** Uvicorn
 - **Database:** SQLite (with optional AES-256 encryption via SQLCipher)
-- **Encryption:** SQLCipher (primary) / Python Fernet (fallback); PBKDF2-HMAC-SHA256 key derivation
+- **Encryption:** SQLCipher (runtime); PBKDF2-HMAC-SHA256 key derivation
 - **UI:** Server-rendered HTML templates (Jinja2)
 - **Numeric Type:** Decimal
 - **Rule Packs:** YAML (versioned)
@@ -129,8 +129,8 @@ This project follows **Semantic Versioning (SemVer)**.
 ## Actual Current Repository Structure
 
 ```text
-.
-├── .agent_tools
+Tax_Co-Pilot/
+├── .agent_tools/
 │   ├── 00_master_directives.md
 │   ├── 01_style_guide.md
 │   ├── 02_architecture.md
@@ -138,14 +138,106 @@ This project follows **Semantic Versioning (SemVer)**.
 │   ├── 04_doc_updater.md
 │   └── 05_session_log.md
 ├── .editorconfig
-├── .github
-│   └── workflows
+├── .github/
+│   ├── ISSUE_TEMPLATE/
+│   │   ├── bug_report.md
+│   │   ├── custom.md
+│   │   └── feature_request.md
+│   └── workflows/
 │       └── ci.yml
 ├── .gitignore
 ├── .pre-commit-config.yaml
 ├── AGENTS.md
-├── CHANGELOG.md
 ├── CLAUDE.md
+├── app/
+│   ├── __init__.py
+│   ├── config.py
+│   ├── engine/
+│   │   ├── __init__.py
+│   │   ├── calculator.py
+│   │   ├── rule_loader.py
+│   │   └── whatif.py
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── domain.py
+│   │   └── forms.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── audit_export.py
+│   │   ├── csv_import.py
+│   │   ├── database.py
+│   │   ├── encryption.py
+│   │   └── form_mapper.py
+│   └── templates/
+│       ├── layouts/
+│       │   └── base.html
+│       └── pages/
+│           ├── calculate.html
+│           ├── dashboard.html
+│           ├── import_csv.html
+│           ├── legal.html
+│           ├── run_compare.html
+│           ├── runs.html
+│           ├── forms_view.html
+│           ├── unlock.html
+│           └── whatif.html
+├── docs/
+│   ├── DISCLAIMER.md
+│   ├── ENCRYPTION.md
+│   ├── EXPORT_CONTROL.md
+│   ├── NOTICE.md
+│   ├── STATE_AUTHORING_GUIDE.md
+│   └── superpowers/
+│       ├── plans/
+│       └── specs/
+├── rule_packs/
+│   ├── federal/
+│   │   ├── 2023/
+│   │   │   ├── federal_2023_manifest.yaml
+│   │   │   └── federal_2023_rules.yaml
+│   │   └── 2024/
+│   │       ├── federal_2024_manifest.yaml
+│   │       └── federal_2024_rules.yaml
+│   └── state/
+│       ├── _template/
+│       │   └── 2024/
+│       ├── AK/
+│       │   └── 2024/
+│       ├── FL/
+│       │   └── 2024/
+│       ├── GA/
+│       │   ├── 2023/
+│       │   └── 2024/
+│       ├── NH/
+│       │   └── 2024/
+│       ├── NV/
+│       │   └── 2024/
+│       ├── SD/
+│       │   └── 2024/
+│       ├── TN/
+│       │   └── 2024/
+│       ├── TX/
+│       │   └── 2024/
+│       ├── WA/
+│       │   └── 2024/
+│       └── WY/
+│           └── 2024/
+├── tests/
+│   ├── __init__.py
+│   ├── test_calculate_name_validation.py
+│   ├── test_calculator_resolve_ref.py
+│   ├── test_encoding_guard.py
+│   ├── test_encrypted_database.py
+│   ├── test_encryption.py
+│   ├── test_forms.py
+│   ├── test_golden.py
+│   ├── test_golden2.py
+│   ├── test_golden_m1.py
+│   ├── test_itemized_credits.py
+│   ├── test_milestone6_routes.py
+│   ├── test_multi_year.py
+│   └── test_state_expansion.py
+├── CHANGELOG.md
 ├── CODE_OF_CONDUCT.md
 ├── CONTRIBUTING.md
 ├── LICENSE
@@ -153,122 +245,12 @@ This project follows **Semantic Versioning (SemVer)**.
 ├── README.txt
 ├── ROADMAP.md
 ├── SECURITY.md
-├── app
-│   ├── __init__.py
-│   ├── config.py
-│   ├── engine
-│   │   ├── __init__.py
-│   │   ├── calculator.py
-│   │   ├── rule_loader.py
-│   │   └── whatif.py
-│   ├── models
-│   │   ├── __init__.py
-│   │   ├── domain.py
-│   │   └── forms.py
-│   ├── services
-│   │   ├── __init__.py
-│   │   ├── audit_export.py
-│   │   ├── csv_import.py
-│   │   ├── database.py
-│   │   ├── encryption.py
-│   │   └── form_mapper.py
-│   └── templates
-│       ├── layouts
-│       │   └── base.html
-│       └── pages
-│           ├── calculate.html
-│           ├── dashboard.html
-│           ├── forms_view.html
-│           ├── import_csv.html
-│           ├── legal.html
-│           ├── run_compare.html
-│           ├── runs.html
-│           ├── unlock.html
-│           └── whatif.html
-├── docs
-│   ├── DISCLAIMER.md
-│   ├── ENCRYPTION.md
-│   ├── EXPORT_CONTROL.md
-│   ├── NOTICE.md
-│   ├── STATE_AUTHORING_GUIDE.md
-│   └── superpowers
-│       ├── plans
-│       │   ├── 2026-03-15-federal-completeness.md
-│       │   ├── 2026-03-16-state-expansion.md
-│       │   ├── 2026-03-18-forms-support.md
-│       │   ├── 2026-03-18-multi-year-support.md
-│       │   └── 2026-03-18-qa-remediation.md
-│       └── specs
-│           ├── 2026-03-15-federal-completeness-design.md
-│           └── 2026-03-16-state-expansion-design.md
+├── data/
 ├── main.py
 ├── pyproject.toml
 ├── requirements-dev.txt
 ├── requirements.txt
-├── rule_packs
-│   ├── federal
-│   │   └── 2024
-│   │       ├── federal_2024_manifest.yaml
-│   │       └── federal_2024_rules.yaml
-│   └── state
-│       ├── AK
-│       │   └── 2024
-│       │       ├── state_AK_2024_manifest.yaml
-│       │       └── state_AK_2024_rules.yaml
-│       ├── FL
-│       │   └── 2024
-│       │       ├── state_FL_2024_manifest.yaml
-│       │       └── state_FL_2024_rules.yaml
-│       ├── GA
-│       │   └── 2024
-│       │       ├── state_GA_2024_manifest.yaml
-│       │       └── state_GA_2024_rules.yaml
-│       ├── NH
-│       │   └── 2024
-│       │       ├── state_NH_2024_manifest.yaml
-│       │       └── state_NH_2024_rules.yaml
-│       ├── NV
-│       │   └── 2024
-│       │       ├── state_NV_2024_manifest.yaml
-│       │       └── state_NV_2024_rules.yaml
-│       ├── SD
-│       │   └── 2024
-│       │       ├── state_SD_2024_manifest.yaml
-│       │       └── state_SD_2024_rules.yaml
-│       ├── TN
-│       │   └── 2024
-│       │       ├── state_TN_2024_manifest.yaml
-│       │       └── state_TN_2024_rules.yaml
-│       ├── TX
-│       │   └── 2024
-│       │       ├── state_TX_2024_manifest.yaml
-│       │       └── state_TX_2024_rules.yaml
-│       ├── WA
-│       │   └── 2024
-│       │       ├── state_WA_2024_manifest.yaml
-│       │       └── state_WA_2024_rules.yaml
-│       ├── WY
-│       │   └── 2024
-│       │       ├── state_WY_2024_manifest.yaml
-│       │       └── state_WY_2024_rules.yaml
-│       └── _template
-│           └── 2024
-│               ├── state_TEMPLATE_2024_manifest.yaml
-│               └── state_TEMPLATE_2024_rules.yaml
-├── run.sh
-└── tests
-    ├── __init__.py
-    ├── test_calculate_name_validation.py
-    ├── test_calculator_resolve_ref.py
-    ├── test_encoding_guard.py
-    ├── test_encrypted_database.py
-    ├── test_encryption.py
-    ├── test_forms.py
-    ├── test_golden.py
-    ├── test_golden2.py
-    ├── test_golden_m1.py
-    ├── test_milestone6_routes.py
-    └── test_state_expansion.py
+└── run.sh
 ```
 
 ---
@@ -318,7 +300,7 @@ Tax_Co-Pilot is licensed under the **GNU Affero General Public License v3.0 or l
 
 Database encryption at rest is powered by **[SQLCipher](https://www.zetetic.net/sqlcipher/)** (AES-256), Copyright © 2008-2024 Zetetic LLC, licensed under the **BSD-3-Clause** license. SQLCipher is built on [SQLite](https://www.sqlite.org/), which is in the public domain.
 
-The Python **[cryptography](https://github.com/pyca/cryptography)** library provides Fernet fallback encryption and is licensed under **Apache-2.0 OR BSD-3-Clause**. It includes **[OpenSSL](https://www.openssl.org/)** (Apache-2.0).
+The Python **[cryptography](https://github.com/pyca/cryptography)** library is used for legacy/compatibility encryption tooling and is licensed under **Apache-2.0 OR BSD-3-Clause**. It includes **[OpenSSL](https://www.openssl.org/)** (Apache-2.0).
 
 ### Key Frameworks
 

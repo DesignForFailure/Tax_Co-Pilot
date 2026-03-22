@@ -55,3 +55,14 @@ def test_calculate_submit_rejects_blank_primary_last_name() -> None:
 
     assert response.status_code == 400
     assert response.text == "last name is required"
+
+
+def test_calculate_submit_rejects_mfs_spouse_aggregation() -> None:
+    response = _post_calculate(
+        filing_status="mfs",
+        s_first="Sam",
+        s_last="Doe",
+    )
+
+    assert response.status_code == 400
+    assert response.text == "MFS is per-person; submit each spouse as a separate run"

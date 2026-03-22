@@ -8,9 +8,22 @@
 
 <form method="POST" action="/whatif">
     <input type="hidden" name="csrf_token" value="{{ csrf }}">
-    <input type="hidden" name="tax_year" value="2024">
     {# Filing status is fixed to mfj for the form — engine overrides it internally #}
     <input type="hidden" name="filing_status" value="mfj">
+
+    <div class="card">
+        <h2>Filing Information</h2>
+        <div class="form-row">
+            <div>
+                <label>Tax Year</label>
+                <select name="tax_year">
+                    {% for yr in available_years|sort(reverse=true) %}
+                    <option value="{{ yr }}" {% if yr == (selected_year if selected_year is defined else 2024) %}selected{% endif %}>{{ yr }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
 
     {# ─── Primary Taxpayer ───────────────────────────────────── #}
     <div class="card">

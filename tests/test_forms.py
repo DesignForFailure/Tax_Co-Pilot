@@ -364,6 +364,30 @@ def test_map_return_run_amount_owed() -> None:
     assert pkt.form_1040.line_34 == Decimal("0")
 
 
+def test_map_return_run_refund_uses_post_credit_tax_when_zero() -> None:
+    """Credits can reduce line 22 to zero; refund must use line 22, not line 16."""
+    inp = TaxReturnInput(
+        tax_year=2024,
+        filing_status=FilingStatus.MFJ,
+        taxpayers=[
+            Taxpayer(
+                role=TaxpayerRole.PRIMARY,
+                first_name="A",
+                last_name="B",
+                w2s=[W2Data(employer_name="X", wages=Decimal("85000"), federal_withheld=Decimal("12000"))],
+            )
+        ],
+        qualifying_children=4,  # $8,000 credit exceeds baseline tax here
+    )
+    run = CalculationEngine(FED, inp).run()
+    pkt = map_return_run(run)
+
+    assert pkt.form_1040.line_21 > 0
+    assert pkt.form_1040.line_22 == Decimal("0")
+    assert pkt.form_1040.line_34 == run.output.refund_or_owed
+    assert pkt.form_1040.line_37 == Decimal("0")
+
+
 def test_consistency_checks_pass_for_valid_run() -> None:
     inp = TaxReturnInput(
         tax_year=2024,

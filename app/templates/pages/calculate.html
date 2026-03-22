@@ -87,6 +87,7 @@
     {# ─── Spouse Taxpayer ────────────────────────────────────── #}
     <div class="card spouse-section" id="spouse_section">
         <h2>Spouse</h2>
+        <p class="text-dim text-sm" style="margin-bottom:12px;">Shown for MFJ only. For MFS, submit one spouse per run.</p>
         <div class="form-row">
             <div><label>First Name</label><input type="text" name="s_first"></div>
             <div><label>Last Name</label><input type="text" name="s_last"></div>
@@ -258,7 +259,7 @@ function removeRow(btn) {
 function toggleSpouse() {
     var fs = document.getElementById('filing_status').value;
     var section = document.getElementById('spouse_section');
-    if (fs === 'mfj' || fs === 'mfs') {
+    if (fs === 'mfj') {
         section.classList.add('visible');
     } else {
         section.classList.remove('visible');

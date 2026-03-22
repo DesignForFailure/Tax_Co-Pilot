@@ -5,7 +5,7 @@ Tax Co-Pilot supports optional encryption-at-rest for the SQLite database to pro
 
 ## Overview
 
-- **Encryption Algorithm**: AES-256 (via SQLCipher) or Fernet (Python fallback)
+- **Encryption Algorithm**: AES-256 (via SQLCipher)
 - **Key Derivation**: PBKDF2-HMAC-SHA256 with 100,000+ iterations
 - **Password Management**: Environment variable, OS keyring, or web UI prompt
 - **Migration**: Seamless migration from unencrypted to encrypted databases
@@ -141,7 +141,7 @@ export TAX_COPILOT_ENCRYPTION_ENABLED=true
 # Database password (optional, will prompt if not set)
 export TAX_COPILOT_DB_PASSWORD="your-password"
 
-# Encryption provider: "sqlcipher" | "python" | "auto" (default: auto)
+# Encryption provider: "sqlcipher" | "auto" (default: auto)
 export TAX_COPILOT_ENCRYPTION_PROVIDER=auto
 
 # Password source: "env" | "keyring" | "prompt" | "auto" (default: auto)
@@ -160,14 +160,8 @@ export TAX_COPILOT_KEY_ITERATIONS=100000
 - Transparent to application
 - Requires `pysqlcipher3` library
 
-**Python Fallback (Automatic)**
-- Pure Python field-level encryption
-- Fernet (symmetric encryption)
-- Used if SQLCipher unavailable
-- Higher overhead (~20-40%)
-- Cross-platform compatible
-
-The system automatically selects SQLCipher if available, falling back to Python encryption otherwise.
+Python-layer fallback encryption is currently disabled at runtime because
+transparent decode/encode hooks are not implemented in persistence reads/writes.
 
 ## System Requirements
 
@@ -194,7 +188,8 @@ brew install sqlcipher
 
 ### Windows
 
-Pre-built wheels for `pysqlcipher3` are available for Windows. If installation fails, the system will automatically fall back to Python encryption.
+Pre-built wheels for `pysqlcipher3` are available for Windows. Runtime encrypted
+operation requires SQLCipher support.
 
 ## Security Considerations
 
@@ -281,14 +276,14 @@ If you need an unencrypted backup:
 **Solutions:**
 1. Install dependencies: `pip install -e .`
 2. Install system libraries (see System Requirements above)
-3. System will automatically fall back to Python encryption
+3. Configure SQLCipher support; runtime encrypted operation requires SQLCipher
 
 ### Performance Issues
 
 **Symptoms**: Slow database operations
 
 **Solutions:**
-1. Check that SQLCipher is being used (not Python fallback)
+1. Check that SQLCipher is installed and in use
 2. Increase `TAX_COPILOT_KEY_ITERATIONS` affects initial unlock time only
 3. Consider hardware: SSD vs HDD makes significant difference
 
@@ -325,7 +320,7 @@ password = "your-secure-password"
 migrate_to_encrypted(
     db_path=db_path,
     password=password,
-    provider_type="sqlcipher",  # or "python"
+    provider_type="sqlcipher",
     kdf_iterations=100_000,
     backup_suffix=".unencrypted.backup"
 )
@@ -357,7 +352,7 @@ print(f"Database state: {state}")
 # - DatabaseState.NONE (doesn't exist)
 # - DatabaseState.UNENCRYPTED
 # - DatabaseState.ENCRYPTED_SQLCIPHER
-# - DatabaseState.ENCRYPTED_PYTHON
+# - DatabaseState.ENCRYPTED_PYTHON (legacy; runtime unsupported)
 ```
 
 ## FAQ

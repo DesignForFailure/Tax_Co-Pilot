@@ -65,9 +65,17 @@
                 <td style="padding:10px 8px;border-bottom:1px solid var(--border);text-align:right;">${{ "{:,.0f}".format(d.val_b) }}</td>
                 <td style="padding:10px 8px;border-bottom:1px solid var(--border);text-align:right;">
                     {% if d.delta_sign == "positive" %}
+                        {% if d.is_refund_field %}
+                        <span style="color:var(--green);">+${{ "{:,.0f}".format(d.delta_abs) }}</span>
+                        {% else %}
                         <span style="color:var(--red);">+${{ "{:,.0f}".format(d.delta_abs) }}</span>
+                        {% endif %}
                     {% elif d.delta_sign == "negative" %}
+                        {% if d.is_refund_field %}
+                        <span style="color:var(--red);">-${{ "{:,.0f}".format(d.delta_abs) }}</span>
+                        {% else %}
                         <span style="color:var(--green);">-${{ "{:,.0f}".format(d.delta_abs) }}</span>
+                        {% endif %}
                     {% else %}
                         <span class="text-dim">—</span>
                     {% endif %}

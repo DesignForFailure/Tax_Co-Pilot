@@ -9,6 +9,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Added
+- `state_outputs_json` persistence column in `return_runs` plus backward-compatible migration path in `init_db()`.
+- `_load_run_from_row()` hydration helper in `main.py` to consistently decode input/output/trace/state payloads.
 - `ItemizedDeductionData` model for Schedule A inputs (medical, SALT, mortgage, charitable).
 - `qualifying_children` field on `TaxReturnInput` for Child Tax Credit.
 - 15 new federal rules per year: itemized deduction calculation (medical 7.5% AGI floor, SALT $10k cap, charitable 60% AGI cap), deduction election (`max(standard, itemized)`), Child Tax Credit with phaseout, post-credit tax.
@@ -35,6 +37,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Comprehensive form mapping and consistency check tests (`tests/test_forms.py`).
 
 ### Changed
+- `MFS` handling is now per-person in `/calculate` (rejects spouse aggregation) and household-aggregated in `WhatIfEngine` by summing separate spouse returns.
+- Runtime encryption now requires SQLCipher; Python-layer fallback provider is explicitly disabled to fail closed.
+- `/whatif` now supports tax-year selection from discovered years (removed hardcoded 2024 submission).
+- Dashboard heading now renders from `run.tax_year` instead of a hardcoded year.
+- Run comparison now includes current output fields (`itemized_deductions`, `deduction_applied`, credits, and total payments) and refund delta coloring is corrected.
+- Audit HTML export now renders all available state outputs generically instead of hardcoding a single Georgia row.
+- README repository tree updated to match current structure (`.agent_tools`, additional state packs, `docs/superpowers`, etc.).
 - `fed.{year}.taxable_income` now uses `deductions.applied` (max of standard/itemized) instead of `standard_deduction`.
 - `fed.{year}.refund_or_owed` now uses `tax.after_credits` instead of `tax.brackets`.
 - `ReturnOutput.federal_tax` now reflects post-credit tax (unchanged when no credits apply).
@@ -91,6 +100,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Hardened `_resolve_ref` handling for missing or invalid string references.
 
 ### Fixed
+- Persisted runs now retain and reload `state_outputs` (state data no longer disappears after save/load).
+- Form mapper refund/owed math now uses line 22 when credits exist, including zero-after-credit cases.
+- Form view now renders 1040 lines 12/19/21/22 so applied-deduction and post-credit tax values are visible.
+- SPDX headers normalized to AGPL in `app/models/forms.py` and `app/services/form_mapper.py`.
 - SQLCipher cursor compatibility via hybrid row factory supporting both index and key access.
 - SQLCipher backup-path handling in encryption service corrected to append suffix safely.
 - Ruff UP035 typing import warnings resolved in encryption service.

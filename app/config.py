@@ -32,14 +32,14 @@ class EncryptionConfig:
 
     Attributes:
         enabled: Whether encryption is enabled (default: False for MVP, True for production)
-        provider: Which encryption provider to use ('auto' tries SQLCipher then Python fallback)
+        provider: Which encryption provider to use ('auto' resolves to SQLCipher)
         password_source: Where to get the password from ('env' | 'keyring' | 'prompt')
         key_derivation_iterations: PBKDF2 iterations for key derivation (100k minimum)
         allow_unencrypted: Safety flag - if False, refuse to create unencrypted DBs
     """
 
     enabled: bool = False  # Start disabled, enable after full implementation
-    provider: Literal["sqlcipher", "python", "auto"] = "auto"
+    provider: Literal["sqlcipher", "auto"] = "auto"
     password_source: Literal["env", "keyring", "prompt", "auto"] = "auto"
     key_derivation_iterations: int = 100_000
     allow_unencrypted: bool = True  # Allow unencrypted during migration period
@@ -50,7 +50,7 @@ class EncryptionConfig:
 
         Environment variables:
             TAX_COPILOT_ENCRYPTION_ENABLED: "true" or "false" (default: false)
-            TAX_COPILOT_ENCRYPTION_PROVIDER: "sqlcipher", "python", or "auto" (default: auto)
+            TAX_COPILOT_ENCRYPTION_PROVIDER: "sqlcipher" or "auto" (default: auto)
             TAX_COPILOT_PASSWORD_SOURCE: "env", "keyring", "prompt", or "auto" (default: auto)
             TAX_COPILOT_KEY_ITERATIONS: integer (default: 100000)
         """
@@ -60,7 +60,7 @@ class EncryptionConfig:
         iterations = int(os.getenv("TAX_COPILOT_KEY_ITERATIONS", "100000"))
 
         # Validate provider
-        if provider not in ("sqlcipher", "python", "auto"):
+        if provider not in ("sqlcipher", "auto"):
             provider = "auto"
 
         # Validate password_source

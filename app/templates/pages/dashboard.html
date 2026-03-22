@@ -2,7 +2,7 @@
 {% block title %}Dashboard{% endblock %}
 {% block content %}
 
-<h1 style="font-size: 24px; margin-bottom: 8px;">Tax Year 2024</h1>
+<h1 style="font-size: 24px; margin-bottom: 8px;">Tax Year {{ run.tax_year if run else "—" }}</h1>
 <p class="text-dim text-sm mb-4">Federal{% if run and run.state_outputs %} + State{% endif %} Return</p>
 
 {% if run %}

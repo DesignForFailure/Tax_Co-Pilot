@@ -16,9 +16,12 @@
 
 """Encryption provider abstraction for database encryption at rest.
 
-Supports multiple encryption backends:
+Runtime encryption backend:
 - SQLCipher (primary): Native SQLite encryption with AES-256
-- Python fallback: Field-level encryption using cryptography library
+
+Legacy compatibility:
+- Python-layer encryption state detection is retained to emit explicit
+  errors instead of silently misreading encrypted JSON blobs.
 
 Password management:
 - Environment variable (TAX_COPILOT_DB_PASSWORD)
@@ -371,10 +374,12 @@ class SQLCipherProvider(EncryptionProvider):
 
 
 class PythonEncryptionProvider(EncryptionProvider):
-    """Python-layer encryption provider (fallback when SQLCipher unavailable).
+    """Python-layer encryption provider (legacy, runtime-disabled).
 
-    Encrypts JSON blob fields using Fernet (symmetric encryption) from cryptography library.
-    Stores encryption metadata in a separate table.
+    Historical note:
+    - This mode stored encrypted JSON blobs in plain SQLite tables.
+    - Runtime read/write support is intentionally disabled because transparent
+      decode/encode hooks were never implemented end-to-end.
     """
 
     def __init__(self, kdf_iterations: int = 100_000) -> None:
@@ -413,47 +418,13 @@ class PythonEncryptionProvider(EncryptionProvider):
     ) -> sqlite3.Connection:
         """Create a connection with Python-layer encryption.
 
-        Note: Connection itself is unencrypted SQLite. Encryption happens at
-        application layer when reading/writing JSON fields.
-
-        Args:
-            db_path: Path to the database file
-            password: Encryption password
-            timeout: Connection timeout in seconds
-
-        Returns:
-            sqlite3.Connection (unencrypted transport, app-layer encryption)
-
-        Raises:
-            ValueError: If password is incorrect or metadata missing
+        Runtime access is disabled because decode/encode hooks are not available
+        in the persistence layer.
         """
-        # Create parent directory if needed
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Open regular SQLite connection
-        conn = sqlite3.connect(str(db_path), timeout=timeout, isolation_level=None)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA foreign_keys=ON")
-        conn.execute("PRAGMA busy_timeout=5000")
-
-        # Verify encryption metadata exists and password is correct
-        try:
-            cursor = conn.execute("SELECT salt FROM _encryption_metadata WHERE id = 1")
-            row = cursor.fetchone()
-            if not row:
-                raise ValueError("Encryption metadata not found")
-
-            # Test password by attempting decryption
-            # (In practice, would decrypt a test value)
-            # For now, just derive key to verify password format
-            salt = row[0]
-            self._derive_key(password, salt)
-
-        except sqlite3.OperationalError as e:
-            raise ValueError(f"Database not initialized for Python encryption: {e}") from e
-
-        return conn
+        raise ValueError(
+            "Python-layer encryption runtime support is disabled. "
+            "Use SQLCipher encryption."
+        )
 
     def detect_state(self, db_path: Path) -> DatabaseState:
         """Detect if database uses Python-layer encryption.
@@ -483,16 +454,19 @@ def get_encryption_provider(provider_type: str = "auto", kdf_iterations: int = 1
     if provider_type == "sqlcipher":
         return SQLCipherProvider(kdf_iterations)
     elif provider_type == "python":
-        return PythonEncryptionProvider(kdf_iterations)
+        raise ValueError(
+            "Python-layer encryption is disabled. Use provider_type='sqlcipher'."
+        )
     elif provider_type == "auto":
-        # Try SQLCipher first
+        # Runtime encryption requires SQLCipher.
         try:
             from pysqlcipher3 import dbapi2 as sqlcipher  # noqa: F401
 
             return SQLCipherProvider(kdf_iterations)
         except ImportError:
-            # Fall back to Python encryption
-            return PythonEncryptionProvider(kdf_iterations)
+            raise ImportError(
+                "SQLCipher runtime support is required but pysqlcipher3 is not installed."
+            ) from None
     else:
         raise ValueError(f"Unknown provider type: {provider_type}")
 
@@ -512,7 +486,7 @@ def migrate_to_encrypted(
     Args:
         db_path: Path to unencrypted database
         password: Encryption password for new database
-        provider_type: Encryption provider to use ("sqlcipher" | "python" | "auto")
+        provider_type: Encryption provider to use ("sqlcipher" | "auto")
         kdf_iterations: PBKDF2 iterations
         backup_suffix: Suffix for backup file
 
@@ -530,14 +504,17 @@ def migrate_to_encrypted(
 
     validate_password(password)
 
+    if provider_type == "python":
+        raise ValueError(
+            "Python-layer encryption migration is disabled. Use provider_type='sqlcipher'."
+        )
+
     # Get provider
     provider = get_encryption_provider(provider_type, kdf_iterations)
 
     # Determine migration strategy based on provider
     if isinstance(provider, SQLCipherProvider):
         _migrate_to_sqlcipher(db_path, password, kdf_iterations, backup_suffix)
-    elif isinstance(provider, PythonEncryptionProvider):
-        _migrate_to_python_encryption(db_path, password, kdf_iterations, backup_suffix)
     else:
         raise RuntimeError(f"Unsupported provider type: {type(provider)}")
 

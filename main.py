@@ -261,6 +261,16 @@ def _verify_csrf(request: Request, form_token: str) -> None:
         raise ValueError("CSRF validation failed")
 
 
+def _load_run_from_row(run_data: dict[str, Any]) -> ReturnRun:
+    """Hydrate a persisted DB row into a typed ReturnRun."""
+    hydrated = dict(run_data)
+    hydrated["input_snapshot"] = json.loads(hydrated["input_snapshot_json"])
+    hydrated["output"] = json.loads(hydrated["output_json"])
+    hydrated["trace"] = json.loads(hydrated["trace_json"])
+    hydrated["state_outputs"] = json.loads(hydrated.get("state_outputs_json", "[]"))
+    return ReturnRun(**{k: v for k, v in hydrated.items() if not k.endswith("_json")})
+
+
 @app.on_event("startup")
 def startup() -> None:
     """Initialize database on startup.
@@ -273,7 +283,7 @@ def startup() -> None:
     if encryption_config.enabled:
         db_state = detect_encryption_state(DB_PATH)
 
-        if db_state in (DatabaseState.ENCRYPTED_SQLCIPHER, DatabaseState.ENCRYPTED_PYTHON):
+        if db_state == DatabaseState.ENCRYPTED_SQLCIPHER:
             # Database is encrypted - try to get password
             password = get_password(source=encryption_config.password_source)
             if password:
@@ -284,6 +294,11 @@ def startup() -> None:
                 # Password needed - will redirect to /unlock on first request
                 # Don't init_db() yet - will happen after unlock
                 pass
+        elif db_state == DatabaseState.ENCRYPTED_PYTHON:
+            raise RuntimeError(
+                "Python-layer encrypted databases are unsupported at runtime. "
+                "Migrate to SQLCipher encryption."
+            )
         else:
             # Database doesn't exist or is unencrypted - init normally
             init_db()
@@ -297,12 +312,18 @@ def dashboard(request: Request) -> Response:
     # Check if database unlock is needed
     if encryption_config.enabled:
         db_state = detect_encryption_state(DB_PATH)
-        if db_state in (DatabaseState.ENCRYPTED_SQLCIPHER, DatabaseState.ENCRYPTED_PYTHON):
+        if db_state == DatabaseState.ENCRYPTED_SQLCIPHER:
             from app.services.database import get_cached_password
 
             if not get_cached_password():
                 # Redirect to unlock page
                 return RedirectResponse(url="/unlock", status_code=303)
+        if db_state == DatabaseState.ENCRYPTED_PYTHON:
+            return HTMLResponse(
+                "Python-layer encrypted databases are unsupported at runtime. "
+                "Migrate to SQLCipher encryption.",
+                status_code=500,
+            )
 
     runs = list_return_runs()
     run = None
@@ -310,10 +331,7 @@ def dashboard(request: Request) -> Response:
         run_id = runs[0]["id"]
         run_data = get_return_run(run_id)
         if run_data:
-            run_data["input_snapshot"] = json.loads(run_data["input_snapshot_json"])
-            run_data["output"] = json.loads(run_data["output_json"])
-            run_data["trace"] = json.loads(run_data["trace_json"])
-            run = ReturnRun(**{k: v for k, v in run_data.items() if not k.endswith("_json")})
+            run = _load_run_from_row(run_data)
 
     csrf = _get_csrf_token(request)
     resp = templates.TemplateResponse("pages/dashboard.html", {"request": request, "run": run})
@@ -476,19 +494,22 @@ def _parse_tax_input_from_form(fd: FormData) -> TaxReturnInput:
     primary = _parse_taxpayer(fd, "p", TaxpayerRole.PRIMARY)
     taxpayers: list[Taxpayer] = [primary]
 
-    # Spouse is only expected for MFJ/MFS
-    if filing_status in (FilingStatus.MFJ, FilingStatus.MFS):
-        s_first = _form_str(fd, "s_first")
-        s_last = _form_str(fd, "s_last")
-        # Only add spouse if they provided at least a name or income data
-        has_spouse_income = bool(
-            _collect_indices(fd, "s_w2")
-            or _collect_indices(fd, "s_1099int")
-            or _collect_indices(fd, "s_1099div")
-            or _collect_indices(fd, "s_1099b")
-        )
+    s_first = _form_str(fd, "s_first")
+    s_last = _form_str(fd, "s_last")
+    has_spouse_income = bool(
+        _collect_indices(fd, "s_w2")
+        or _collect_indices(fd, "s_1099int")
+        or _collect_indices(fd, "s_1099div")
+        or _collect_indices(fd, "s_1099b")
+    )
+
+    # MFS returns are per-person, so this single-return form must not aggregate
+    # both spouses into one run.
+    if filing_status == FilingStatus.MFJ:
         if s_first or s_last or has_spouse_income:
             taxpayers.append(_parse_taxpayer(fd, "s", TaxpayerRole.SPOUSE))
+    elif filing_status == FilingStatus.MFS and (s_first or s_last or has_spouse_income):
+        raise ValueError("MFS is per-person; submit each spouse as a separate run")
 
     adjustments = AdjustmentsData(
         student_loan_interest=_form_money(fd, "adj_student_loan"),
@@ -576,21 +597,22 @@ def compare_runs(request: Request, a: str = "", b: str = "") -> Response:
     run_b_data = get_return_run(b)
     if not run_a_data or not run_b_data:
         return HTMLResponse("One or both runs not found", status_code=404)
-    run_a_data["input_snapshot"] = json.loads(run_a_data["input_snapshot_json"])
-    run_a_data["output"] = json.loads(run_a_data["output_json"])
-    run_a_data["trace"] = json.loads(run_a_data["trace_json"])
-    run_a = ReturnRun(**{k: v for k, v in run_a_data.items() if not k.endswith("_json")})
-    run_b_data["input_snapshot"] = json.loads(run_b_data["input_snapshot_json"])
-    run_b_data["output"] = json.loads(run_b_data["output_json"])
-    run_b_data["trace"] = json.loads(run_b_data["trace_json"])
-    run_b = ReturnRun(**{k: v for k, v in run_b_data.items() if not k.endswith("_json")})
+    run_a = _load_run_from_row(run_a_data)
+    run_b = _load_run_from_row(run_b_data)
     output_fields = [
         "gross_income",
         "agi",
         "standard_deduction",
+        "itemized_deductions",
+        "deduction_applied",
         "taxable_income",
+        "tax_before_credits",
+        "child_tax_credit",
+        "total_credits",
         "federal_tax",
         "total_withholding",
+        "estimated_tax_payments",
+        "total_payments",
         "refund_or_owed",
     ]
     output_diffs: list[dict[str, Any]] = []
@@ -606,6 +628,7 @@ def compare_runs(request: Request, a: str = "", b: str = "") -> Response:
                 "delta": delta,
                 "delta_abs": abs(delta),
                 "delta_sign": "positive" if delta > 0 else ("negative" if delta < 0 else "zero"),
+                "is_refund_field": field == "refund_or_owed",
             }
         )
     return templates.TemplateResponse(
@@ -625,10 +648,7 @@ def view_run(request: Request, run_id: str) -> HTMLResponse:
     if not run_data:
         return HTMLResponse("Run not found", status_code=404)
 
-    run_data["input_snapshot"] = json.loads(run_data["input_snapshot_json"])
-    run_data["output"] = json.loads(run_data["output_json"])
-    run_data["trace"] = json.loads(run_data["trace_json"])
-    run = ReturnRun(**{k: v for k, v in run_data.items() if not k.endswith("_json")})
+    run = _load_run_from_row(run_data)
     return templates.TemplateResponse("pages/dashboard.html", {"request": request, "run": run})
 
 
@@ -639,7 +659,8 @@ def view_run(request: Request, run_id: str) -> HTMLResponse:
 def whatif_form(request: Request) -> Response:
     csrf = _get_csrf_token(request)
     resp = templates.TemplateResponse(
-        "pages/whatif.html", {"request": request, "csrf": csrf}
+        "pages/whatif.html",
+        {"request": request, "csrf": csrf, "available_years": available_years},
     )
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return resp
@@ -655,7 +676,13 @@ async def whatif_submit(request: Request) -> Response:
     csrf = _get_csrf_token(request)
     resp = templates.TemplateResponse(
         "pages/whatif.html",
-        {"request": request, "csrf": csrf, "comparison": comparison},
+        {
+            "request": request,
+            "csrf": csrf,
+            "comparison": comparison,
+            "available_years": available_years,
+            "selected_year": inputs.tax_year,
+        },
     )
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return resp
@@ -705,10 +732,7 @@ def export_run_json(run_id: str) -> Response:
     run_data = get_return_run(run_id)
     if not run_data:
         return HTMLResponse("Run not found", status_code=404)
-    run_data["input_snapshot"] = json.loads(run_data["input_snapshot_json"])
-    run_data["output"] = json.loads(run_data["output_json"])
-    run_data["trace"] = json.loads(run_data["trace_json"])
-    run = ReturnRun(**{k: v for k, v in run_data.items() if not k.endswith("_json")})
+    run = _load_run_from_row(run_data)
     # Serialize to indented JSON matching what export_json() would write to disk.
     json_bytes = json.dumps(
         json.loads(run.model_dump_json()), indent=2, ensure_ascii=False
@@ -725,10 +749,7 @@ def export_run_html(run_id: str) -> Response:
     run_data = get_return_run(run_id)
     if not run_data:
         return HTMLResponse("Run not found", status_code=404)
-    run_data["input_snapshot"] = json.loads(run_data["input_snapshot_json"])
-    run_data["output"] = json.loads(run_data["output_json"])
-    run_data["trace"] = json.loads(run_data["trace_json"])
-    run = ReturnRun(**{k: v for k, v in run_data.items() if not k.endswith("_json")})
+    run = _load_run_from_row(run_data)
     html_content = generate_audit_html(run)
     return StreamingResponse(
         io.BytesIO(html_content.encode("utf-8")),
@@ -745,10 +766,7 @@ def view_run_forms(request: Request, run_id: str) -> Response:
     run_data = get_return_run(run_id)
     if not run_data:
         return HTMLResponse("Run not found", status_code=404)
-    run_data["input_snapshot"] = json.loads(run_data["input_snapshot_json"])
-    run_data["output"] = json.loads(run_data["output_json"])
-    run_data["trace"] = json.loads(run_data["trace_json"])
-    run = ReturnRun(**{k: v for k, v in run_data.items() if not k.endswith("_json")})
+    run = _load_run_from_row(run_data)
 
     from app.services.form_mapper import map_return_run
 
@@ -763,10 +781,7 @@ def export_run_forms(run_id: str) -> Response:
     run_data = get_return_run(run_id)
     if not run_data:
         return HTMLResponse("Run not found", status_code=404)
-    run_data["input_snapshot"] = json.loads(run_data["input_snapshot_json"])
-    run_data["output"] = json.loads(run_data["output_json"])
-    run_data["trace"] = json.loads(run_data["trace_json"])
-    run = ReturnRun(**{k: v for k, v in run_data.items() if not k.endswith("_json")})
+    run = _load_run_from_row(run_data)
 
     from app.services.form_mapper import map_return_run
 
@@ -823,7 +838,12 @@ def unlock_submit(request: Request, password: str = Form(""), csrf_token: str = 
 
         # Try to open database with this password
         db_state = detect_encryption_state(DB_PATH)
-        if db_state not in (DatabaseState.ENCRYPTED_SQLCIPHER, DatabaseState.ENCRYPTED_PYTHON):
+        if db_state == DatabaseState.ENCRYPTED_PYTHON:
+            return RedirectResponse(
+                url="/unlock?error=Python-layer+encryption+is+unsupported;+use+SQLCipher",
+                status_code=303,
+            )
+        if db_state != DatabaseState.ENCRYPTED_SQLCIPHER:
             return RedirectResponse(
                 url="/unlock?error=Database+is+not+encrypted", status_code=303
             )
