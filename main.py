@@ -73,6 +73,7 @@ from app.services.database import (
     list_return_runs,
     save_return_run,
     set_cached_password,
+    update_run_annotation,
 )
 from app.services.encryption import (
     DatabaseState,
@@ -881,6 +882,103 @@ def unlock_submit(request: Request, password: str = Form(""), csrf_token: str = 
     except Exception as e:
         error_msg = f"Unlock+failed:+{str(e)[:50]}"
         return RedirectResponse(url=f"/unlock?error={error_msg}", status_code=303)
+
+
+@app.post("/runs/{run_id}/annotate")
+async def annotate_run(request: Request, run_id: str) -> RedirectResponse:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    tags = str(fd.get("tags", "")).strip()
+    notes = str(fd.get("notes", "")).strip()
+    update_run_annotation(run_id, tags, notes)
+    return RedirectResponse(url="/runs", status_code=303)
+
+
+@app.get("/export-all")
+def export_all_runs() -> Response:
+    rows = list_return_runs()
+    hydrated = []
+    for r in rows:
+        try:
+            run = _load_run_from_row(r)
+            hydrated.append(json.loads(run.model_dump_json()))
+        except Exception:
+            hydrated.append(r)  # fallback: raw row
+    return Response(
+        content=json.dumps(hydrated, ensure_ascii=False, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=tax_copilot_runs.json"},
+    )
+
+
+@app.post("/import-returns", response_class=HTMLResponse)
+async def import_returns(request: Request) -> HTMLResponse:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    upload = fd.get("file")
+    if not upload or not hasattr(upload, "read"):
+        return HTMLResponse("No file uploaded", status_code=400)
+    content = (await upload.read()).decode("utf-8")
+    try:
+        entries = json.loads(content)
+    except json.JSONDecodeError as e:
+        return HTMLResponse(f"Invalid JSON: {e}", status_code=400)
+    if not isinstance(entries, list):
+        return HTMLResponse("Expected a JSON array", status_code=400)
+    imported = 0
+    errors: list[str] = []
+    for i, entry in enumerate(entries):
+        try:
+            run = ReturnRun(**entry)
+            year = run.tax_year
+            if year in _federal_cache:
+                expected = _federal_cache[year].checksum
+                if run.rule_pack_checksum and run.rule_pack_checksum != expected:
+                    errors.append(f"Entry {i}: checksum mismatch (pack may differ)")
+                    continue
+            run_dict = json.loads(run.model_dump_json())
+            save_return_run(run_dict)
+            imported += 1
+        except Exception as e:
+            errors.append(f"Entry {i}: {e}")
+    result = f"Imported {imported} run(s)."
+    if errors:
+        result += f" {len(errors)} error(s): " + "; ".join(errors[:5])
+    return HTMLResponse(result, status_code=200)
+
+
+@app.get("/backup")
+def backup_database() -> Response:
+    if not DB_PATH.exists():
+        return HTMLResponse("No database file found", status_code=404)
+    return Response(
+        content=DB_PATH.read_bytes(),
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f"attachment; filename={DB_PATH.name}"},
+    )
+
+
+@app.post("/restore", response_class=HTMLResponse)
+async def restore_database(request: Request) -> Response:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    upload = fd.get("file")
+    if not upload or not hasattr(upload, "read"):
+        return HTMLResponse("No file uploaded", status_code=400)
+    content = await upload.read()
+    if not content[:16].startswith(b"SQLite format 3"):
+        return HTMLResponse("Not a valid SQLite database file", status_code=400)
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    DB_PATH.write_bytes(content)
+    try:
+        init_db()
+    except Exception as e:
+        return HTMLResponse(
+            f"Database restored but failed to initialize: {e}. "
+            "If the backup is encrypted, ensure the same password is active.",
+            status_code=500,
+        )
+    return RedirectResponse(url="/runs", status_code=303)
 
 
 @app.exception_handler(ValueError)

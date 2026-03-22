@@ -142,7 +142,9 @@ Tax_Co-Pilot/
 │   ├── ISSUE_TEMPLATE/
 │   │   ├── bug_report.md
 │   │   ├── custom.md
-│   │   └── feature_request.md
+│   │   ├── feature_request.md
+│   │   └── new_state.md
+│   ├── PULL_REQUEST_TEMPLATE.md
 │   └── workflows/
 │       └── ci.yml
 ├── .gitignore
@@ -186,6 +188,7 @@ Tax_Co-Pilot/
 │   ├── ENCRYPTION.md
 │   ├── EXPORT_CONTROL.md
 │   ├── NOTICE.md
+│   ├── RULE_PACK_AUTHORING.md
 │   ├── STATE_AUTHORING_GUIDE.md
 │   └── superpowers/
 │       ├── plans/
@@ -195,10 +198,13 @@ Tax_Co-Pilot/
 │       │   ├── 2026-03-18-multi-year-support.md
 │       │   ├── 2026-03-18-qa-remediation.md
 │       │   ├── 2026-03-21-ca-ny-state-packs.md
-│       │   └── 2026-03-21-itemized-deductions-credits.md
+│       │   ├── 2026-03-21-itemized-deductions-credits.md
+│       │   └── 2026-03-22-data-mgmt-dx.md
 │       └── specs/
 │           ├── 2026-03-15-federal-completeness-design.md
 │           └── 2026-03-16-state-expansion-design.md
+├── scripts/
+│   └── validate_rule_pack.py
 ├── rule_packs/
 │   ├── federal/
 │   │   ├── 2023/
@@ -277,6 +283,7 @@ Tax_Co-Pilot/
 │   ├── test_itemized_credits.py
 │   ├── test_milestone6_routes.py
 │   ├── test_multi_year.py
+│   ├── test_data_mgmt.py
 │   ├── test_state_ca_ny.py
 │   └── test_state_expansion.py
 ├── CHANGELOG.md
