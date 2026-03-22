@@ -139,6 +139,10 @@ Tax_Co-Pilot/
 │   └── 05_session_log.md
 ├── .editorconfig
 ├── .github/
+│   ├── ISSUE_TEMPLATE/
+│   │   ├── bug_report.md
+│   │   ├── custom.md
+│   │   └── feature_request.md
 │   └── workflows/
 │       └── ci.yml
 ├── .gitignore
