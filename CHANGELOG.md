@@ -9,6 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Added
+- **Milestone 11 — Data Management & Developer Experience (complete):** Full return data export/import (`GET /export-all`, `POST /import-returns`), database backup/restore (`GET /backup`, `POST /restore`), run tagging and notes (`POST /runs/{id}/annotate`), rule pack validation CLI (`scripts/validate_rule_pack.py`), rule pack authoring guide (`docs/RULE_PACK_AUTHORING.md`), GitHub issue/PR templates (`.github/ISSUE_TEMPLATE/new_state.md`, `.github/PULL_REQUEST_TEMPLATE.md`).
+- `tags` and `notes` fields on `ReturnRun` model with backward-compatible DB migration.
+- `update_run_annotation()` in database service for inline tag/note editing.
+- Export/import round-trip with checksum verification against loaded federal rule packs.
+- Restore endpoint validates SQLite magic bytes before overwriting database.
+- Data management tests (`tests/test_data_mgmt.py`): export JSON, backup download, round-trip, annotation, restore rejection.
+- **Milestone 10 — State Tax Expansion (complete):** Added California (9 progressive brackets + 1% mental health services surtax) and New York (9 progressive brackets) state rule packs for tax year 2024. Added "State of Residence" dropdown to the calculate form. All state packs (GA, CA, NY, plus 9 no-income-tax stubs) now loadable and tested.
 - `state_outputs_json` persistence column in `return_runs` plus backward-compatible migration path in `init_db()`.
 - `_load_run_from_row()` hydration helper in `main.py` to consistently decode input/output/trace/state payloads.
 - `ItemizedDeductionData` model for Schedule A inputs (medical, SALT, mortgage, charitable).

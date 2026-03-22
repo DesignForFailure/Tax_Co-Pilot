@@ -142,7 +142,9 @@ Tax_Co-Pilot/
 │   ├── ISSUE_TEMPLATE/
 │   │   ├── bug_report.md
 │   │   ├── custom.md
-│   │   └── feature_request.md
+│   │   ├── feature_request.md
+│   │   └── new_state.md
+│   ├── PULL_REQUEST_TEMPLATE.md
 │   └── workflows/
 │       └── ci.yml
 ├── .gitignore
@@ -174,11 +176,11 @@ Tax_Co-Pilot/
 │       └── pages/
 │           ├── calculate.html
 │           ├── dashboard.html
+│           ├── forms_view.html
 │           ├── import_csv.html
 │           ├── legal.html
 │           ├── run_compare.html
 │           ├── runs.html
-│           ├── forms_view.html
 │           ├── unlock.html
 │           └── whatif.html
 ├── docs/
@@ -186,10 +188,23 @@ Tax_Co-Pilot/
 │   ├── ENCRYPTION.md
 │   ├── EXPORT_CONTROL.md
 │   ├── NOTICE.md
+│   ├── RULE_PACK_AUTHORING.md
 │   ├── STATE_AUTHORING_GUIDE.md
 │   └── superpowers/
 │       ├── plans/
+│       │   ├── 2026-03-15-federal-completeness.md
+│       │   ├── 2026-03-16-state-expansion.md
+│       │   ├── 2026-03-18-forms-support.md
+│       │   ├── 2026-03-18-multi-year-support.md
+│       │   ├── 2026-03-18-qa-remediation.md
+│       │   ├── 2026-03-21-ca-ny-state-packs.md
+│       │   ├── 2026-03-21-itemized-deductions-credits.md
+│       │   └── 2026-03-22-data-mgmt-dx.md
 │       └── specs/
+│           ├── 2026-03-15-federal-completeness-design.md
+│           └── 2026-03-16-state-expansion-design.md
+├── scripts/
+│   └── validate_rule_pack.py
 ├── rule_packs/
 │   ├── federal/
 │   │   ├── 2023/
@@ -201,27 +216,59 @@ Tax_Co-Pilot/
 │   └── state/
 │       ├── _template/
 │       │   └── 2024/
+│       │       ├── state_TEMPLATE_2024_manifest.yaml
+│       │       └── state_TEMPLATE_2024_rules.yaml
 │       ├── AK/
 │       │   └── 2024/
+│       │       ├── state_AK_2024_manifest.yaml
+│       │       └── state_AK_2024_rules.yaml
+│       ├── CA/
+│       │   └── 2024/
+│       │       ├── state_CA_2024_manifest.yaml
+│       │       └── state_CA_2024_rules.yaml
 │       ├── FL/
 │       │   └── 2024/
+│       │       ├── state_FL_2024_manifest.yaml
+│       │       └── state_FL_2024_rules.yaml
 │       ├── GA/
 │       │   ├── 2023/
+│       │   │   ├── state_GA_2023_manifest.yaml
+│       │   │   └── state_GA_2023_rules.yaml
 │       │   └── 2024/
+│       │       ├── state_GA_2024_manifest.yaml
+│       │       └── state_GA_2024_rules.yaml
 │       ├── NH/
 │       │   └── 2024/
+│       │       ├── state_NH_2024_manifest.yaml
+│       │       └── state_NH_2024_rules.yaml
 │       ├── NV/
 │       │   └── 2024/
+│       │       ├── state_NV_2024_manifest.yaml
+│       │       └── state_NV_2024_rules.yaml
+│       ├── NY/
+│       │   └── 2024/
+│       │       ├── state_NY_2024_manifest.yaml
+│       │       └── state_NY_2024_rules.yaml
 │       ├── SD/
 │       │   └── 2024/
+│       │       ├── state_SD_2024_manifest.yaml
+│       │       └── state_SD_2024_rules.yaml
 │       ├── TN/
 │       │   └── 2024/
+│       │       ├── state_TN_2024_manifest.yaml
+│       │       └── state_TN_2024_rules.yaml
 │       ├── TX/
 │       │   └── 2024/
+│       │       ├── state_TX_2024_manifest.yaml
+│       │       └── state_TX_2024_rules.yaml
 │       ├── WA/
 │       │   └── 2024/
+│       │       ├── state_WA_2024_manifest.yaml
+│       │       └── state_WA_2024_rules.yaml
 │       └── WY/
 │           └── 2024/
+│               ├── state_WY_2024_manifest.yaml
+│               └── state_WY_2024_rules.yaml
 ├── tests/
 │   ├── __init__.py
 │   ├── test_calculate_name_validation.py
@@ -236,6 +283,8 @@ Tax_Co-Pilot/
 │   ├── test_itemized_credits.py
 │   ├── test_milestone6_routes.py
 │   ├── test_multi_year.py
+│   ├── test_data_mgmt.py
+│   ├── test_state_ca_ny.py
 │   └── test_state_expansion.py
 ├── CHANGELOG.md
 ├── CODE_OF_CONDUCT.md
@@ -246,6 +295,7 @@ Tax_Co-Pilot/
 ├── ROADMAP.md
 ├── SECURITY.md
 ├── data/
+│   └── tax_copilot.db
 ├── main.py
 ├── pyproject.toml
 ├── requirements-dev.txt

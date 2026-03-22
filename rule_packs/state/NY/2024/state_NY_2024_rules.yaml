@@ -1,0 +1,116 @@
+# Tax_Co-Pilot - Local-first personal tax software system
+# Copyright (C) 2026  Tax_Co-Pilot Contributors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+constants:
+  standard_deduction:
+    single: "8000"
+    mfj: "16050"
+    mfs: "8000"
+    hoh: "11200"
+
+rules:
+
+  - id: "ny.2024.agi"
+    description: "New York AGI (starts from federal AGI)"
+    type: "formula"
+    expression: "federal_agi"
+    inputs:
+      federal_agi: { ref: "fed.2024.agi.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "ny.2024.standard_deduction"
+    description: "New York standard deduction"
+    type: "lookup"
+    table: "constants.standard_deduction"
+    key: { ref: "input.filing_status" }
+
+  - id: "ny.2024.taxable_income"
+    description: "New York taxable income = max(AGI - deduction, 0)"
+    type: "formula"
+    expression: "max(agi - deduction, 0)"
+    inputs:
+      agi: { ref: "ny.2024.agi" }
+      deduction: { ref: "ny.2024.standard_deduction" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ny.2024.tax"
+    description: "New York income tax (2024 progressive brackets)"
+    type: "bracket_table"
+    input: { ref: "ny.2024.taxable_income" }
+    key: { ref: "input.filing_status" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+    tables:
+      single:
+        - { lower: "0",        upper: "8500",      rate: "0.04" }
+        - { lower: "8500",     upper: "11700",     rate: "0.045" }
+        - { lower: "11700",    upper: "13900",     rate: "0.0525" }
+        - { lower: "13900",    upper: "80650",     rate: "0.0585" }
+        - { lower: "80650",    upper: "215400",    rate: "0.0625" }
+        - { lower: "215400",   upper: "1077550",   rate: "0.0685" }
+        - { lower: "1077550",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+      mfj:
+        - { lower: "0",        upper: "17150",     rate: "0.04" }
+        - { lower: "17150",    upper: "23600",     rate: "0.045" }
+        - { lower: "23600",    upper: "27900",     rate: "0.0525" }
+        - { lower: "27900",    upper: "161550",    rate: "0.0585" }
+        - { lower: "161550",   upper: "323200",    rate: "0.0625" }
+        - { lower: "323200",   upper: "2155350",   rate: "0.0685" }
+        - { lower: "2155350",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+      mfs:
+        - { lower: "0",        upper: "8500",      rate: "0.04" }
+        - { lower: "8500",     upper: "11700",     rate: "0.045" }
+        - { lower: "11700",    upper: "13900",     rate: "0.0525" }
+        - { lower: "13900",    upper: "80650",     rate: "0.0585" }
+        - { lower: "80650",    upper: "215400",    rate: "0.0625" }
+        - { lower: "215400",   upper: "1077550",   rate: "0.0685" }
+        - { lower: "1077550",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+      hoh:
+        - { lower: "0",        upper: "8500",      rate: "0.04" }
+        - { lower: "8500",     upper: "11700",     rate: "0.045" }
+        - { lower: "11700",    upper: "13900",     rate: "0.0525" }
+        - { lower: "13900",    upper: "80650",     rate: "0.0585" }
+        - { lower: "80650",    upper: "215400",    rate: "0.0625" }
+        - { lower: "215400",   upper: "1077550",   rate: "0.0685" }
+        - { lower: "1077550",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+
+  - id: "ny.2024.withholding"
+    description: "Total New York tax withheld"
+    type: "sum"
+    inputs:
+      items: { ref: "input.withholding.state.NY" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "ny.2024.refund_or_owed"
+    description: "New York refund (positive) or amount owed (negative)"
+    type: "formula"
+    expression: "withholding - tax"
+    inputs:
+      withholding: { ref: "ny.2024.withholding" }
+      tax: { ref: "ny.2024.tax" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0

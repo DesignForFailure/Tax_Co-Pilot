@@ -191,6 +191,10 @@ def init_db() -> None:
         conn.execute(
             "ALTER TABLE return_runs ADD COLUMN state_outputs_json TEXT NOT NULL DEFAULT '[]'"
         )
+    if "tags" not in columns:
+        conn.execute("ALTER TABLE return_runs ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+    if "notes" not in columns:
+        conn.execute("ALTER TABLE return_runs ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
     conn.close()
 
 
@@ -208,8 +212,9 @@ def save_return_run(run_data: dict) -> None:
         """INSERT INTO return_runs
            (id, tax_year, filing_status, scenario_name,
             rule_pack_version, rule_pack_checksum,
-            input_snapshot_json, output_json, trace_json, state_outputs_json, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            input_snapshot_json, output_json, trace_json, state_outputs_json,
+            created_at, tags, notes)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             run_data["id"],
             run_data["tax_year"],
@@ -222,6 +227,8 @@ def save_return_run(run_data: dict) -> None:
             json.dumps(run_data["trace"], ensure_ascii=False),
             json.dumps(run_data.get("state_outputs", []), ensure_ascii=False),
             run_data["created_at"],
+            run_data.get("tags", ""),
+            run_data.get("notes", ""),
         ),
     )
     conn.close()
@@ -257,4 +264,14 @@ def delete_return_run(run_id: str) -> None:
     """
     conn = get_connection()
     conn.execute("DELETE FROM return_runs WHERE id = ?", (run_id,))
+    conn.close()
+
+
+def update_run_annotation(run_id: str, tags: str, notes: str) -> None:
+    """Update tags and notes for an existing run."""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE return_runs SET tags = ?, notes = ? WHERE id = ?",
+        (tags, notes, run_id),
+    )
     conn.close()

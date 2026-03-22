@@ -11,6 +11,25 @@
 </div>
 {% endif %}
 
+<div style="margin-bottom: 12px;">
+    <a href="/export-all" class="btn btn-sm btn-outline">Export All Runs (JSON)</a>
+    <a href="/backup" class="btn btn-sm btn-outline">Backup Database</a>
+</div>
+<div style="margin-bottom: 12px;">
+    <form method="POST" action="/import-returns" enctype="multipart/form-data" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <input type="file" name="file" accept=".json" style="font-size:12px;">
+        <button type="submit" class="btn btn-sm btn-outline">Import Runs</button>
+    </form>
+    &nbsp;
+    <form method="POST" action="/restore" enctype="multipart/form-data" style="display:inline;"
+          onsubmit="return confirm('This will REPLACE your entire database. All current runs will be lost. Continue?')">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <input type="file" name="file" accept=".db,.sqlite" style="font-size:12px;">
+        <button type="submit" class="btn btn-sm btn-danger" style="font-size:11px;">Restore Database</button>
+    </form>
+</div>
+
 <div class="card">
     {% if runs %}
         <table style="width:100%;border-collapse:collapse;">
@@ -20,6 +39,7 @@
                     <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Created</th>
                     <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Filing Status</th>
                     <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Rule Pack</th>
+                    <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Tags / Notes</th>
                     <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Actions</th>
                 </tr>
             </thead>
@@ -32,6 +52,14 @@
                     <td style="padding:8px;border-bottom:1px solid var(--border);">{{ r.created_at }}</td>
                     <td style="padding:8px;border-bottom:1px solid var(--border);">{{ r.filing_status }}</td>
                     <td style="padding:8px;border-bottom:1px solid var(--border);">{{ r.rule_pack_version }}</td>
+                    <td style="padding:8px;border-bottom:1px solid var(--border);">
+                        <form method="POST" action="/runs/{{ r.id }}/annotate" style="display:inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf }}">
+                            <input type="text" name="tags" value="{{ r.tags or '' }}" placeholder="tags" style="width:80px;font-size:11px;">
+                            <input type="text" name="notes" value="{{ r.notes or '' }}" placeholder="notes" style="width:120px;font-size:11px;">
+                            <button type="submit" class="btn btn-sm btn-outline" style="font-size:10px;padding:2px 6px;">Save</button>
+                        </form>
+                    </td>
                     <td style="padding:8px;border-bottom:1px solid var(--border);">
                         <a href="/runs/{{ r.id }}">View</a>
                         &nbsp;
