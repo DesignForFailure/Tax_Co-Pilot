@@ -600,6 +600,8 @@ def _migrate_to_sqlcipher(
         hex_key = _hex_encode_key(password)
         conn.execute(f"ATTACH DATABASE '{encrypted_path}' AS encrypted KEY \"x'{hex_key}'\"")
         conn.execute(f"PRAGMA encrypted.kdf_iter = {kdf_iterations}")
+        conn.execute("PRAGMA encrypted.cipher_page_size = 4096")
+        conn.execute("PRAGMA encrypted.cipher_compatibility = 4")
 
         # Export all data
         conn.execute("SELECT sqlcipher_export('encrypted')")
