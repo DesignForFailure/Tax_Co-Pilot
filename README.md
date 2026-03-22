@@ -169,7 +169,8 @@ Tax_Co-Pilot/
 │   │   ├── csv_import.py
 │   │   ├── database.py
 │   │   ├── encryption.py
-│   │   └── form_mapper.py
+│   │   ├── form_mapper.py
+│   │   └── rule_pack_editor.py
 │   └── templates/
 │       ├── layouts/
 │       │   └── base.html
@@ -180,6 +181,10 @@ Tax_Co-Pilot/
 │           ├── import_csv.html
 │           ├── legal.html
 │           ├── rotate_key.html
+│           ├── rule_editor.html
+│           ├── rule_pack_detail.html
+│           ├── rule_pack_import.html
+│           ├── rule_packs.html
 │           ├── run_compare.html
 │           ├── runs.html
 │           ├── unlock.html
@@ -201,11 +206,13 @@ Tax_Co-Pilot/
 │       │   ├── 2026-03-21-ca-ny-state-packs.md
 │       │   ├── 2026-03-21-itemized-deductions-credits.md
 │       │   ├── 2026-03-22-data-mgmt-dx.md
-│       │   └── 2026-03-22-hardening-qa.md
+│       │   ├── 2026-03-22-hardening-qa.md
+│       │   └── 2026-03-22-rule-pack-editor.md
 │       └── specs/
 │           ├── 2026-03-15-federal-completeness-design.md
 │           ├── 2026-03-16-state-expansion-design.md
-│           └── 2026-03-22-hardening-qa-design.md
+│           ├── 2026-03-22-hardening-qa-design.md
+│           └── 2026-03-22-rule-pack-editor-design.md
 ├── scripts/
 │   └── validate_rule_pack.py
 ├── rule_packs/
@@ -290,6 +297,8 @@ Tax_Co-Pilot/
 │   ├── test_multi_year.py
 │   ├── test_parse_money.py
 │   ├── test_route_coverage.py
+│   ├── test_rule_pack_editor.py
+│   ├── test_rule_pack_routes.py
 │   ├── test_state_ca_ny.py
 │   └── test_state_expansion.py
 ├── CHANGELOG.md
