@@ -144,6 +144,17 @@ def test_get_password_env_source() -> None:
     os.environ.pop("TAX_COPILOT_DB_PASSWORD")
 
 
+def test_hex_key_encoding() -> None:
+    """Password with special chars encodes cleanly for PRAGMA key."""
+    from app.services.encryption import _hex_encode_key
+
+    assert _hex_encode_key("simple") == "73696d706c65"
+    assert _hex_encode_key("it's a secret") == "69742773206120736563726574"
+    result = _hex_encode_key("pass'word\"test")
+    assert "'" not in result
+    assert '"' not in result
+
+
 def test_compute_checksum() -> None:
     """Test SHA-256 checksum computation."""
     data = b"Hello, World!"

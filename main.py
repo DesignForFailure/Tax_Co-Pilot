@@ -36,6 +36,11 @@ import io
 import json
 import re
 import secrets
+import sqlite3 as _sqlite3
+import tempfile
+import urllib.parse
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, cast
@@ -67,19 +72,23 @@ from app.services.audit_export import generate_audit_html
 from app.services.csv_import import import_csv as _import_csv
 from app.services.database import (
     DB_PATH,
+    clear_cached_password,
     delete_return_run,
+    get_cached_password,
     get_return_run,
     init_db,
     list_return_runs,
     save_return_run,
     set_cached_password,
     update_run_annotation,
+    verify_chain,
 )
 from app.services.encryption import (
     DatabaseState,
     PasswordValidationError,
     detect_encryption_state,
     get_password,
+    rotate_key,
     set_password_in_keyring,
     validate_password,
 )
@@ -87,7 +96,16 @@ from app.services.encryption import (
 # ─── FastAPI app and basic hardening ───────────────────────────
 # TrustedHostMiddleware mitigates DNS rebinding / Host header attacks.
 # Keep this locked to localhost unless you intentionally expose the service.
-app = FastAPI(title="Tax Copilot", version="0.1.0")
+
+
+@asynccontextmanager
+async def _lifespan(a: FastAPI) -> AsyncIterator[None]:  # noqa: ARG001
+    _startup()
+    yield
+    clear_cached_password()
+
+
+app = FastAPI(title="Tax Copilot", version="0.1.0", lifespan=_lifespan)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
 
 # ─── Security headers (defense-in-depth) ───────────────────────
@@ -272,8 +290,7 @@ def _load_run_from_row(run_data: dict[str, Any]) -> ReturnRun:
     return ReturnRun(**{k: v for k, v in hydrated.items() if not k.endswith("_json")})
 
 
-@app.on_event("startup")
-def startup() -> None:
+def _startup() -> None:
     """Initialize database on startup.
 
     Handles encryption setup:
@@ -345,7 +362,7 @@ def calculate_form(request: Request) -> HTMLResponse:
     csrf = _get_csrf_token(request)
     resp = templates.TemplateResponse(
         "pages/calculate.html",
-        {"request": request, "csrf": csrf, "available_years": available_years, "available_states": sorted(_get_state_packs(max(available_years)).keys())},
+        {"request": request, "csrf": csrf, "available_years": available_years, "available_states": sorted(_get_state_packs(max(available_years)).keys()) if available_years else []},
     )
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return resp
@@ -355,6 +372,15 @@ def calculate_form(request: Request) -> HTMLResponse:
 
 _MAX_TEXT = 200
 _MAX_INDEXED_ENTRIES = 50  # Cap on dynamic rows per section (defense-in-depth)
+_MAX_IMPORT_BYTES = 10 * 1024 * 1024  # 10 MB
+_MAX_RESTORE_BYTES = 100 * 1024 * 1024  # 100 MB
+_MAX_IMPORT_ENTRIES = 1000
+_MAX_NOTES = 2000
+
+
+def _sanitize_filename(raw: str) -> str:
+    """Strip non-alphanumeric chars from a string for safe Content-Disposition."""
+    return re.sub(r"[^a-zA-Z0-9_-]", "", raw)
 _IDX_RE = re.compile(r"^(\w+?)_(\d+)_(\w+)$")
 
 
@@ -490,6 +516,8 @@ def _parse_taxpayer(fd: FormData, prefix: str, role: TaxpayerRole) -> Taxpayer:
 def _parse_tax_input_from_form(fd: FormData) -> TaxReturnInput:
     """Convert raw multi-part form data into a validated ``TaxReturnInput``."""
     tax_year = int(str(fd.get("tax_year", "2024") or "2024"))
+    if tax_year not in available_years:
+        raise ValueError(f"Unsupported tax year: {tax_year}")
     filing_status = FilingStatus(str(fd.get("filing_status", "mfj") or "mfj"))
 
     primary = _parse_taxpayer(fd, "p", TaxpayerRole.PRIMARY)
@@ -744,7 +772,7 @@ def export_run_json(run_id: str) -> Response:
     return StreamingResponse(
         io.BytesIO(json_bytes),
         media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="run_{run_id}.json"'},
+        headers={"Content-Disposition": f'attachment; filename="run_{_sanitize_filename(run_id)}.json"'},
     )
 
 
@@ -758,7 +786,7 @@ def export_run_html(run_id: str) -> Response:
     return StreamingResponse(
         io.BytesIO(html_content.encode("utf-8")),
         media_type="text/html",
-        headers={"Content-Disposition": f'attachment; filename="audit_{run_id}.html"'},
+        headers={"Content-Disposition": f'attachment; filename="audit_{_sanitize_filename(run_id)}.html"'},
     )
 
 
@@ -796,7 +824,7 @@ def export_run_forms(run_id: str) -> Response:
     return StreamingResponse(
         io.BytesIO(json_bytes),
         media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="forms_{run_id}.json"'},
+        headers={"Content-Disposition": f'attachment; filename="forms_{_sanitize_filename(run_id)}.json"'},
     )
 
 
@@ -834,7 +862,7 @@ def unlock_submit(request: Request, password: str = Form(""), csrf_token: str = 
     _verify_csrf(request, csrf_token)
 
     if not password:
-        return RedirectResponse(url="/unlock?error=Password+is+required", status_code=303)
+        return RedirectResponse(url=f"/unlock?error={urllib.parse.quote_plus('Password is required')}", status_code=303)
 
     try:
         # Validate password format
@@ -869,27 +897,28 @@ def unlock_submit(request: Request, password: str = Form(""), csrf_token: str = 
         # Initialize database if not already done
         init_db()
 
-        # Redirect to dashboard
-        return RedirectResponse(url="/", status_code=303)
+        # Redirect to dashboard with fresh CSRF token
+        resp = RedirectResponse(url="/", status_code=303)
+        resp.set_cookie("csrf", secrets.token_urlsafe(32), httponly=True, samesite="strict")
+        return resp
 
     except PasswordValidationError as e:
-        error_msg = str(e).replace(" ", "+")
-        return RedirectResponse(url=f"/unlock?error={error_msg}", status_code=303)
+        return RedirectResponse(url=f"/unlock?error={urllib.parse.quote_plus(str(e)[:100])}", status_code=303)
     except ValueError:
         # Wrong password or corrupted database
-        error_msg = "Incorrect+password+or+corrupted+database"
-        return RedirectResponse(url=f"/unlock?error={error_msg}", status_code=303)
+        return RedirectResponse(url=f"/unlock?error={urllib.parse.quote_plus('Incorrect password or corrupted database')}", status_code=303)
     except Exception as e:
-        error_msg = f"Unlock+failed:+{str(e)[:50]}"
-        return RedirectResponse(url=f"/unlock?error={error_msg}", status_code=303)
+        return RedirectResponse(url=f"/unlock?error={urllib.parse.quote_plus(f'Unlock failed: {str(e)[:50]}')}", status_code=303)
 
 
 @app.post("/runs/{run_id}/annotate")
 async def annotate_run(request: Request, run_id: str) -> RedirectResponse:
     fd = await request.form()
     _verify_csrf(request, str(fd.get("csrf_token", "")))
-    tags = str(fd.get("tags", "")).strip()
+    tags = _form_str(fd, "tags")
     notes = str(fd.get("notes", "")).strip()
+    if len(notes) > _MAX_NOTES:
+        raise ValueError(f"Notes exceed {_MAX_NOTES} characters")
     update_run_annotation(run_id, tags, notes)
     return RedirectResponse(url="/runs", status_code=303)
 
@@ -903,7 +932,7 @@ def export_all_runs() -> Response:
             run = _load_run_from_row(r)
             hydrated.append(json.loads(run.model_dump_json()))
         except Exception:
-            hydrated.append(r)  # fallback: raw row
+            hydrated.append({"error": f"Failed to hydrate run {r.get('id', '?')}", "id": r.get("id")})
     return Response(
         content=json.dumps(hydrated, ensure_ascii=False, indent=2),
         media_type="application/json",
@@ -919,12 +948,16 @@ async def import_returns(request: Request) -> HTMLResponse:
     if not upload or not hasattr(upload, "read"):
         return HTMLResponse("No file uploaded", status_code=400)
     content = (await upload.read()).decode("utf-8")
+    if len(content.encode("utf-8")) > _MAX_IMPORT_BYTES:
+        return HTMLResponse(f"File too large (max {_MAX_IMPORT_BYTES // (1024*1024)} MB)", status_code=400)
     try:
         entries = json.loads(content)
     except json.JSONDecodeError as e:
         return HTMLResponse(f"Invalid JSON: {e}", status_code=400)
     if not isinstance(entries, list):
         return HTMLResponse("Expected a JSON array", status_code=400)
+    if len(entries) > _MAX_IMPORT_ENTRIES:
+        return HTMLResponse(f"Too many entries (max {_MAX_IMPORT_ENTRIES})", status_code=400)
     imported = 0
     errors: list[str] = []
     for i, entry in enumerate(entries):
@@ -966,8 +999,24 @@ async def restore_database(request: Request) -> Response:
     if not upload or not hasattr(upload, "read"):
         return HTMLResponse("No file uploaded", status_code=400)
     content = await upload.read()
+    if len(content) > _MAX_RESTORE_BYTES:
+        return HTMLResponse(f"File too large (max {_MAX_RESTORE_BYTES // (1024*1024)} MB)", status_code=400)
     if not content[:16].startswith(b"SQLite format 3"):
         return HTMLResponse("Not a valid SQLite database file", status_code=400)
+    # Verify it's a real SQLite database, not just matching magic bytes
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        tmp.write(content)
+        tmp_path = tmp.name
+    try:
+        test_conn = _sqlite3.connect(tmp_path)
+        result = test_conn.execute("PRAGMA integrity_check").fetchone()
+        test_conn.close()
+        if not result or result[0] != "ok":
+            return HTMLResponse("Uploaded file is not a valid SQLite database", status_code=400)
+    except Exception:
+        return HTMLResponse("Uploaded file is not a valid SQLite database", status_code=400)
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     DB_PATH.write_bytes(content)
     try:
@@ -979,6 +1028,72 @@ async def restore_database(request: Request) -> Response:
             status_code=500,
         )
     return RedirectResponse(url="/runs", status_code=303)
+
+
+@app.get("/rotate-key", response_class=HTMLResponse)
+def rotate_key_form(request: Request, error: str | None = None, success: str | None = None) -> Response:
+    """Show key rotation form."""
+    csrf = _get_csrf_token(request)
+    resp = templates.TemplateResponse(
+        "pages/rotate_key.html",
+        {"request": request, "csrf": csrf, "error": error, "success": success},
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+@app.post("/rotate-key")
+async def rotate_key_submit(request: Request) -> RedirectResponse:
+    """Handle key rotation."""
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+
+    current_password = str(fd.get("current_password", ""))
+    new_password = str(fd.get("new_password", ""))
+    confirm = str(fd.get("confirm_new_password", ""))
+
+    if not current_password or not new_password:
+        return RedirectResponse(
+            url=f"/rotate-key?error={urllib.parse.quote_plus('All fields are required')}",
+            status_code=303,
+        )
+    if new_password != confirm:
+        return RedirectResponse(
+            url=f"/rotate-key?error={urllib.parse.quote_plus('New passwords do not match')}",
+            status_code=303,
+        )
+
+    if current_password != get_cached_password():
+        return RedirectResponse(
+            url=f"/rotate-key?error={urllib.parse.quote_plus('Current password is incorrect')}",
+            status_code=303,
+        )
+
+    try:
+        validate_password(new_password)
+        rotate_key(current_password, new_password)
+        set_cached_password(new_password)
+        set_password_in_keyring(new_password)
+        return RedirectResponse(
+            url=f"/rotate-key?success={urllib.parse.quote_plus('Key rotated successfully')}",
+            status_code=303,
+        )
+    except Exception as e:
+        return RedirectResponse(
+            url=f"/rotate-key?error={urllib.parse.quote_plus(str(e)[:100])}",
+            status_code=303,
+        )
+
+
+@app.get("/audit/verify")
+def audit_verify() -> Response:
+    """Walk the hash chain and report integrity status."""
+    errors = verify_chain()
+    status = "ok" if not errors else "integrity_errors"
+    return Response(
+        content=json.dumps({"status": status, "errors": errors}, indent=2),
+        media_type="application/json",
+    )
 
 
 @app.exception_handler(ValueError)

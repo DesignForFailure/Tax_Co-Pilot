@@ -58,3 +58,13 @@ def test_resolve_ref_typoed_rule_ref_raises_clear_missing_reference_error() -> N
 
     with pytest.raises(RulePackError, match=r"Missing reference: fed\.2024\.taxable_incom"):
         engine._resolve_ref("fed.2024.taxable_incom")
+
+
+def test_unary_negation_in_expression() -> None:
+    """Engine handles unary minus in formula expressions."""
+    engine = CalculationEngine.__new__(CalculationEngine)
+    variables = {"x": Decimal("100"), "y": Decimal("50")}
+
+    assert engine._safe_eval("-x", variables) == Decimal("-100")
+    assert engine._safe_eval("-x + y", variables) == Decimal("-50")
+    assert engine._safe_eval("+x", variables) == Decimal("100")

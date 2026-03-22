@@ -314,3 +314,5 @@ class ReturnRun(BaseModel):
     )
     tags: str = ""
     notes: str = ""
+    integrity_hash: str = ""
+    previous_hash: str = ""

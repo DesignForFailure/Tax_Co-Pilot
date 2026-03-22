@@ -179,6 +179,7 @@ Tax_Co-Pilot/
 │           ├── forms_view.html
 │           ├── import_csv.html
 │           ├── legal.html
+│           ├── rotate_key.html
 │           ├── run_compare.html
 │           ├── runs.html
 │           ├── unlock.html
@@ -199,10 +200,12 @@ Tax_Co-Pilot/
 │       │   ├── 2026-03-18-qa-remediation.md
 │       │   ├── 2026-03-21-ca-ny-state-packs.md
 │       │   ├── 2026-03-21-itemized-deductions-credits.md
-│       │   └── 2026-03-22-data-mgmt-dx.md
+│       │   ├── 2026-03-22-data-mgmt-dx.md
+│       │   └── 2026-03-22-hardening-qa.md
 │       └── specs/
 │           ├── 2026-03-15-federal-completeness-design.md
-│           └── 2026-03-16-state-expansion-design.md
+│           ├── 2026-03-16-state-expansion-design.md
+│           └── 2026-03-22-hardening-qa-design.md
 ├── scripts/
 │   └── validate_rule_pack.py
 ├── rule_packs/
@@ -273,9 +276,11 @@ Tax_Co-Pilot/
 │   ├── __init__.py
 │   ├── test_calculate_name_validation.py
 │   ├── test_calculator_resolve_ref.py
+│   ├── test_data_mgmt.py
 │   ├── test_encoding_guard.py
 │   ├── test_encrypted_database.py
 │   ├── test_encryption.py
+│   ├── test_error_paths.py
 │   ├── test_forms.py
 │   ├── test_golden.py
 │   ├── test_golden2.py
@@ -283,7 +288,8 @@ Tax_Co-Pilot/
 │   ├── test_itemized_credits.py
 │   ├── test_milestone6_routes.py
 │   ├── test_multi_year.py
-│   ├── test_data_mgmt.py
+│   ├── test_parse_money.py
+│   ├── test_route_coverage.py
 │   ├── test_state_ca_ny.py
 │   └── test_state_expansion.py
 ├── CHANGELOG.md
