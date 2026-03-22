@@ -48,7 +48,7 @@ from typing import Any, cast
 from fastapi import FastAPI, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
-from starlette.datastructures import FormData
+from starlette.datastructures import FormData, UploadFile
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import config as encryption_config
@@ -100,6 +100,9 @@ from app.services.rule_pack_editor import (
     export_yaml,
     load_pack_detail,
     save_rule,
+)
+from app.services.rule_pack_editor import (
+    import_yaml as import_rule_yaml,
 )
 from app.services.rule_pack_editor import (
     list_all_packs as list_rule_packs,
@@ -1224,30 +1227,52 @@ async def rule_packs_create(request: Request) -> RedirectResponse:
 
 @app.get("/rule-packs/import", response_class=HTMLResponse)
 def rule_packs_import_form(request: Request) -> HTMLResponse:
-    """Stub for Task 5 — renders a placeholder import page."""
+    """Render the YAML import form."""
     csrf = _get_csrf_token(request)
-    resp = HTMLResponse(
-        content=(
-            "<!DOCTYPE html><html><head><title>Import Rule Pack</title></head>"
-            "<body><h1>Import YAML</h1><p>Full import form coming in Task 5.</p>"
-            "<p><a href='/rule-packs'>Back to Rule Packs</a></p></body></html>"
-        )
+    resp = templates.TemplateResponse(
+        "pages/rule_pack_import.html",
+        {"request": request, "csrf": csrf, "error": None},
     )
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return resp
 
 
 @app.post("/rule-packs/import", response_class=HTMLResponse)
-async def rule_packs_import_post(request: Request) -> HTMLResponse:
-    """Stub for Task 5 — accepts upload but just redirects back."""
+async def rule_packs_import_post(request: Request) -> Response:
+    """Handle YAML file upload and import as a new custom pack."""
     fd = await request.form()
     _verify_csrf(request, str(fd.get("csrf_token", "")))
-    return HTMLResponse(
-        content=(
-            "<!DOCTYPE html><html><head><title>Import Rule Pack</title></head>"
-            "<body><h1>Import received</h1><p>Full processing coming in Task 5.</p>"
-            "<p><a href='/rule-packs'>Back to Rule Packs</a></p></body></html>"
+    custom_name = _form_str(fd, "custom_name")
+
+    manifest_field = fd.get("manifest_file")
+    rules_field = fd.get("rules_file")
+
+    csrf = _get_csrf_token(request)
+
+    def _render_error(msg: str) -> HTMLResponse:
+        resp = templates.TemplateResponse(
+            "pages/rule_pack_import.html",
+            {"request": request, "csrf": csrf, "error": msg},
+            status_code=400,
         )
+        resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+        return resp
+
+    if not isinstance(manifest_field, UploadFile) or not isinstance(rules_field, UploadFile):
+        return _render_error("Both manifest_file and rules_file are required.")
+
+    manifest_bytes = await manifest_field.read()
+    rules_bytes = await rules_field.read()
+
+    try:
+        info = import_rule_yaml(manifest_bytes, rules_bytes, custom_name)
+    except ValueError as exc:
+        return _render_error(str(exc))
+
+    _bust_pack_cache(info.jurisdiction, info.year)
+    return RedirectResponse(
+        url=f"/rule-packs/{info.jurisdiction}/{info.year}/{info.variant}",
+        status_code=303,
     )
 
 

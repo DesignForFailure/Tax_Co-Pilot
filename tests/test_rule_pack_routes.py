@@ -7,6 +7,7 @@ import shutil
 from pathlib import Path
 
 import pytest
+import yaml as _yaml
 from starlette.testclient import TestClient
 
 from app.services.database import init_db
@@ -189,3 +190,42 @@ def test_delete_rule_via_post() -> None:
         follow_redirects=False,
     )
     assert r.status_code == 303
+
+
+def test_import_page_renders() -> None:
+    c = _client()
+    r = c.get("/rule-packs/import")
+    assert r.status_code == 200
+    assert "Import" in r.text
+
+
+def test_import_upload_valid() -> None:
+    c = _client()
+    manifest = _yaml.dump(
+        {"version": "1", "tax_year": 2024, "jurisdiction": "federal"}
+    ).encode()
+    rules = _yaml.dump(
+        {
+            "constants": {},
+            "rules": [
+                {
+                    "id": "fed.2024.imported_rule",
+                    "description": "Imported",
+                    "type": "formula",
+                    "expression": "x",
+                    "inputs": {"x": {"ref": "input.w2.wages"}},
+                }
+            ],
+        }
+    ).encode()
+    r = c.post(
+        "/rule-packs/import",
+        data={"csrf_token": CSRF, "custom_name": "uploaded"},
+        files={
+            "manifest_file": ("manifest.yaml", manifest, "application/x-yaml"),
+            "rules_file": ("rules.yaml", rules, "application/x-yaml"),
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert "custom_v" in r.headers.get("location", "")
