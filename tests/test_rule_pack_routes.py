@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import shutil
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -28,9 +29,9 @@ def _client() -> TestClient:
 
 
 @pytest.fixture(autouse=True)
-def _cleanup_custom_packs() -> None:
+def _cleanup_custom_packs() -> Generator[None, None, None]:
     """Remove any custom_v* directories created during tests."""
-    yield  # type: ignore[misc]
+    yield
     base = Path(__file__).resolve().parent.parent / "rule_packs"
     for custom_dir in base.rglob("custom_v*"):
         if custom_dir.is_dir():
