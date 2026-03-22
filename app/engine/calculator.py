@@ -584,6 +584,12 @@ class CalculationEngine:
     def _eval_atom(self, expr: str, variables: dict[str, Decimal]) -> Decimal:
         expr = expr.strip()
 
+        # Handle unary operators
+        if expr.startswith("-") and len(expr) > 1:
+            return -self._eval_atom(expr[1:], variables)
+        if expr.startswith("+") and len(expr) > 1:
+            return self._eval_atom(expr[1:], variables)
+
         for func in ("max", "min"):
             if expr.startswith(f"{func}(") and expr.endswith(")"):
                 inner = expr[len(func) + 1 : -1]

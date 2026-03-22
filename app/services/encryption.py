@@ -63,8 +63,8 @@ class HybridRow:
             return self._values[self._index_by_name[key]]
         raise TypeError(f"Row indices must be integers or strings, not {type(key).__name__}")
 
-    def __iter__(self) -> Iterator[Any]:
-        return iter(self._values)
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._columns)
 
     def __len__(self) -> int:
         return len(self._values)
@@ -72,10 +72,47 @@ class HybridRow:
     def keys(self) -> tuple[str, ...]:
         return self._columns
 
+    def values(self) -> tuple[Any, ...]:
+        return self._values
+
 
 def hybrid_factory(cursor: Any, row: tuple[Any, ...]) -> HybridRow:
     """Convert a database row into a hybrid row with dict+sequence semantics."""
     return HybridRow(cursor, row)
+
+
+def _hex_encode_key(password: str) -> str:
+    """Encode password as hex for SQLCipher PRAGMA key.
+
+    SQLCipher accepts hex-encoded keys via: PRAGMA key = "x'<hex>'"
+    This avoids SQL injection from passwords containing quotes.
+    """
+    return password.encode("utf-8").hex()
+
+
+def rotate_key(old_password: str, new_password: str) -> None:
+    """Re-encrypt the database with a new password using SQLCipher PRAGMA rekey.
+
+    Requires SQLCipher. The database must already be encrypted.
+    """
+    try:
+        from pysqlcipher3 import dbapi2 as sqlcipher
+    except ImportError as e:
+        raise ImportError("pysqlcipher3 is required for key rotation") from e
+
+    from app.services.database import DB_PATH
+
+    conn = sqlcipher.connect(str(DB_PATH), timeout=10.0, isolation_level=None)
+    old_hex = _hex_encode_key(old_password)
+    conn.execute(f"PRAGMA key = \"x'{old_hex}'\"")
+    # Verify old key works
+    conn.execute("SELECT count(*) FROM sqlite_master")
+    # Rotate to new key
+    new_hex = _hex_encode_key(new_password)
+    conn.execute(f"PRAGMA rekey = \"x'{new_hex}'\"")
+    # Verify new key works
+    conn.execute("SELECT count(*) FROM sqlite_master")
+    conn.close()
 
 
 class DatabaseState(Enum):
@@ -336,11 +373,17 @@ class SQLCipherProvider(EncryptionProvider):
             # Connect to database
             conn = sqlcipher.connect(str(db_path), timeout=timeout, isolation_level=None)
 
-            # Set encryption key
-            conn.execute(f"PRAGMA key = '{password}'")
+            # Set encryption key (hex-encoded to prevent SQL injection from quotes)
+            hex_key = _hex_encode_key(password)
+            conn.execute(f"PRAGMA key = \"x'{hex_key}'\"")
 
             # Configure key derivation (PBKDF2)
             conn.execute(f"PRAGMA kdf_iter = {self.kdf_iterations}")
+
+            # Pin cipher parameters for cross-version compatibility.
+            # Order matters: key → kdf_iter → cipher params → first read.
+            conn.execute("PRAGMA cipher_page_size = 4096")
+            conn.execute("PRAGMA cipher_compatibility = 4")
 
             # Configure SQLite pragmas (matching unencrypted behavior)
             conn.row_factory = hybrid_factory
@@ -554,7 +597,8 @@ def _migrate_to_sqlcipher(
 
         # Perform migration using SQLCipher's ATTACH DATABASE + export
         conn = sqlcipher.connect(str(db_path), timeout=10.0)
-        conn.execute(f"ATTACH DATABASE '{encrypted_path}' AS encrypted KEY '{password}'")
+        hex_key = _hex_encode_key(password)
+        conn.execute(f"ATTACH DATABASE '{encrypted_path}' AS encrypted KEY \"x'{hex_key}'\"")
         conn.execute(f"PRAGMA encrypted.kdf_iter = {kdf_iterations}")
 
         # Export all data

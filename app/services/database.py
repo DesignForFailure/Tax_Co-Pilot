@@ -37,8 +37,10 @@ Future improvements:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 from app.config import config
@@ -46,6 +48,7 @@ from app.services.encryption import (
     DatabaseState,
     detect_encryption_state,
     get_encryption_provider,
+    hybrid_factory,
 )
 
 DB_PATH = Path("data/tax_copilot.db")
@@ -73,6 +76,16 @@ def get_cached_password() -> str | None:
         Cached password if set, None otherwise
     """
     return _cached_password
+
+
+def clear_cached_password() -> None:
+    """Clear the in-memory password cache.
+
+    Called on application shutdown to avoid leaving plaintext
+    passwords in process memory longer than necessary.
+    """
+    global _cached_password
+    _cached_password = None
 
 
 def get_connection(password: str | None = None) -> sqlite3.Connection:
@@ -127,7 +140,7 @@ def get_connection(password: str | None = None) -> sqlite3.Connection:
             # For now, allow unencrypted connections (migration happens in main.py)
             DB_PATH.parent.mkdir(parents=True, exist_ok=True)
             conn = sqlite3.connect(str(DB_PATH), timeout=5.0, isolation_level=None)
-            conn.row_factory = sqlite3.Row
+            conn.row_factory = hybrid_factory
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA foreign_keys=ON")
             conn.execute("PRAGMA busy_timeout=5000")
@@ -145,7 +158,7 @@ def get_connection(password: str | None = None) -> sqlite3.Connection:
                 # Create unencrypted database
                 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
                 conn = sqlite3.connect(str(DB_PATH), timeout=5.0, isolation_level=None)
-                conn.row_factory = sqlite3.Row
+                conn.row_factory = hybrid_factory
                 conn.execute("PRAGMA journal_mode=WAL")
                 conn.execute("PRAGMA foreign_keys=ON")
                 conn.execute("PRAGMA busy_timeout=5000")
@@ -155,11 +168,33 @@ def get_connection(password: str | None = None) -> sqlite3.Connection:
         # Encryption disabled - use standard SQLite
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(DB_PATH), timeout=5.0, isolation_level=None)
-        conn.row_factory = sqlite3.Row
+        conn.row_factory = hybrid_factory
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
         conn.execute("PRAGMA busy_timeout=5000")
         return conn
+
+
+def _compute_integrity_hash(run_data: dict) -> str:
+    """Compute SHA-256 integrity hash over substantive run content."""
+    payload = (
+        str(run_data.get("id", ""))
+        + str(run_data.get("tax_year", ""))
+        + json.dumps(run_data.get("input_snapshot", {}), sort_keys=True, ensure_ascii=False)
+        + json.dumps(run_data.get("output", {}), sort_keys=True, ensure_ascii=False)
+        + json.dumps(run_data.get("trace", []), sort_keys=True, ensure_ascii=False)
+        + str(run_data.get("rule_pack_checksum", ""))
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _get_latest_hash() -> str:
+    """Get the integrity_hash of the most recent run (for chain linking)."""
+    with closing(get_connection()) as conn:
+        row = conn.execute(
+            "SELECT integrity_hash FROM return_runs ORDER BY created_at DESC, rowid DESC LIMIT 1"
+        ).fetchone()
+    return row["integrity_hash"] if row else ""
 
 
 def init_db() -> None:
@@ -168,34 +203,41 @@ def init_db() -> None:
     QA:
     - Safe to call on every startup.
     """
-    conn = get_connection()
-    conn.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS return_runs (
-            id TEXT PRIMARY KEY,
-            tax_year INTEGER NOT NULL,
-            filing_status TEXT NOT NULL,
-            scenario_name TEXT NOT NULL DEFAULT 'baseline',
-            rule_pack_version TEXT NOT NULL,
-            rule_pack_checksum TEXT NOT NULL,
-            input_snapshot_json TEXT NOT NULL,
-            output_json TEXT NOT NULL,
-            trace_json TEXT NOT NULL,
-            state_outputs_json TEXT NOT NULL DEFAULT '[]',
-            created_at TEXT NOT NULL
-        );
-        """
-    )
-    columns = {row[1] for row in conn.execute("PRAGMA table_info(return_runs)").fetchall()}
-    if "state_outputs_json" not in columns:
-        conn.execute(
-            "ALTER TABLE return_runs ADD COLUMN state_outputs_json TEXT NOT NULL DEFAULT '[]'"
+    with closing(get_connection()) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS return_runs (
+                id TEXT PRIMARY KEY,
+                tax_year INTEGER NOT NULL,
+                filing_status TEXT NOT NULL,
+                scenario_name TEXT NOT NULL DEFAULT 'baseline',
+                rule_pack_version TEXT NOT NULL,
+                rule_pack_checksum TEXT NOT NULL,
+                input_snapshot_json TEXT NOT NULL,
+                output_json TEXT NOT NULL,
+                trace_json TEXT NOT NULL,
+                state_outputs_json TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT NOT NULL
+            );
+            """
         )
-    if "tags" not in columns:
-        conn.execute("ALTER TABLE return_runs ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
-    if "notes" not in columns:
-        conn.execute("ALTER TABLE return_runs ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
-    conn.close()
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(return_runs)").fetchall()}
+        if "state_outputs_json" not in columns:
+            conn.execute(
+                "ALTER TABLE return_runs ADD COLUMN state_outputs_json TEXT NOT NULL DEFAULT '[]'"
+            )
+        if "tags" not in columns:
+            conn.execute("ALTER TABLE return_runs ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+        if "notes" not in columns:
+            conn.execute("ALTER TABLE return_runs ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
+        if "integrity_hash" not in columns:
+            conn.execute(
+                "ALTER TABLE return_runs ADD COLUMN integrity_hash TEXT NOT NULL DEFAULT ''"
+            )
+        if "previous_hash" not in columns:
+            conn.execute(
+                "ALTER TABLE return_runs ADD COLUMN previous_hash TEXT NOT NULL DEFAULT ''"
+            )
 
 
 def save_return_run(run_data: dict) -> None:
@@ -207,53 +249,54 @@ def save_return_run(run_data: dict) -> None:
     QA:
     - ReturnRuns are treated as immutable; updates are intentionally not supported.
     """
-    conn = get_connection()
-    conn.execute(
-        """INSERT INTO return_runs
-           (id, tax_year, filing_status, scenario_name,
-            rule_pack_version, rule_pack_checksum,
-            input_snapshot_json, output_json, trace_json, state_outputs_json,
-            created_at, tags, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (
-            run_data["id"],
-            run_data["tax_year"],
-            run_data["filing_status"],
-            run_data.get("scenario_name", "baseline"),
-            run_data["rule_pack_version"],
-            run_data["rule_pack_checksum"],
-            json.dumps(run_data["input_snapshot"], ensure_ascii=False),
-            json.dumps(run_data["output"], ensure_ascii=False),
-            json.dumps(run_data["trace"], ensure_ascii=False),
-            json.dumps(run_data.get("state_outputs", []), ensure_ascii=False),
-            run_data["created_at"],
-            run_data.get("tags", ""),
-            run_data.get("notes", ""),
-        ),
-    )
-    conn.close()
+    integrity_hash = _compute_integrity_hash(run_data)
+    previous_hash = _get_latest_hash()
+    with closing(get_connection()) as conn:
+        conn.execute(
+            """INSERT INTO return_runs
+               (id, tax_year, filing_status, scenario_name,
+                rule_pack_version, rule_pack_checksum,
+                input_snapshot_json, output_json, trace_json, state_outputs_json,
+                created_at, tags, notes, integrity_hash, previous_hash)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                run_data["id"],
+                run_data["tax_year"],
+                run_data["filing_status"],
+                run_data.get("scenario_name", "baseline"),
+                run_data["rule_pack_version"],
+                run_data["rule_pack_checksum"],
+                json.dumps(run_data["input_snapshot"], ensure_ascii=False),
+                json.dumps(run_data["output"], ensure_ascii=False),
+                json.dumps(run_data["trace"], ensure_ascii=False),
+                json.dumps(run_data.get("state_outputs", []), ensure_ascii=False),
+                run_data["created_at"],
+                run_data.get("tags", ""),
+                run_data.get("notes", ""),
+                integrity_hash,
+                previous_hash,
+            ),
+        )
 
 
 def list_return_runs(tax_year: int | None = None) -> list[dict]:
     """List saved runs, newest first."""
-    conn = get_connection()
-    if tax_year is not None:
-        rows = conn.execute(
-            "SELECT * FROM return_runs WHERE tax_year = ? ORDER BY created_at DESC",
-            (tax_year,),
-        ).fetchall()
-    else:
-        rows = conn.execute("SELECT * FROM return_runs ORDER BY created_at DESC").fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    with closing(get_connection()) as conn:
+        if tax_year is not None:
+            rows = conn.execute(
+                "SELECT * FROM return_runs WHERE tax_year = ? ORDER BY created_at DESC",
+                (tax_year,),
+            ).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM return_runs ORDER BY created_at DESC").fetchall()
+        return [dict(r) for r in rows]
 
 
 def get_return_run(run_id: str) -> dict | None:
     """Fetch a single run by id."""
-    conn = get_connection()
-    row = conn.execute("SELECT * FROM return_runs WHERE id = ?", (run_id,)).fetchone()
-    conn.close()
-    return dict(row) if row else None
+    with closing(get_connection()) as conn:
+        row = conn.execute("SELECT * FROM return_runs WHERE id = ?", (run_id,)).fetchone()
+        return dict(row) if row else None
 
 
 def delete_return_run(run_id: str) -> None:
@@ -262,16 +305,65 @@ def delete_return_run(run_id: str) -> None:
     Security:
     - Uses parameterized query (prevents SQL injection).
     """
-    conn = get_connection()
-    conn.execute("DELETE FROM return_runs WHERE id = ?", (run_id,))
-    conn.close()
+    with closing(get_connection()) as conn:
+        conn.execute("DELETE FROM return_runs WHERE id = ?", (run_id,))
 
 
 def update_run_annotation(run_id: str, tags: str, notes: str) -> None:
     """Update tags and notes for an existing run."""
-    conn = get_connection()
-    conn.execute(
-        "UPDATE return_runs SET tags = ?, notes = ? WHERE id = ?",
-        (tags, notes, run_id),
-    )
-    conn.close()
+    with closing(get_connection()) as conn:
+        conn.execute(
+            "UPDATE return_runs SET tags = ?, notes = ? WHERE id = ?",
+            (tags, notes, run_id),
+        )
+
+
+def verify_chain() -> list[dict]:
+    """Walk the hash chain and return a list of broken links.
+
+    Returns an empty list if the chain is intact.
+    """
+    with closing(get_connection()) as conn:
+        rows = conn.execute(
+            "SELECT id, integrity_hash, previous_hash, created_at, "
+            "tax_year, rule_pack_checksum, input_snapshot_json, output_json, trace_json "
+            "FROM return_runs ORDER BY created_at ASC, rowid ASC"
+        ).fetchall()
+
+    errors: list[dict] = []
+    prev_hash = ""
+    for row in rows:
+        run_id = row["id"]
+        stored_hash = row["integrity_hash"]
+        stored_prev = row["previous_hash"]
+
+        # Verify chain link
+        if stored_prev != prev_hash:
+            errors.append({
+                "id": run_id,
+                "error": "chain_break",
+                "expected_previous": prev_hash,
+                "actual_previous": stored_prev,
+            })
+
+        # Recompute integrity hash
+        run_data = {
+            "id": run_id,
+            "tax_year": row["tax_year"],
+            "input_snapshot": json.loads(row["input_snapshot_json"]),
+            "output": json.loads(row["output_json"]),
+            "trace": json.loads(row["trace_json"]),
+            "rule_pack_checksum": row["rule_pack_checksum"],
+        }
+        expected_hash = _compute_integrity_hash(run_data)
+        if stored_hash and stored_hash != expected_hash:
+            errors.append({
+                "id": run_id,
+                "error": "tampered",
+                "expected_hash": expected_hash,
+                "actual_hash": stored_hash,
+            })
+
+        prev_hash = stored_hash
+
+    return errors

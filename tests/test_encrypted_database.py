@@ -52,6 +52,19 @@ def test_hybrid_factory_supports_index_and_name_access() -> None:
     assert row.keys() == ("id", "data")
 
 
+def test_hybrid_row_iteration_yields_columns() -> None:
+    """HybridRow iteration yields column names (not values) for sqlite3.Row compat."""
+    from app.services.encryption import HybridRow
+
+    class FakeCursor:
+        description = [("id",), ("name",), ("value",)]
+
+    row = HybridRow(FakeCursor(), ("abc", "test", 42))
+    assert list(row) == ["id", "name", "value"]
+    assert dict(row) == {"id": "abc", "name": "test", "value": 42}
+    assert row.values() == ("abc", "test", 42)
+
+
 @pytest.fixture
 def temp_db() -> Generator[Path, None, None]:
     """Create a temporary database for testing."""
