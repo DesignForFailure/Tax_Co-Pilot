@@ -28,9 +28,15 @@ from app.services.rule_pack_editor import (
     PackInfo,
     _pack_path,
     _validate_path_param,
+    clone_pack,
+    create_empty_pack,
+    delete_pack,
+    delete_rule,
     export_yaml,
+    import_yaml,
     list_all_packs,
     load_pack_detail,
+    save_rule,
     validate_pack,
 )
 
@@ -191,3 +197,109 @@ def test_pack_info_dataclass() -> None:
     info = PackInfo(jurisdiction="federal", year=2024, variant="standard", is_custom=False)
     assert info.jurisdiction == "federal"
     assert info.custom_name == ""
+
+
+def test_clone_pack_creates_custom_v1(tmp_packs: Path) -> None:
+    info = clone_pack("federal", 2024, "standard", "my_scenario", base_dir=tmp_packs)
+    assert info.variant == "custom_v1"
+    assert info.is_custom is True
+    custom_dir = tmp_packs / "federal" / "2024" / "custom_v1"
+    assert (custom_dir / "manifest.yaml").exists()
+    assert (custom_dir / "rules.yaml").exists()
+    m = yaml.safe_load((custom_dir / "manifest.yaml").read_text())
+    assert m["custom"] is True
+    assert m["custom_name"] == "my_scenario"
+
+
+def test_clone_auto_increments_version(tmp_packs: Path) -> None:
+    clone_pack("federal", 2024, "standard", "first", base_dir=tmp_packs)
+    info2 = clone_pack("federal", 2024, "standard", "second", base_dir=tmp_packs)
+    assert info2.variant == "custom_v2"
+    assert (tmp_packs / "federal" / "2024" / "custom_v2").exists()
+
+
+def test_create_empty_pack(tmp_packs: Path) -> None:
+    info = create_empty_pack("federal", 2024, "blank_pack", base_dir=tmp_packs)
+    assert info.is_custom is True
+    custom_dir = tmp_packs / "federal" / "2024" / info.variant
+    m = yaml.safe_load((custom_dir / "manifest.yaml").read_text())
+    assert m["jurisdiction"] == "federal"
+    r = yaml.safe_load((custom_dir / "rules.yaml").read_text())
+    assert r["rules"] == []
+
+
+def test_save_rule_to_custom_pack(tmp_packs: Path) -> None:
+    clone_pack("federal", 2024, "standard", "editable", base_dir=tmp_packs)
+    rule_data = {
+        "id": "fed.2024.custom_rule",
+        "description": "A custom rule",
+        "type": "formula",
+        "expression": "x",
+        "inputs": {"x": {"ref": "input.w2.wages"}},
+    }
+    save_rule("federal", 2024, "custom_v1", "fed.2024.custom_rule", rule_data, base_dir=tmp_packs)
+    detail = load_pack_detail("federal", 2024, "custom_v1", base_dir=tmp_packs)
+    ids = [r["id"] for r in detail["rules"]]
+    assert "fed.2024.custom_rule" in ids
+
+
+def test_save_rule_to_standard_pack_raises(tmp_packs: Path) -> None:
+    rule_data = {
+        "id": "fed.2024.x",
+        "type": "formula",
+        "expression": "x",
+        "inputs": {"x": {"ref": "input.w2.wages"}},
+    }
+    with pytest.raises(ValueError, match="standard"):
+        save_rule("federal", 2024, "standard", "fed.2024.x", rule_data, base_dir=tmp_packs)
+
+
+def test_delete_rule(tmp_packs: Path) -> None:
+    clone_pack("federal", 2024, "standard", "del_test", base_dir=tmp_packs)
+    delete_rule("federal", 2024, "custom_v1", "fed.2024.gross_income.wages", base_dir=tmp_packs)
+    detail = load_pack_detail("federal", 2024, "custom_v1", base_dir=tmp_packs)
+    ids = [r["id"] for r in detail["rules"]]
+    assert "fed.2024.gross_income.wages" not in ids
+
+
+def test_delete_standard_pack_raises(tmp_packs: Path) -> None:
+    with pytest.raises(ValueError, match="standard"):
+        delete_pack("federal", 2024, "standard", base_dir=tmp_packs)
+
+
+def test_delete_custom_pack(tmp_packs: Path) -> None:
+    clone_pack("federal", 2024, "standard", "to_delete", base_dir=tmp_packs)
+    delete_pack("federal", 2024, "custom_v1", base_dir=tmp_packs)
+    assert not (tmp_packs / "federal" / "2024" / "custom_v1").exists()
+
+
+def test_import_yaml_valid(tmp_packs: Path) -> None:
+    manifest_bytes = yaml.dump(
+        {"version": "1", "tax_year": 2024, "jurisdiction": "federal"}
+    ).encode()
+    rules_bytes = yaml.dump(
+        {
+            "constants": {},
+            "rules": [
+                {
+                    "id": "fed.2024.imp",
+                    "description": "Imported",
+                    "type": "formula",
+                    "expression": "x",
+                    "inputs": {"x": {"ref": "input.w2.wages"}},
+                },
+            ],
+        }
+    ).encode()
+    info = import_yaml(manifest_bytes, rules_bytes, custom_name="imported", base_dir=tmp_packs)
+    assert info.is_custom is True
+    assert (tmp_packs / "federal" / "2024" / info.variant / "manifest.yaml").exists()
+
+
+def test_import_yaml_invalid_rejected(tmp_packs: Path) -> None:
+    manifest_bytes = yaml.dump(
+        {"version": "1", "tax_year": 2024, "jurisdiction": "federal"}
+    ).encode()
+    rules_bytes = yaml.dump({"rules": [{"id": "WRONG", "type": "sum"}]}).encode()
+    with pytest.raises(ValueError, match="[Vv]alidat|prefix|Invalid"):
+        import_yaml(manifest_bytes, rules_bytes, custom_name="bad", base_dir=tmp_packs)

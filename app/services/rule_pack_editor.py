@@ -24,9 +24,13 @@ The engine's rule_loader.py stays purely for loading/validation.
 from __future__ import annotations
 
 import re
+import shutil
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 from app.engine.rule_loader import RulePack, RulePackError, _read_yaml
 
@@ -250,12 +254,290 @@ def export_yaml(
     return manifest_path.read_bytes(), rules_path.read_bytes()
 
 
+def _next_custom_version(pack_parent_dir: Path) -> int:
+    """Find the next available custom_vN number in a year directory."""
+    existing = [
+        int(d.name.split("_v")[1])
+        for d in pack_parent_dir.iterdir()
+        if d.is_dir() and d.name.startswith("custom_v") and d.name.split("_v")[1].isdigit()
+    ]
+    return max(existing, default=0) + 1
+
+
+def _atomic_write_yaml(path: Path, data: dict[str, Any]) -> None:
+    """Write YAML atomically: write to .tmp, then rename."""
+    tmp_fd, tmp_path_str = tempfile.mkstemp(
+        dir=str(path.parent), suffix=".tmp", prefix=path.name
+    )
+    tmp_path = Path(tmp_path_str)
+    try:
+        with open(tmp_fd, "w", encoding="utf-8") as f:
+            yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+        tmp_path.rename(path)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
+
+
+def clone_pack(
+    jurisdiction: str,
+    year: int,
+    source_variant: str,
+    custom_name: str,
+    *,
+    base_dir: Path | None = None,
+) -> PackInfo:
+    """Clone a pack into a new custom variant with auto-incremented version."""
+    source_dir = _pack_path(jurisdiction, year, source_variant, base_dir=base_dir)
+    if not source_dir.exists():
+        raise ValueError(f"Source pack not found: {source_dir}")
+
+    # Determine parent dir (the year directory) for version scanning
+    parent_dir = source_dir if source_variant == "standard" else source_dir.parent
+    version = _next_custom_version(parent_dir)
+    variant = f"custom_v{version}"
+
+    target_dir = parent_dir / variant
+    target_dir.mkdir(parents=True, exist_ok=False)
+
+    # Copy rules file
+    source_rules = None
+    for candidate in [source_dir / "rules.yaml"] + sorted(source_dir.glob("*rules*.yaml")):
+        if candidate.exists() and "manifest" not in candidate.name:
+            source_rules = candidate
+            break
+    if source_rules:
+        shutil.copy2(source_rules, target_dir / "rules.yaml")
+
+    # Read source manifest, add custom metadata, write
+    source_manifest = source_dir / "manifest.yaml"
+    if not source_manifest.exists():
+        candidates = list(source_dir.glob("*manifest*.yaml"))
+        source_manifest = candidates[0] if candidates else source_dir / "manifest.yaml"
+    manifest_data = _read_yaml(source_manifest)
+    manifest_data["version"] = str(version)
+    manifest_data["custom"] = True
+    manifest_data["custom_name"] = custom_name
+    _atomic_write_yaml(target_dir / "manifest.yaml", manifest_data)
+
+    # Count rules
+    rule_count = 0
+    r_path = target_dir / "rules.yaml"
+    if r_path.exists():
+        try:
+            rd = _read_yaml(r_path)
+            rule_count = len(rd.get("rules", []) or [])
+        except Exception:
+            pass
+
+    return PackInfo(
+        jurisdiction=jurisdiction,
+        year=year,
+        variant=variant,
+        is_custom=True,
+        version=str(version),
+        custom_name=custom_name,
+        rule_count=rule_count,
+    )
+
+
+def create_empty_pack(
+    jurisdiction: str, year: int, custom_name: str, *, base_dir: Path | None = None
+) -> PackInfo:
+    """Create a new custom pack with an empty rule list."""
+    parent_dir = _pack_path(jurisdiction, year, "standard", base_dir=base_dir)
+    if not parent_dir.exists():
+        parent_dir.mkdir(parents=True, exist_ok=True)
+
+    version = _next_custom_version(parent_dir)
+    variant = f"custom_v{version}"
+    target_dir = parent_dir / variant
+    target_dir.mkdir(parents=True, exist_ok=False)
+
+    j_lower = jurisdiction.lower()
+    manifest: dict[str, Any] = {
+        "version": str(version),
+        "tax_year": year,
+        "jurisdiction": "federal" if j_lower in _FEDERAL_JURISDICTIONS else jurisdiction.upper(),
+        "custom": True,
+        "custom_name": custom_name,
+    }
+    rules: dict[str, Any] = {"constants": {}, "rules": []}
+
+    _atomic_write_yaml(target_dir / "manifest.yaml", manifest)
+    _atomic_write_yaml(target_dir / "rules.yaml", rules)
+
+    return PackInfo(
+        jurisdiction=jurisdiction,
+        year=year,
+        variant=variant,
+        is_custom=True,
+        version=str(version),
+        custom_name=custom_name,
+        rule_count=0,
+    )
+
+
+def save_rule(
+    jurisdiction: str,
+    year: int,
+    variant: str,
+    rule_id: str,
+    rule_data: dict[str, Any],
+    *,
+    base_dir: Path | None = None,
+) -> None:
+    """Add or update a single rule in a custom pack.
+
+    Validates BEFORE writing: builds the candidate rules YAML in a temp
+    directory, runs RulePack.load() on it, and only overwrites the real
+    file if validation passes.
+    """
+    if variant == "standard":
+        raise ValueError("Cannot modify a standard pack — clone it as custom first")
+
+    pack_dir = _pack_path(jurisdiction, year, variant, base_dir=base_dir)
+    rules_path = pack_dir / "rules.yaml"
+    rules_yaml = _read_yaml(rules_path)
+    rule_list: list[dict[str, Any]] = rules_yaml.get("rules", []) or []
+
+    # Update existing or append
+    found = False
+    for i, r in enumerate(rule_list):
+        if r.get("id") == rule_id:
+            rule_list[i] = rule_data
+            found = True
+            break
+    if not found:
+        rule_list.append(rule_data)
+
+    rules_yaml["rules"] = rule_list
+
+    # Validate before writing: copy manifest to a temp dir, write candidate rules, load
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+        manifest_src = pack_dir / "manifest.yaml"
+        if not manifest_src.exists():
+            candidates = list(pack_dir.glob("*_manifest*.yaml"))
+            manifest_src = candidates[0] if candidates else manifest_src
+        shutil.copy2(manifest_src, tmp / "manifest.yaml")
+        _atomic_write_yaml(tmp / "rules.yaml", rules_yaml)
+        try:
+            RulePack.load(tmp)
+        except Exception as exc:
+            raise ValueError(f"Validation failed: {exc}") from exc
+
+    # Validation passed — write for real
+    _atomic_write_yaml(rules_path, rules_yaml)
+
+
+def delete_rule(
+    jurisdiction: str,
+    year: int,
+    variant: str,
+    rule_id: str,
+    *,
+    base_dir: Path | None = None,
+) -> None:
+    """Remove a rule from a custom pack."""
+    if variant == "standard":
+        raise ValueError("Cannot modify a standard pack — clone it as custom first")
+
+    pack_dir = _pack_path(jurisdiction, year, variant, base_dir=base_dir)
+    rules_path = pack_dir / "rules.yaml"
+    rules_yaml = _read_yaml(rules_path)
+    rule_list: list[dict[str, Any]] = rules_yaml.get("rules", []) or []
+
+    rules_yaml["rules"] = [r for r in rule_list if r.get("id") != rule_id]
+    _atomic_write_yaml(rules_path, rules_yaml)
+
+
+def delete_pack(
+    jurisdiction: str, year: int, variant: str, *, base_dir: Path | None = None
+) -> None:
+    """Delete a custom pack's directory (refuses standard packs)."""
+    if variant == "standard":
+        raise ValueError("Cannot delete a standard pack")
+
+    pack_dir = _pack_path(jurisdiction, year, variant, base_dir=base_dir)
+    if pack_dir.exists():
+        shutil.rmtree(pack_dir)
+
+
+def import_yaml(
+    manifest_bytes: bytes,
+    rules_bytes: bytes,
+    custom_name: str,
+    *,
+    base_dir: Path | None = None,
+) -> PackInfo:
+    """Import uploaded YAML files as a new custom pack.
+
+    Validates via RulePack.load() before committing. Raises ValueError on failure.
+    """
+    manifest: Any = yaml.safe_load(manifest_bytes)
+    if not isinstance(manifest, dict):
+        raise ValueError("Manifest must be a YAML mapping")
+
+    jurisdiction = str(manifest.get("jurisdiction", "")).strip()
+    tax_year = int(manifest.get("tax_year", 0))
+    if not jurisdiction or tax_year <= 0:
+        raise ValueError("Manifest must include jurisdiction and positive tax_year")
+
+    # Determine target directory
+    parent_dir = _pack_path(jurisdiction, tax_year, "standard", base_dir=base_dir)
+    if not parent_dir.exists():
+        parent_dir.mkdir(parents=True, exist_ok=True)
+
+    version = _next_custom_version(parent_dir)
+    variant = f"custom_v{version}"
+    target_dir = parent_dir / variant
+    target_dir.mkdir(parents=True, exist_ok=False)
+
+    # Write files
+    manifest["custom"] = True
+    manifest["custom_name"] = custom_name
+    manifest["version"] = str(version)
+    _atomic_write_yaml(target_dir / "manifest.yaml", manifest)
+    (target_dir / "rules.yaml").write_bytes(rules_bytes)
+
+    # Validate — if invalid, clean up
+    try:
+        RulePack.load(target_dir)
+    except Exception as exc:
+        shutil.rmtree(target_dir, ignore_errors=True)
+        raise ValueError(f"Validation failed: {exc}") from exc
+
+    rule_count = 0
+    try:
+        rd = yaml.safe_load(rules_bytes)
+        rule_count = len(rd.get("rules", []) or []) if isinstance(rd, dict) else 0
+    except Exception:
+        pass
+
+    return PackInfo(
+        jurisdiction=jurisdiction,
+        year=tax_year,
+        variant=variant,
+        is_custom=True,
+        version=str(version),
+        custom_name=custom_name,
+        rule_count=rule_count,
+    )
+
+
 __all__ = [
     "PackInfo",
     "list_all_packs",
     "load_pack_detail",
     "validate_pack",
     "export_yaml",
+    "clone_pack",
+    "create_empty_pack",
+    "save_rule",
+    "delete_rule",
+    "delete_pack",
+    "import_yaml",
     "_pack_path",
     "_validate_path_param",
 ]
