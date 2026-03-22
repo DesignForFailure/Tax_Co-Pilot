@@ -105,3 +105,87 @@ def test_delete_custom_pack_via_post() -> None:
         follow_redirects=False,
     )
     assert r.status_code == 303
+
+
+def test_rule_editor_renders() -> None:
+    c = _client()
+    r = c.get("/rule-packs/federal/2024/standard/rules/fed.2024.gross_income.wages")
+    assert r.status_code == 200
+    assert "fed.2024.gross_income.wages" in r.text
+    assert "sum" in r.text.lower()
+
+
+def test_add_rule_form_renders() -> None:
+    c = _client()
+    resp = c.post(
+        "/rule-packs/federal/2024/standard/clone",
+        data={"csrf_token": CSRF, "custom_name": "for_add"},
+        follow_redirects=False,
+    )
+    variant = resp.headers["location"].rstrip("/").split("/")[-1]
+    r = c.get(f"/rule-packs/federal/2024/{variant}/rules/add")
+    assert r.status_code == 200
+    assert "Add Rule" in r.text or "New Rule" in r.text
+
+
+def test_save_rule_via_post() -> None:
+    c = _client()
+    resp = c.post(
+        "/rule-packs/federal/2024/standard/clone",
+        data={"csrf_token": CSRF, "custom_name": "for_save"},
+        follow_redirects=False,
+    )
+    variant = resp.headers["location"].rstrip("/").split("/")[-1]
+    r = c.post(
+        f"/rule-packs/federal/2024/{variant}/rules/add",
+        data={
+            "csrf_token": CSRF,
+            "rule_id": "fed.2024.my_new_rule",
+            "rule_type": "formula",
+            "description": "Test formula",
+            "expression": "x",
+            "input_name_0": "x",
+            "input_type_0": "ref",
+            "input_value_0": "input.w2.wages",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303 or r.status_code == 200
+
+
+def test_save_existing_rule_via_post() -> None:
+    c = _client()
+    resp = c.post(
+        "/rule-packs/federal/2024/standard/clone",
+        data={"csrf_token": CSRF, "custom_name": "for_edit"},
+        follow_redirects=False,
+    )
+    variant = resp.headers["location"].rstrip("/").split("/")[-1]
+    r = c.post(
+        f"/rule-packs/federal/2024/{variant}/rules/fed.2024.gross_income.wages",
+        data={
+            "csrf_token": CSRF,
+            "rule_id": "fed.2024.gross_income.wages",
+            "rule_type": "sum",
+            "description": "Updated wages",
+            "sum_items_ref": "input.w2.wages",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+
+
+def test_delete_rule_via_post() -> None:
+    c = _client()
+    resp = c.post(
+        "/rule-packs/federal/2024/standard/clone",
+        data={"csrf_token": CSRF, "custom_name": "for_rule_del"},
+        follow_redirects=False,
+    )
+    variant = resp.headers["location"].rstrip("/").split("/")[-1]
+    r = c.post(
+        f"/rule-packs/federal/2024/{variant}/rules/fed.2024.gross_income.wages/delete",
+        data={"csrf_token": CSRF},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303

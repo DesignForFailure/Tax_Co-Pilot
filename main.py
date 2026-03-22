@@ -96,8 +96,10 @@ from app.services.rule_pack_editor import (
     clone_pack,
     create_empty_pack,
     delete_pack,
+    delete_rule,
     export_yaml,
     load_pack_detail,
+    save_rule,
 )
 from app.services.rule_pack_editor import (
     list_all_packs as list_rule_packs,
@@ -416,6 +418,75 @@ def _form_str(fd: FormData, key: str, default: str = "") -> str:
 
 def _form_money(fd: FormData, key: str, default: str = "0") -> Decimal:
     return _parse_money(str(fd.get(key, default) or default), allow_negative=False)
+
+
+def _parse_rule_form(fd: FormData) -> dict[str, Any]:
+    """Parse the rule editor form into a rule dict for YAML storage."""
+    rule_id = _form_str(fd, "rule_id")
+    rule_type = _form_str(fd, "rule_type")
+    description = _form_str(fd, "description")
+    form_line = _form_str(fd, "form_line")
+
+    rule: dict[str, Any] = {
+        "id": rule_id,
+        "type": rule_type,
+        "description": description,
+    }
+    if form_line:
+        rule["form_line"] = form_line
+
+    if rule_type == "sum":
+        items_ref = _form_str(fd, "sum_items_ref")
+        rule["inputs"] = {"items": {"ref": items_ref}}
+
+    elif rule_type == "formula":
+        rule["expression"] = _form_str(fd, "expression")
+        inputs: dict[str, Any] = {}
+        i = 0
+        while True:
+            name = str(fd.get(f"input_name_{i}", "") or "").strip()
+            if not name:
+                break
+            itype = str(fd.get(f"input_type_{i}", "ref") or "ref").strip()
+            ival = str(fd.get(f"input_value_{i}", "") or "").strip()
+            if itype == "literal":
+                inputs[name] = {"literal": ival}
+            else:
+                inputs[name] = {"ref": ival}
+            i += 1
+        rule["inputs"] = inputs
+
+    elif rule_type == "lookup":
+        rule["table"] = _form_str(fd, "lookup_table")
+        key_ref = _form_str(fd, "lookup_key_ref")
+        rule["key"] = {"ref": key_ref}
+
+    elif rule_type == "bracket_table":
+        input_ref = _form_str(fd, "bracket_input_ref")
+        key_ref = _form_str(fd, "bracket_key_ref")
+        rule["input"] = {"ref": input_ref}
+        rule["key"] = {"ref": key_ref}
+        tables: dict[str, list[dict[str, str | None]]] = {}
+        for status in ("single", "mfj", "mfs", "hoh", "qss"):
+            brackets: list[dict[str, str | None]] = []
+            row = 0
+            while True:
+                lower = str(fd.get(f"bracket_{status}_{row}_lower", "") or "").strip()
+                if not lower and row > 0:
+                    break
+                if not lower:
+                    row += 1
+                    continue
+                upper = str(fd.get(f"bracket_{status}_{row}_upper", "") or "").strip() or None
+                rate = str(fd.get(f"bracket_{status}_{row}_rate", "") or "").strip()
+                brackets.append({"lower": lower, "upper": upper, "rate": rate})
+                row += 1
+            if brackets:
+                tables[status] = brackets
+        if tables:
+            rule["tables"] = tables
+
+    return rule
 
 
 def _collect_indices(fd: FormData, prefix: str) -> list[int]:
@@ -1255,6 +1326,129 @@ def rule_pack_export(
         media_type="application/x-yaml",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+@app.get("/rule-packs/{jurisdiction}/{year}/{variant}/rules/add", response_class=HTMLResponse)
+def rule_add_form(request: Request, jurisdiction: str, year: int, variant: str) -> HTMLResponse:
+    csrf = _get_csrf_token(request)
+    detail = load_pack_detail(jurisdiction, year, variant)
+    id_prefix = "fed." if jurisdiction.lower() in {"federal", "fed"} else f"{jurisdiction.lower()}."
+    id_prefix += f"{year}."
+    resp = templates.TemplateResponse(
+        "pages/rule_editor.html",
+        {
+            "request": request,
+            "csrf": csrf,
+            "pack": detail,
+            "rule": None,
+            "is_new": True,
+            "id_prefix": id_prefix,
+        },
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+@app.post("/rule-packs/{jurisdiction}/{year}/{variant}/rules/add")
+async def rule_add_submit(request: Request, jurisdiction: str, year: int, variant: str) -> Response:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    rule_data = _parse_rule_form(fd)
+    try:
+        save_rule(jurisdiction, year, variant, rule_data["id"], rule_data)
+        _bust_pack_cache(jurisdiction, year)
+        return RedirectResponse(
+            url=f"/rule-packs/{jurisdiction}/{year}/{variant}",
+            status_code=303,
+        )
+    except ValueError as exc:
+        csrf = _get_csrf_token(request)
+        detail = load_pack_detail(jurisdiction, year, variant)
+        resp = templates.TemplateResponse(
+            "pages/rule_editor.html",
+            {
+                "request": request,
+                "csrf": csrf,
+                "pack": detail,
+                "rule": rule_data,
+                "is_new": True,
+                "error": str(exc),
+                "id_prefix": "",
+            },
+        )
+        resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+        return resp
+
+
+@app.get("/rule-packs/{jurisdiction}/{year}/{variant}/rules/{rule_id}", response_class=HTMLResponse)
+def rule_edit_form(
+    request: Request, jurisdiction: str, year: int, variant: str, rule_id: str
+) -> HTMLResponse:
+    csrf = _get_csrf_token(request)
+    detail = load_pack_detail(jurisdiction, year, variant)
+    rule = next((r for r in detail["rules"] if r["id"] == rule_id), None)
+    if rule is None:
+        return HTMLResponse(content="Rule not found", status_code=404)
+    resp = templates.TemplateResponse(
+        "pages/rule_editor.html",
+        {
+            "request": request,
+            "csrf": csrf,
+            "pack": detail,
+            "rule": rule,
+            "is_new": False,
+            "id_prefix": "",
+        },
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+@app.post("/rule-packs/{jurisdiction}/{year}/{variant}/rules/{rule_id}/delete")
+async def rule_delete_submit(
+    request: Request, jurisdiction: str, year: int, variant: str, rule_id: str
+) -> RedirectResponse:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    delete_rule(jurisdiction, year, variant, rule_id)
+    _bust_pack_cache(jurisdiction, year)
+    return RedirectResponse(
+        url=f"/rule-packs/{jurisdiction}/{year}/{variant}",
+        status_code=303,
+    )
+
+
+@app.post("/rule-packs/{jurisdiction}/{year}/{variant}/rules/{rule_id}")
+async def rule_save_submit(
+    request: Request, jurisdiction: str, year: int, variant: str, rule_id: str
+) -> Response:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    rule_data = _parse_rule_form(fd)
+    try:
+        save_rule(jurisdiction, year, variant, rule_id, rule_data)
+        _bust_pack_cache(jurisdiction, year)
+        return RedirectResponse(
+            url=f"/rule-packs/{jurisdiction}/{year}/{variant}",
+            status_code=303,
+        )
+    except ValueError as exc:
+        csrf = _get_csrf_token(request)
+        detail = load_pack_detail(jurisdiction, year, variant)
+        resp = templates.TemplateResponse(
+            "pages/rule_editor.html",
+            {
+                "request": request,
+                "csrf": csrf,
+                "pack": detail,
+                "rule": rule_data,
+                "is_new": False,
+                "error": str(exc),
+                "id_prefix": "",
+            },
+        )
+        resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+        return resp
 
 
 @app.exception_handler(ValueError)
