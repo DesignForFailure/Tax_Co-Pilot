@@ -16,6 +16,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - All DB functions now use `contextlib.closing` for leak-safe connections.
 
 ### Added
+- **ci.yml** - Pushed file from previous milestone; required pushing separately from branch.
 - **Milestone 11 — Data Management & Developer Experience (complete):** Full return data export/import (`GET /export-all`, `POST /import-returns`), database backup/restore (`GET /backup`, `POST /restore`), run tagging and notes (`POST /runs/{id}/annotate`), rule pack validation CLI (`scripts/validate_rule_pack.py`), rule pack authoring guide (`docs/RULE_PACK_AUTHORING.md`), GitHub issue/PR templates (`.github/ISSUE_TEMPLATE/new_state.md`, `.github/PULL_REQUEST_TEMPLATE.md`).
 - `tags` and `notes` fields on `ReturnRun` model with backward-compatible DB migration.
 - `update_run_annotation()` in database service for inline tag/note editing.
