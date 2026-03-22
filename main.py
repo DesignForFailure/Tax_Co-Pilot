@@ -92,6 +92,19 @@ from app.services.encryption import (
     set_password_in_keyring,
     validate_password,
 )
+from app.services.rule_pack_editor import (
+    clone_pack,
+    create_empty_pack,
+    delete_pack,
+    export_yaml,
+    load_pack_detail,
+)
+from app.services.rule_pack_editor import (
+    list_all_packs as list_rule_packs,
+)
+from app.services.rule_pack_editor import (
+    validate_pack as validate_rule_pack,
+)
 
 # ─── FastAPI app and basic hardening ───────────────────────────
 # TrustedHostMiddleware mitigates DNS rebinding / Host header attacks.
@@ -156,6 +169,15 @@ STATE_PACKS_DIR = BASE_DIR / "rule_packs" / "state"
 # Cache: year -> loaded RulePack / state dict
 _federal_cache: dict[int, RulePack] = {}
 _state_cache: dict[int, dict[str, RulePack]] = {}
+
+
+def _bust_pack_cache(jurisdiction: str, year: int) -> None:
+    """Remove cached packs so next load reads from disk."""
+    j = jurisdiction.lower()
+    if j in {"federal", "fed"}:
+        _federal_cache.pop(year, None)
+    else:
+        _state_cache.pop(year, None)
 
 
 def _discover_available_years() -> list[int]:
@@ -1093,6 +1115,145 @@ def audit_verify() -> Response:
     return Response(
         content=json.dumps({"status": status, "errors": errors}, indent=2),
         media_type="application/json",
+    )
+
+
+# ── Rule Pack Editor routes ────────────────────────────────────
+# IMPORTANT: literal routes (/rule-packs/create, /rule-packs/import) MUST come
+# before the parameterized route /rule-packs/{jurisdiction}/... to avoid
+# FastAPI treating "create" or "import" as a jurisdiction path segment.
+
+
+@app.get("/rule-packs", response_class=HTMLResponse)
+def rule_packs_list(request: Request) -> HTMLResponse:
+    csrf = _get_csrf_token(request)
+    packs = list_rule_packs()
+    resp = templates.TemplateResponse(
+        "pages/rule_packs.html",
+        {"request": request, "csrf": csrf, "packs": packs, "available_years": available_years},
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+@app.post("/rule-packs/create")
+async def rule_packs_create(request: Request) -> RedirectResponse:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    jurisdiction = _form_str(fd, "jurisdiction")
+    year = int(_form_str(fd, "year") or "0")
+    custom_name = _form_str(fd, "custom_name")
+    info = create_empty_pack(jurisdiction, year, custom_name)
+    _bust_pack_cache(jurisdiction, year)
+    return RedirectResponse(
+        url=f"/rule-packs/{info.jurisdiction}/{info.year}/{info.variant}",
+        status_code=303,
+    )
+
+
+@app.get("/rule-packs/import", response_class=HTMLResponse)
+def rule_packs_import_form(request: Request) -> HTMLResponse:
+    """Stub for Task 5 — renders a placeholder import page."""
+    csrf = _get_csrf_token(request)
+    resp = HTMLResponse(
+        content=(
+            "<!DOCTYPE html><html><head><title>Import Rule Pack</title></head>"
+            "<body><h1>Import YAML</h1><p>Full import form coming in Task 5.</p>"
+            "<p><a href='/rule-packs'>Back to Rule Packs</a></p></body></html>"
+        )
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+@app.post("/rule-packs/import", response_class=HTMLResponse)
+async def rule_packs_import_post(request: Request) -> HTMLResponse:
+    """Stub for Task 5 — accepts upload but just redirects back."""
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    return HTMLResponse(
+        content=(
+            "<!DOCTYPE html><html><head><title>Import Rule Pack</title></head>"
+            "<body><h1>Import received</h1><p>Full processing coming in Task 5.</p>"
+            "<p><a href='/rule-packs'>Back to Rule Packs</a></p></body></html>"
+        )
+    )
+
+
+@app.get("/rule-packs/{jurisdiction}/{year}/{variant}", response_class=HTMLResponse)
+def rule_pack_detail(
+    request: Request, jurisdiction: str, year: int, variant: str
+) -> HTMLResponse:
+    csrf = _get_csrf_token(request)
+    detail = load_pack_detail(jurisdiction, year, variant)
+    resp = templates.TemplateResponse(
+        "pages/rule_pack_detail.html",
+        {"request": request, "csrf": csrf, "pack": detail},
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+@app.post("/rule-packs/{jurisdiction}/{year}/{variant}/clone")
+async def rule_pack_clone(
+    request: Request, jurisdiction: str, year: int, variant: str
+) -> RedirectResponse:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    custom_name = _form_str(fd, "custom_name")
+    info = clone_pack(jurisdiction, year, variant, custom_name)
+    _bust_pack_cache(jurisdiction, year)
+    return RedirectResponse(
+        url=f"/rule-packs/{info.jurisdiction}/{info.year}/{info.variant}",
+        status_code=303,
+    )
+
+
+@app.post("/rule-packs/{jurisdiction}/{year}/{variant}/delete")
+async def rule_pack_delete(
+    request: Request, jurisdiction: str, year: int, variant: str
+) -> RedirectResponse:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    delete_pack(jurisdiction, year, variant)
+    _bust_pack_cache(jurisdiction, year)
+    return RedirectResponse(url="/rule-packs", status_code=303)
+
+
+@app.post("/rule-packs/{jurisdiction}/{year}/{variant}/validate", response_class=HTMLResponse)
+async def rule_pack_validate(
+    request: Request, jurisdiction: str, year: int, variant: str
+) -> HTMLResponse:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    errors = validate_rule_pack(jurisdiction, year, variant)
+    detail = load_pack_detail(jurisdiction, year, variant)
+    csrf = _get_csrf_token(request)
+    resp = templates.TemplateResponse(
+        "pages/rule_pack_detail.html",
+        {
+            "request": request,
+            "csrf": csrf,
+            "pack": detail,
+            "validation_errors": errors,
+            "validated": True,
+        },
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+@app.get("/rule-packs/{jurisdiction}/{year}/{variant}/export")
+def rule_pack_export(
+    request: Request, jurisdiction: str, year: int, variant: str
+) -> Response:
+    manifest_bytes, rules_bytes = export_yaml(jurisdiction, year, variant)
+    combined = b"# === MANIFEST ===\n" + manifest_bytes + b"\n# === RULES ===\n" + rules_bytes
+    filename = f"{jurisdiction}_{year}_{variant}.yaml"
+    return Response(
+        content=combined,
+        media_type="application/x-yaml",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 
