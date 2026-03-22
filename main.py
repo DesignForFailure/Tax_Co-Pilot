@@ -387,9 +387,16 @@ def dashboard(request: Request) -> Response:
 @app.get("/calculate", response_class=HTMLResponse)
 def calculate_form(request: Request) -> HTMLResponse:
     csrf = _get_csrf_token(request)
+    all_packs = list_rule_packs()
     resp = templates.TemplateResponse(
         "pages/calculate.html",
-        {"request": request, "csrf": csrf, "available_years": available_years, "available_states": sorted(_get_state_packs(max(available_years)).keys()) if available_years else []},
+        {
+            "request": request,
+            "csrf": csrf,
+            "available_years": available_years,
+            "available_states": sorted(_get_state_packs(max(available_years)).keys()) if available_years else [],
+            "pack_variants": all_packs,
+        },
     )
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return resp
@@ -687,7 +694,16 @@ async def calculate_submit(request: Request) -> RedirectResponse:
     residence = str(fd.get("state_of_residence", "")).strip().upper()
     if residence:
         states_needed.add(residence)
-    fed_pack = _get_federal_pack(inputs.tax_year)
+    pack_variant = _form_str(fd, "pack_variant") or "standard"
+    if pack_variant != "standard":
+        from app.services.rule_pack_editor import _pack_path
+        fed_custom_dir = _pack_path("federal", inputs.tax_year, pack_variant)
+        if fed_custom_dir.exists():
+            fed_pack = RulePack.load(fed_custom_dir)
+        else:
+            fed_pack = _get_federal_pack(inputs.tax_year)
+    else:
+        fed_pack = _get_federal_pack(inputs.tax_year)
     year_state_packs = _get_state_packs(inputs.tax_year)
     active_state_packs = {
         s: year_state_packs[s] for s in states_needed if s in year_state_packs

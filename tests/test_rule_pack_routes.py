@@ -229,3 +229,12 @@ def test_import_upload_valid() -> None:
     )
     assert r.status_code == 303
     assert "custom_v" in r.headers.get("location", "")
+
+
+
+def test_calculate_with_custom_variant_param() -> None:
+    """The calculate form should accept a pack_variant parameter."""
+    c = _client()
+    r = c.get("/calculate")
+    assert r.status_code == 200
+    assert "pack_variant" in r.text or "Rule Pack" in r.text

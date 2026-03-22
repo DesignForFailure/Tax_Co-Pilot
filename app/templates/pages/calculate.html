@@ -39,6 +39,15 @@
                     {% endfor %}
                 </select>
             </div>
+            <div>
+                <label>Rule Pack Variant</label>
+                <select name="pack_variant">
+                    <option value="standard" selected>Standard</option>
+                    {% for pv in pack_variants if pv.jurisdiction == 'federal' and pv.is_custom %}
+                    <option value="{{ pv.variant }}">Custom {{ pv.version }} — {{ pv.custom_name or pv.variant }}</option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
     </div>
 
