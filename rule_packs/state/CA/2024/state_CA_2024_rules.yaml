@@ -1,0 +1,136 @@
+# Tax_Co-Pilot - Local-first personal tax software system
+# Copyright (C) 2026  Tax_Co-Pilot Contributors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+constants:
+  standard_deduction:
+    single: "5540"
+    mfj: "11080"
+    mfs: "5540"
+    hoh: "11080"
+
+rules:
+  - id: "ca.2024.agi"
+    description: "California AGI (MVP: starts from federal AGI)"
+    type: "formula"
+    expression: "federal_agi"
+    inputs:
+      federal_agi: { ref: "fed.2024.agi.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "ca.2024.standard_deduction"
+    description: "California standard deduction"
+    type: "lookup"
+    table: "constants.standard_deduction"
+    key: { ref: "input.filing_status" }
+
+  - id: "ca.2024.taxable_income"
+    description: "California taxable income = max(AGI - standard deduction, 0)"
+    type: "formula"
+    expression: "max(agi - deduction, 0)"
+    inputs:
+      agi: { ref: "ca.2024.agi" }
+      deduction: { ref: "ca.2024.standard_deduction" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ca.2024.tax.base"
+    description: "California income tax using 2024 bracket tables"
+    type: "bracket_table"
+    input: { ref: "ca.2024.taxable_income" }
+    key: { ref: "input.filing_status" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+    tables:
+      single:
+        - { lower: "0", upper: "10412", rate: "0.01" }
+        - { lower: "10412", upper: "24684", rate: "0.02" }
+        - { lower: "24684", upper: "38959", rate: "0.04" }
+        - { lower: "38959", upper: "54081", rate: "0.06" }
+        - { lower: "54081", upper: "68350", rate: "0.08" }
+        - { lower: "68350", upper: "349137", rate: "0.093" }
+        - { lower: "349137", upper: "418961", rate: "0.103" }
+        - { lower: "418961", upper: "698271", rate: "0.113" }
+        - { lower: "698271", upper: null, rate: "0.123" }
+      mfj:
+        - { lower: "0", upper: "20824", rate: "0.01" }
+        - { lower: "20824", upper: "49368", rate: "0.02" }
+        - { lower: "49368", upper: "77918", rate: "0.04" }
+        - { lower: "77918", upper: "108162", rate: "0.06" }
+        - { lower: "108162", upper: "136700", rate: "0.08" }
+        - { lower: "136700", upper: "698274", rate: "0.093" }
+        - { lower: "698274", upper: "837922", rate: "0.103" }
+        - { lower: "837922", upper: "1396542", rate: "0.113" }
+        - { lower: "1396542", upper: null, rate: "0.123" }
+      mfs:
+        - { lower: "0", upper: "10412", rate: "0.01" }
+        - { lower: "10412", upper: "24684", rate: "0.02" }
+        - { lower: "24684", upper: "38959", rate: "0.04" }
+        - { lower: "38959", upper: "54081", rate: "0.06" }
+        - { lower: "54081", upper: "68350", rate: "0.08" }
+        - { lower: "68350", upper: "349137", rate: "0.093" }
+        - { lower: "349137", upper: "418961", rate: "0.103" }
+        - { lower: "418961", upper: "698271", rate: "0.113" }
+        - { lower: "698271", upper: null, rate: "0.123" }
+      hoh:
+        - { lower: "0", upper: "10412", rate: "0.01" }
+        - { lower: "10412", upper: "24684", rate: "0.02" }
+        - { lower: "24684", upper: "38959", rate: "0.04" }
+        - { lower: "38959", upper: "54081", rate: "0.06" }
+        - { lower: "54081", upper: "68350", rate: "0.08" }
+        - { lower: "68350", upper: "349137", rate: "0.093" }
+        - { lower: "349137", upper: "418961", rate: "0.103" }
+        - { lower: "418961", upper: "698271", rate: "0.113" }
+        - { lower: "698271", upper: null, rate: "0.123" }
+
+  - id: "ca.2024.tax.mhs"
+    description: "Mental health services surtax (1% on taxable income over $1M)"
+    type: "formula"
+    expression: "max(taxable_income - threshold, 0) * rate"
+    inputs:
+      taxable_income: { ref: "ca.2024.taxable_income" }
+      threshold: { literal: "1000000" }
+      rate: { literal: "0.01" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "ca.2024.tax"
+    description: "California total income tax"
+    type: "formula"
+    expression: "base_tax + mhs"
+    inputs:
+      base_tax: { ref: "ca.2024.tax.base" }
+      mhs: { ref: "ca.2024.tax.mhs" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ca.2024.withholding"
+    description: "Total California tax withheld"
+    type: "sum"
+    inputs:
+      items: { ref: "input.withholding.state.CA" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "ca.2024.refund_or_owed"
+    description: "California refund (positive) or amount owed (negative)"
+    type: "formula"
+    expression: "withholding - tax"
+    inputs:
+      withholding: { ref: "ca.2024.withholding" }
+      tax: { ref: "ca.2024.tax" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0

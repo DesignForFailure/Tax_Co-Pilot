@@ -258,14 +258,16 @@ def test_ga_all_filing_statuses(filing_status: FilingStatus) -> None:
 
 
 def test_state_pack_discovery() -> None:
-    """_get_state_packs finds all 10 state packs."""
+    """_get_state_packs finds all 12 state packs."""
     from main import _get_state_packs
 
     packs = _get_state_packs(2024)
     assert "GA" in packs
     assert packs["GA"].jurisdiction == "GA"
-    # Should find GA + 9 no-income-tax stubs = 10
-    assert len(packs) >= 10
+    assert "CA" in packs
+    assert "NY" in packs
+    # Should find GA + CA + NY + 9 no-income-tax stubs = 12
+    assert len(packs) >= 12
     for code in NO_TAX_STATES:
         assert code in packs
 

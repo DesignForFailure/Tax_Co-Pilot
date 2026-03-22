@@ -30,6 +30,15 @@
                     <option value="qss">Qualifying Surviving Spouse</option>
                 </select>
             </div>
+            <div>
+                <label>State of Residence</label>
+                <select name="state_of_residence">
+                    <option value="">— None —</option>
+                    {% for st in available_states %}
+                    <option value="{{ st }}">{{ st }}</option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
     </div>
 

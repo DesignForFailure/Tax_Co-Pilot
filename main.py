@@ -344,7 +344,7 @@ def calculate_form(request: Request) -> HTMLResponse:
     csrf = _get_csrf_token(request)
     resp = templates.TemplateResponse(
         "pages/calculate.html",
-        {"request": request, "csrf": csrf, "available_years": available_years},
+        {"request": request, "csrf": csrf, "available_years": available_years, "available_states": sorted(_get_state_packs(max(available_years)).keys())},
     )
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return resp
@@ -559,6 +559,9 @@ async def calculate_submit(request: Request) -> RedirectResponse:
         for w in tp.w2s
         if w.state
     }
+    residence = str(fd.get("state_of_residence", "")).strip().upper()
+    if residence:
+        states_needed.add(residence)
     fed_pack = _get_federal_pack(inputs.tax_year)
     year_state_packs = _get_state_packs(inputs.tax_year)
     active_state_packs = {
