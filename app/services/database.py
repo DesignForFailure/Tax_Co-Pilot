@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Tax_Co-Pilot - Local-first personal tax software system
 # Copyright (C) 2026  Tax_Co-Pilot Contributors
 #
@@ -250,8 +251,14 @@ def save_return_run(run_data: dict) -> None:
     - ReturnRuns are treated as immutable; updates are intentionally not supported.
     """
     integrity_hash = _compute_integrity_hash(run_data)
-    previous_hash = _get_latest_hash()
     with closing(get_connection()) as conn:
+        # Atomic read-then-insert prevents concurrent saves from
+        # duplicating previous_hash in the integrity chain.
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT integrity_hash FROM return_runs ORDER BY created_at DESC, rowid DESC LIMIT 1"
+        ).fetchone()
+        previous_hash = row["integrity_hash"] if row else ""
         conn.execute(
             """INSERT INTO return_runs
                (id, tax_year, filing_status, scenario_name,
@@ -277,6 +284,7 @@ def save_return_run(run_data: dict) -> None:
                 previous_hash,
             ),
         )
+        conn.execute("COMMIT")
 
 
 def list_return_runs(tax_year: int | None = None) -> list[dict]:

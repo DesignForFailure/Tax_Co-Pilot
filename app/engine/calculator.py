@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Tax_Co-Pilot - Local-first personal tax software system
 # Copyright (C) 2026  Tax_Co-Pilot Contributors
 #
@@ -59,6 +60,8 @@ def _to_decimal(val: Any) -> Decimal:
 
 
 def _round(val: Decimal, mode: str, precision: int) -> Decimal:
+    if precision < 0:
+        raise ValueError(f"rounding_precision must be >= 0, got {precision}")
     rm = ROUNDING_MODES.get(mode, ROUND_HALF_UP)
     if precision == 0:
         return val.quantize(Decimal("1"), rounding=rm)
@@ -456,7 +459,7 @@ class CalculationEngine:
 
             intermediates.append(
                 {
-                    "bracket": f"{(rate * 100):g}%",
+                    "bracket": f"{(rate * Decimal('100')).normalize()}%",
                     "range": f"{_format_usd(lower)}–{_format_usd(upper) if upper is not None else '∞'}",
                     "taxable_amount": str(taxable_in_bracket),
                     "tax": str(tax_in_bracket),
