@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Tax_Co-Pilot - Local-first personal tax software system
 # Copyright (C) 2026  Tax_Co-Pilot Contributors
 #

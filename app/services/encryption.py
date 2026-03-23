@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Tax_Co-Pilot - Local-first personal tax software system
 # Copyright (C) 2026  Tax_Co-Pilot Contributors
 #
@@ -33,6 +34,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import secrets
 import sqlite3
 from abc import ABC, abstractmethod
@@ -562,6 +564,16 @@ def migrate_to_encrypted(
         raise RuntimeError(f"Unsupported provider type: {type(provider)}")
 
 
+_SAFE_TABLE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _validate_table_name(name: str) -> str:
+    """Reject table names that could enable SQL injection."""
+    if not _SAFE_TABLE_NAME_RE.fullmatch(name):
+        raise RuntimeError(f"Unsafe table name rejected: {name!r}")
+    return name
+
+
 def _migrate_to_sqlcipher(
     db_path: Path, password: str, kdf_iterations: int, backup_suffix: str
 ) -> None:
@@ -587,7 +599,10 @@ def _migrate_to_sqlcipher(
 
         # Get row counts for verification
         tables_query = "SELECT name FROM sqlite_master WHERE type='table'"
-        tables = [row[0] for row in source_conn.execute(tables_query).fetchall()]
+        tables = [
+            _validate_table_name(row[0])
+            for row in source_conn.execute(tables_query).fetchall()
+        ]
         source_counts = {}
         for table in tables:
             count = source_conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
@@ -705,7 +720,7 @@ def _migrate_to_python_encryption(
 
         # Copy data with encryption for JSON columns
         tables = [
-            row[0]
+            _validate_table_name(row[0])
             for row in source_conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'"
             ).fetchall()

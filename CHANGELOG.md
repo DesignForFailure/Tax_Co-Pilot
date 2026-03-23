@@ -20,6 +20,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - `tests/test_rule_pack_routes.py`: 15 route integration tests with test cleanup fixture.
 - **Hardening, QA & Auditability pass (complete):** Fixed SQL injection in SQLCipher PRAGMA, `tax_year` validation, unary negation in rule expressions, `hybrid_factory` consistency, URL-encoded error redirects, upload size limits with SQLite integrity validation, input sanitization (tags/notes caps, filename sanitization, export fallback). Added tamper-evident hash chain (`integrity_hash`, `previous_hash`) with `GET /audit/verify`. Key rotation via `POST /rotate-key` with `PRAGMA rekey`. Password cache clearing on shutdown. Explicit cipher parameters. CSRF token rotation after authentication. Made `pip-audit` blocking in CI.
 
+### Fixed
+- **Security: Timing side-channel in key rotation** — `current_password` comparison in `/rotate-key` now uses `secrets.compare_digest` (constant-time) instead of `!=`.
+- **Security: SQL injection in encryption migrations** — Table names from `sqlite_master` are now validated against `^[A-Za-z_][A-Za-z0-9_]*$` before interpolation into SQL in `_migrate_to_sqlcipher` and `_migrate_to_python_encryption`.
+- **Integrity: Race condition in hash chain linking** — `save_return_run` now wraps `_get_latest_hash` read and INSERT in a single `BEGIN IMMEDIATE` / `COMMIT` block to prevent concurrent saves from duplicating `previous_hash`.
+- **Correctness: Float coercion in bracket audit trace** — Bracket label formatting changed from `f"{(rate * 100):g}%"` (implicit float) to `f"{(rate * Decimal('100')).normalize()}%"` preserving Decimal fidelity.
+- **Validation: Negative rounding precision** — `_round()` now raises `ValueError` if `precision < 0`, preventing silent misrounding from malformed rule packs.
+- **Security: Upload size cap on rule pack import** — Rule pack file uploads are now limited to 2 MiB per file.
+- **Compliance: SPDX license headers** — Added `# SPDX-License-Identifier: AGPL-3.0-or-later` to 28 Python source files that were missing the machine-readable identifier.
+- **Cleanup: Removed garbage file** — Deleted accidental file in repo root (mypy error message saved as filename).
+
 ### Changed
 - Migrated from deprecated `@app.on_event("startup")` to lifespan context manager.
 - All DB functions now use `contextlib.closing` for leak-safe connections.

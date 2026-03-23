@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Tax_Co-Pilot - Local-first personal tax software system
 # Copyright (C) 2026  Tax_Co-Pilot Contributors
 #
@@ -1175,7 +1176,7 @@ async def rotate_key_submit(request: Request) -> RedirectResponse:
             status_code=303,
         )
 
-    if current_password != get_cached_password():
+    if not secrets.compare_digest(current_password, get_cached_password() or ""):
         return RedirectResponse(
             url=f"/rotate-key?error={urllib.parse.quote_plus('Current password is incorrect')}",
             status_code=303,
@@ -1277,8 +1278,11 @@ async def rule_packs_import_post(request: Request) -> Response:
     if not isinstance(manifest_field, UploadFile) or not isinstance(rules_field, UploadFile):
         return _render_error("Both manifest_file and rules_file are required.")
 
+    _MAX_RULE_PACK_SIZE = 2 * 1024 * 1024  # 2 MiB per file
     manifest_bytes = await manifest_field.read()
     rules_bytes = await rules_field.read()
+    if len(manifest_bytes) > _MAX_RULE_PACK_SIZE or len(rules_bytes) > _MAX_RULE_PACK_SIZE:
+        return _render_error("Uploaded file exceeds the 2 MiB size limit.")
 
     try:
         info = import_rule_yaml(manifest_bytes, rules_bytes, custom_name)
