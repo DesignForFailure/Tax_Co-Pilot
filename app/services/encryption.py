@@ -105,16 +105,18 @@ def rotate_key(old_password: str, new_password: str) -> None:
     from app.services.database import DB_PATH
 
     conn = sqlcipher.connect(str(DB_PATH), timeout=10.0, isolation_level=None)
-    old_hex = _hex_encode_key(old_password)
-    conn.execute(f"PRAGMA key = \"x'{old_hex}'\"")
-    # Verify old key works
-    conn.execute("SELECT count(*) FROM sqlite_master")
-    # Rotate to new key
-    new_hex = _hex_encode_key(new_password)
-    conn.execute(f"PRAGMA rekey = \"x'{new_hex}'\"")
-    # Verify new key works
-    conn.execute("SELECT count(*) FROM sqlite_master")
-    conn.close()
+    try:
+        old_hex = _hex_encode_key(old_password)
+        conn.execute(f"PRAGMA key = \"x'{old_hex}'\"")
+        # Verify old key works
+        conn.execute("SELECT count(*) FROM sqlite_master")
+        # Rotate to new key
+        new_hex = _hex_encode_key(new_password)
+        conn.execute(f"PRAGMA rekey = \"x'{new_hex}'\"")
+        # Verify new key works
+        conn.execute("SELECT count(*) FROM sqlite_master")
+    finally:
+        conn.close()
 
 
 class DatabaseState(Enum):
@@ -207,7 +209,19 @@ def detect_encryption_state(db_path: Path) -> DatabaseState:
             return DatabaseState.UNENCRYPTED
 
     except (sqlite3.DatabaseError, sqlite3.OperationalError):
-        # Can't read sqlite_master → likely encrypted with SQLCipher
+        # Distinguish corrupted plaintext from encrypted:
+        # SQLite files start with "SQLite format 3\x00"; encrypted files don't.
+        try:
+            with open(db_path, "rb") as f:
+                header = f.read(16)
+            if header.startswith(b"SQLite format 3\x00"):
+                raise RuntimeError(
+                    f"Database at {db_path} appears corrupted "
+                    "(has SQLite header but cannot be read). "
+                    "Restore from a backup or delete the file to start fresh."
+                )
+        except OSError:
+            pass
         return DatabaseState.ENCRYPTED_SQLCIPHER
 
 

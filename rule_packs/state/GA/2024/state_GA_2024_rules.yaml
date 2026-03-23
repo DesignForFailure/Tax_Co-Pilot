@@ -20,11 +20,13 @@ constants:
     mfj: "7100"
     mfs: "3550"
     hoh: "5400"
+    qss: "7100"
   personal_exemption:
     single: "2700"
     mfj: "7400"
     mfs: "2700"
     hoh: "2700"
+    qss: "7400"
 
 rules:
   - id: "ga.2024.agi"

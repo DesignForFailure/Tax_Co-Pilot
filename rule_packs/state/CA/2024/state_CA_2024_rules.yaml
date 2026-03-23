@@ -20,6 +20,7 @@ constants:
     mfj: "11080"
     mfs: "5540"
     hoh: "11080"
+    qss: "11080"
 
 rules:
   - id: "ca.2024.agi"
@@ -95,6 +96,16 @@ rules:
         - { lower: "349137", upper: "418961", rate: "0.103" }
         - { lower: "418961", upper: "698271", rate: "0.113" }
         - { lower: "698271", upper: null, rate: "0.123" }
+      qss:
+        - { lower: "0", upper: "20824", rate: "0.01" }
+        - { lower: "20824", upper: "49368", rate: "0.02" }
+        - { lower: "49368", upper: "77918", rate: "0.04" }
+        - { lower: "77918", upper: "108162", rate: "0.06" }
+        - { lower: "108162", upper: "136700", rate: "0.08" }
+        - { lower: "136700", upper: "698274", rate: "0.093" }
+        - { lower: "698274", upper: "837922", rate: "0.103" }
+        - { lower: "837922", upper: "1396542", rate: "0.113" }
+        - { lower: "1396542", upper: null, rate: "0.123" }
 
   - id: "ca.2024.tax.mhs"
     description: "Mental health services surtax (1% on taxable income over $1M)"

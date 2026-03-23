@@ -134,8 +134,8 @@ def test_annotate_nonexistent_run() -> None:
         data={"csrf_token": CSRF, "tags": "test", "notes": "test"},
         follow_redirects=False,
     )
-    # Should redirect (303) — the UPDATE affects 0 rows but doesn't error
-    assert resp.status_code == 303
+    # Should return 404 — run doesn't exist
+    assert resp.status_code == 404
 
 
 def test_delete_nonexistent_run() -> None:

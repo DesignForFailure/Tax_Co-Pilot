@@ -20,6 +20,7 @@ constants:
     mfj: "16050"
     mfs: "8000"
     hoh: "11200"
+    qss: "16050"
 
 rules:
 
@@ -94,6 +95,16 @@ rules:
         - { lower: "80650",    upper: "215400",    rate: "0.0625" }
         - { lower: "215400",   upper: "1077550",   rate: "0.0685" }
         - { lower: "1077550",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+      qss:
+        - { lower: "0",        upper: "17150",     rate: "0.04" }
+        - { lower: "17150",    upper: "23600",     rate: "0.045" }
+        - { lower: "23600",    upper: "27900",     rate: "0.0525" }
+        - { lower: "27900",    upper: "161550",    rate: "0.0585" }
+        - { lower: "161550",   upper: "323200",    rate: "0.0625" }
+        - { lower: "323200",   upper: "2155350",   rate: "0.0685" }
+        - { lower: "2155350",  upper: "5000000",   rate: "0.0965" }
         - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
         - { lower: "25000000", upper: null,        rate: "0.109" }
 
