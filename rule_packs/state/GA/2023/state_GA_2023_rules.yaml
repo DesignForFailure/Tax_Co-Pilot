@@ -20,11 +20,13 @@ constants:
     mfj: "7100"
     mfs: "3550"
     hoh: "5400"
+    qss: "7100"
   personal_exemption:
     single: "2700"
     mfj: "7400"
     mfs: "2700"
     hoh: "2700"
+    qss: "7400"
 
 rules:
   - id: "ga.2023.agi"
@@ -95,6 +97,13 @@ rules:
         - { lower: "3750", upper: "5250", rate: "0.04" }
         - { lower: "5250", upper: "7000", rate: "0.05" }
         - { lower: "7000", upper: null, rate: "0.0575" }
+      qss:
+        - { lower: "0", upper: "1000", rate: "0.01" }
+        - { lower: "1000", upper: "3000", rate: "0.02" }
+        - { lower: "3000", upper: "5000", rate: "0.03" }
+        - { lower: "5000", upper: "7000", rate: "0.04" }
+        - { lower: "7000", upper: "10000", rate: "0.05" }
+        - { lower: "10000", upper: null, rate: "0.0575" }
 
   - id: "ga.2023.withholding"
     description: "Total Georgia tax withheld"

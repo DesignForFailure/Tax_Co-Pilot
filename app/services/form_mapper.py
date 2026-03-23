@@ -63,7 +63,8 @@ def map_return_run(run: ReturnRun) -> FormPacket:
     for trace in run.trace:
         if not trace.form_line:
             continue
-        value = Decimal(str(trace.result.get("value", "0")))
+        raw_val = trace.result.get("value")
+        value = Decimal(str(raw_val)) if raw_val is not None else Decimal("0")
         target = _FORM_LINE_MAP.get(trace.form_line)
         if target:
             form_name, field_name = target

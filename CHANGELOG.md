@@ -29,6 +29,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - **Security: Upload size cap on rule pack import** — Rule pack file uploads are now limited to 2 MiB per file.
 - **Compliance: SPDX license headers** — Added `# SPDX-License-Identifier: AGPL-3.0-or-later` to 28 Python source files that were missing the machine-readable identifier.
 - **Cleanup: Removed garbage file** — Deleted accidental file in repo root (mypy error message saved as filename).
+- **Edge case: `_safe_eval` misparse of nested `max()`/`min()`** — Bracket-matching now uses depth tracking instead of `endswith(")")`, which broke on expressions like `max(a, b) + c`.
+- **Edge case: Backup route missing WAL checkpoint** — `GET /backup` now runs `PRAGMA wal_checkpoint(TRUNCATE)` before reading the DB file, ensuring all committed transactions are included.
+- **Edge case: Restore route overwrites DB on failure** — Restore now keeps a `.pre_restore_backup` copy and rolls back if `init_db()` fails on the restored file.
+- **Edge case: `_parse_money` rejects `$` prefix and unicode minus signs** — Dollar signs, en-dashes, em-dashes, and unicode minus (U+2212) are now normalized before parsing.
+- **Edge case: CSV BOM breaks import** — `csv_import.py` now strips UTF-8 BOM (`\ufeff`) that Excel adds by default on Windows.
+- **Edge case: Import returns crashes on non-UTF-8 files** — `POST /import-returns` now catches `UnicodeDecodeError` and returns 400.
+- **Edge case: Import returns gives opaque error on duplicate run IDs** — Duplicate runs are now detected and skipped with a clear error message instead of a SQLite PRIMARY KEY violation.
+- **Edge case: QSS filing status missing from state rule packs** — Added `qss` (Qualifying Surviving Spouse) entries to GA 2023, GA 2024, CA 2024, NY 2024, and template rule packs.
+- **Edge case: `form_mapper` crashes on `None` trace values** — `Decimal(str(None))` → now guards with explicit `None` check.
+- **Edge case: `verify_chain` silently skips empty hashes** — Runs with missing `integrity_hash` are now reported as `missing_hash` errors; chain propagation uses expected hash to avoid poisoning.
+- **Edge case: `rotate_key` connection leak on error** — SQLCipher connection in `rotate_key()` now wrapped in `try/finally` to ensure `conn.close()`.
+- **Edge case: Corrupted plaintext DB misclassified as encrypted** — `detect_encryption_state` now checks for SQLite magic bytes before assuming encryption, raising `RuntimeError` for corrupted files.
+- **Edge case: `annotate_run` silently succeeds for nonexistent runs** — Now returns 404 when run ID not found (backed by `update_run_annotation` returning `bool`).
+- **Edge case: Same-password key rotation allowed** — `/rotate-key` now rejects `new_password == current_password`.
+- **Edge case: `export_yaml` crashes on missing files** — Now raises `ValueError` if manifest or rules file not found.
+- **Edge case: `delete_rule` silently succeeds when rule not found** — Now raises `ValueError`.
+- **Edge case: Custom pack name validation missing** — `clone_pack`, `create_empty_pack`, and `import_yaml` now validate custom names (non-empty, no control chars, max 100 chars).
+- **Edge case: TOCTOU in `clone_pack`/`create_empty_pack`** — `mkdir(exist_ok=False)` race caught with `FileExistsError` handler.
+- **Edge case: `Content-Disposition` header unquoted filenames** — Backup and export routes now quote filenames per RFC 6266.
+- **Edge case: `save_return_run` missing ROLLBACK on error** — Transaction now wrapped in `try/except` with explicit `ROLLBACK`.
 
 ### Changed
 - Migrated from deprecated `@app.on_event("startup")` to lifespan context manager.

@@ -41,7 +41,7 @@ import sqlite3 as _sqlite3
 import tempfile
 import urllib.parse
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, closing
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, cast
@@ -76,6 +76,7 @@ from app.services.database import (
     clear_cached_password,
     delete_return_run,
     get_cached_password,
+    get_connection,
     get_return_run,
     init_db,
     list_return_runs,
@@ -253,8 +254,10 @@ def _parse_money(
     if not s:
         s = default
 
-    # Normalize common formatting
+    # Normalize common formatting: dollar signs, commas, unicode minus variants
+    s = s.lstrip("$").strip()
     s = s.replace(",", "")
+    s = s.replace("\u2212", "-").replace("\u2013", "-").replace("\u2014", "-")
 
     # Disallow exponent notation and leading plus for predictability
     if "e" in s.lower() or s.startswith("+"):
@@ -1025,14 +1028,16 @@ def unlock_submit(request: Request, password: str = Form(""), csrf_token: str = 
 
 
 @app.post("/runs/{run_id}/annotate")
-async def annotate_run(request: Request, run_id: str) -> RedirectResponse:
+async def annotate_run(request: Request, run_id: str) -> Response:
     fd = await request.form()
     _verify_csrf(request, str(fd.get("csrf_token", "")))
     tags = _form_str(fd, "tags")
     notes = str(fd.get("notes", "")).strip()
     if len(notes) > _MAX_NOTES:
         raise ValueError(f"Notes exceed {_MAX_NOTES} characters")
-    update_run_annotation(run_id, tags, notes)
+    found = update_run_annotation(run_id, tags, notes)
+    if not found:
+        return HTMLResponse(f"Run {run_id!r} not found", status_code=404)
     return RedirectResponse(url="/runs", status_code=303)
 
 
@@ -1060,9 +1065,13 @@ async def import_returns(request: Request) -> HTMLResponse:
     upload = fd.get("file")
     if not upload or not hasattr(upload, "read"):
         return HTMLResponse("No file uploaded", status_code=400)
-    content = (await upload.read()).decode("utf-8")
-    if len(content.encode("utf-8")) > _MAX_IMPORT_BYTES:
+    raw_bytes = await upload.read()
+    if len(raw_bytes) > _MAX_IMPORT_BYTES:
         return HTMLResponse(f"File too large (max {_MAX_IMPORT_BYTES // (1024*1024)} MB)", status_code=400)
+    try:
+        content = raw_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        return HTMLResponse("File must be UTF-8 encoded JSON", status_code=400)
     try:
         entries = json.loads(content)
     except json.JSONDecodeError as e:
@@ -1083,6 +1092,11 @@ async def import_returns(request: Request) -> HTMLResponse:
                     errors.append(f"Entry {i}: checksum mismatch (pack may differ)")
                     continue
             run_dict = json.loads(run.model_dump_json())
+            # Skip runs that already exist (avoids opaque PRIMARY KEY errors)
+            existing = get_return_run(run.id)
+            if existing:
+                errors.append(f"Entry {i}: run {run.id!r} already exists, skipped")
+                continue
             save_return_run(run_dict)
             imported += 1
         except Exception as e:
@@ -1097,10 +1111,16 @@ async def import_returns(request: Request) -> HTMLResponse:
 def backup_database() -> Response:
     if not DB_PATH.exists():
         return HTMLResponse("No database file found", status_code=404)
+    # Checkpoint WAL to ensure backup includes all committed transactions
+    try:
+        with closing(get_connection()) as conn:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    except Exception:
+        pass  # Best-effort; raw read still works for non-WAL DBs
     return Response(
         content=DB_PATH.read_bytes(),
         media_type="application/octet-stream",
-        headers={"Content-Disposition": f"attachment; filename={DB_PATH.name}"},
+        headers={"Content-Disposition": f'attachment; filename="{DB_PATH.name}"'},
     )
 
 
@@ -1131,15 +1151,26 @@ async def restore_database(request: Request) -> Response:
     finally:
         Path(tmp_path).unlink(missing_ok=True)
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # Keep a safety copy so we can rollback if init_db fails on the restored file
+    backup_copy = DB_PATH.with_suffix(".pre_restore_backup") if DB_PATH.exists() else None
+    if backup_copy:
+        import shutil as _shutil_restore
+        _shutil_restore.copy2(DB_PATH, backup_copy)
     DB_PATH.write_bytes(content)
     try:
         init_db()
     except Exception as e:
+        # Rollback: restore the original database
+        if backup_copy and backup_copy.exists():
+            backup_copy.rename(DB_PATH)
         return HTMLResponse(
-            f"Database restored but failed to initialize: {e}. "
+            f"Restore failed — original database has been preserved. Error: {e}. "
             "If the backup is encrypted, ensure the same password is active.",
-            status_code=500,
+            status_code=400,
         )
+    # Success — clean up safety copy
+    if backup_copy and backup_copy.exists():
+        backup_copy.unlink(missing_ok=True)
     return RedirectResponse(url="/runs", status_code=303)
 
 
@@ -1179,6 +1210,11 @@ async def rotate_key_submit(request: Request) -> RedirectResponse:
     if not secrets.compare_digest(current_password, get_cached_password() or ""):
         return RedirectResponse(
             url=f"/rotate-key?error={urllib.parse.quote_plus('Current password is incorrect')}",
+            status_code=303,
+        )
+    if secrets.compare_digest(current_password, new_password):
+        return RedirectResponse(
+            url=f"/rotate-key?error={urllib.parse.quote_plus('New password must differ from current password')}",
             status_code=303,
         )
 
@@ -1363,13 +1399,16 @@ async def rule_pack_validate(
 def rule_pack_export(
     request: Request, jurisdiction: str, year: int, variant: str
 ) -> Response:
-    manifest_bytes, rules_bytes = export_yaml(jurisdiction, year, variant)
+    try:
+        manifest_bytes, rules_bytes = export_yaml(jurisdiction, year, variant)
+    except ValueError as exc:
+        return HTMLResponse(str(exc), status_code=404)
     combined = b"# === MANIFEST ===\n" + manifest_bytes + b"\n# === RULES ===\n" + rules_bytes
     filename = f"{jurisdiction}_{year}_{variant}.yaml"
     return Response(
         content=combined,
         media_type="application/x-yaml",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

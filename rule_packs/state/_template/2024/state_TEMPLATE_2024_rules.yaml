@@ -53,6 +53,7 @@ constants:
     mfj: "0"
     mfs: "0"
     hoh: "0"
+    qss: "0"
 
   # Add more constant tables as needed for your state, e.g.:
   # personal_exemption:

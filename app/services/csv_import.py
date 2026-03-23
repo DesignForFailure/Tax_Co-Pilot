@@ -51,7 +51,10 @@ def _money(
     if not raw:
         raw = "0"
 
+    # Normalize dollar signs, commas, unicode minus variants
+    raw = raw.lstrip("$").strip()
     raw = raw.replace(",", "")
+    raw = raw.replace("\u2212", "-").replace("\u2013", "-").replace("\u2014", "-")
 
     if "e" in raw.lower() or raw.startswith("+"):
         raise ValueError(f"Invalid money: {s!r}")
@@ -89,7 +92,8 @@ def import_csv(csv_text: str, record_type: str) -> tuple[list[BaseModel], list[s
     errors: list[str] = []
     records: list[BaseModel] = []
 
-    reader = csv.DictReader(io.StringIO(csv_text or ""))
+    # Strip UTF-8 BOM (Excel default CSV export on Windows)
+    reader = csv.DictReader(io.StringIO((csv_text or "").lstrip("\ufeff")))
     for idx, row in enumerate(reader, start=2):  # header is line 1
         try:
             if record_type == "W2":

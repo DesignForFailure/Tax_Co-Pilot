@@ -255,36 +255,40 @@ def save_return_run(run_data: dict) -> None:
         # Atomic read-then-insert prevents concurrent saves from
         # duplicating previous_hash in the integrity chain.
         conn.execute("BEGIN IMMEDIATE")
-        row = conn.execute(
-            "SELECT integrity_hash FROM return_runs ORDER BY created_at DESC, rowid DESC LIMIT 1"
-        ).fetchone()
-        previous_hash = row["integrity_hash"] if row else ""
-        conn.execute(
-            """INSERT INTO return_runs
-               (id, tax_year, filing_status, scenario_name,
-                rule_pack_version, rule_pack_checksum,
-                input_snapshot_json, output_json, trace_json, state_outputs_json,
-                created_at, tags, notes, integrity_hash, previous_hash)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                run_data["id"],
-                run_data["tax_year"],
-                run_data["filing_status"],
-                run_data.get("scenario_name", "baseline"),
-                run_data["rule_pack_version"],
-                run_data["rule_pack_checksum"],
-                json.dumps(run_data["input_snapshot"], ensure_ascii=False),
-                json.dumps(run_data["output"], ensure_ascii=False),
-                json.dumps(run_data["trace"], ensure_ascii=False),
-                json.dumps(run_data.get("state_outputs", []), ensure_ascii=False),
-                run_data["created_at"],
-                run_data.get("tags", ""),
-                run_data.get("notes", ""),
-                integrity_hash,
-                previous_hash,
-            ),
-        )
-        conn.execute("COMMIT")
+        try:
+            row = conn.execute(
+                "SELECT integrity_hash FROM return_runs ORDER BY created_at DESC, rowid DESC LIMIT 1"
+            ).fetchone()
+            previous_hash = row["integrity_hash"] if row else ""
+            conn.execute(
+                """INSERT INTO return_runs
+                   (id, tax_year, filing_status, scenario_name,
+                    rule_pack_version, rule_pack_checksum,
+                    input_snapshot_json, output_json, trace_json, state_outputs_json,
+                    created_at, tags, notes, integrity_hash, previous_hash)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    run_data["id"],
+                    run_data["tax_year"],
+                    run_data["filing_status"],
+                    run_data.get("scenario_name", "baseline"),
+                    run_data["rule_pack_version"],
+                    run_data["rule_pack_checksum"],
+                    json.dumps(run_data["input_snapshot"], ensure_ascii=False),
+                    json.dumps(run_data["output"], ensure_ascii=False),
+                    json.dumps(run_data["trace"], ensure_ascii=False),
+                    json.dumps(run_data.get("state_outputs", []), ensure_ascii=False),
+                    run_data["created_at"],
+                    run_data.get("tags", ""),
+                    run_data.get("notes", ""),
+                    integrity_hash,
+                    previous_hash,
+                ),
+            )
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
 
 
 def list_return_runs(tax_year: int | None = None) -> list[dict]:
@@ -317,13 +321,14 @@ def delete_return_run(run_id: str) -> None:
         conn.execute("DELETE FROM return_runs WHERE id = ?", (run_id,))
 
 
-def update_run_annotation(run_id: str, tags: str, notes: str) -> None:
-    """Update tags and notes for an existing run."""
+def update_run_annotation(run_id: str, tags: str, notes: str) -> bool:
+    """Update tags and notes for an existing run. Returns True if found."""
     with closing(get_connection()) as conn:
-        conn.execute(
+        cursor = conn.execute(
             "UPDATE return_runs SET tags = ?, notes = ? WHERE id = ?",
             (tags, notes, run_id),
         )
+        return cursor.rowcount > 0
 
 
 def verify_chain() -> list[dict]:
@@ -364,7 +369,12 @@ def verify_chain() -> list[dict]:
             "rule_pack_checksum": row["rule_pack_checksum"],
         }
         expected_hash = _compute_integrity_hash(run_data)
-        if stored_hash and stored_hash != expected_hash:
+        if not stored_hash:
+            errors.append({
+                "id": run_id,
+                "error": "missing_hash",
+            })
+        elif stored_hash != expected_hash:
             errors.append({
                 "id": run_id,
                 "error": "tampered",
@@ -372,6 +382,7 @@ def verify_chain() -> list[dict]:
                 "actual_hash": stored_hash,
             })
 
-        prev_hash = stored_hash
+        # Propagate expected hash so one bad row doesn't poison the chain
+        prev_hash = expected_hash if stored_hash else stored_hash
 
     return errors

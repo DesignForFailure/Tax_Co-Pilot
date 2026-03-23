@@ -44,6 +44,17 @@ _RULE_ID_RE = re.compile(r"^[a-z]{2,10}\.\d{4}\.[a-z0-9_.]+$")
 _FEDERAL_JURISDICTIONS = {"federal", "fed"}
 
 
+def _validate_custom_name(name: str) -> None:
+    """Reject empty or control-character-containing custom names."""
+    stripped = name.strip()
+    if not stripped:
+        raise ValueError("Custom name must not be empty")
+    if any(ord(c) < 32 for c in stripped):
+        raise ValueError("Custom name must not contain control characters")
+    if len(stripped) > 100:
+        raise ValueError("Custom name too long (max 100 characters)")
+
+
 def _validate_path_param(value: str, name: str) -> None:
     """Reject path traversal and invalid characters."""
     if ".." in value or "/" in value or "\\" in value:
@@ -69,6 +80,11 @@ def _pack_path(
     _validate_path_param(jurisdiction, "jurisdiction")
     _validate_path_param(variant, "variant")
     _validate_year(year)
+
+    if not _JURISDICTION_RE.match(jurisdiction):
+        raise ValueError(f"Invalid jurisdiction: {jurisdiction!r}")
+    if variant != "standard" and not _VARIANT_RE.match(variant):
+        raise ValueError(f"Invalid variant: {variant!r}")
 
     j = jurisdiction.lower()
     if j in _FEDERAL_JURISDICTIONS:
@@ -252,6 +268,10 @@ def export_yaml(
         candidates2 = [c for c in pack_dir.glob("*rules*.yaml") if "manifest" not in c.name]
         if candidates2:
             rules_path = candidates2[0]
+    if not manifest_path.exists():
+        raise ValueError(f"Manifest file not found in {pack_dir}")
+    if not rules_path.exists():
+        raise ValueError(f"Rules file not found in {pack_dir}")
     return manifest_path.read_bytes(), rules_path.read_bytes()
 
 
@@ -289,6 +309,7 @@ def clone_pack(
     base_dir: Path | None = None,
 ) -> PackInfo:
     """Clone a pack into a new custom variant with auto-incremented version."""
+    _validate_custom_name(custom_name)
     source_dir = _pack_path(jurisdiction, year, source_variant, base_dir=base_dir)
     if not source_dir.exists():
         raise ValueError(f"Source pack not found: {source_dir}")
@@ -299,7 +320,12 @@ def clone_pack(
     variant = f"custom_v{version}"
 
     target_dir = parent_dir / variant
-    target_dir.mkdir(parents=True, exist_ok=False)
+    try:
+        target_dir.mkdir(parents=True, exist_ok=False)
+    except FileExistsError:
+        raise ValueError(
+            "A custom pack is being created concurrently; please try again."
+        ) from None
 
     # Copy rules file
     source_rules = None
@@ -346,6 +372,7 @@ def create_empty_pack(
     jurisdiction: str, year: int, custom_name: str, *, base_dir: Path | None = None
 ) -> PackInfo:
     """Create a new custom pack with an empty rule list."""
+    _validate_custom_name(custom_name)
     parent_dir = _pack_path(jurisdiction, year, "standard", base_dir=base_dir)
     if not parent_dir.exists():
         parent_dir.mkdir(parents=True, exist_ok=True)
@@ -353,7 +380,12 @@ def create_empty_pack(
     version = _next_custom_version(parent_dir)
     variant = f"custom_v{version}"
     target_dir = parent_dir / variant
-    target_dir.mkdir(parents=True, exist_ok=False)
+    try:
+        target_dir.mkdir(parents=True, exist_ok=False)
+    except FileExistsError:
+        raise ValueError(
+            "A custom pack is being created concurrently; please try again."
+        ) from None
 
     j_lower = jurisdiction.lower()
     manifest: dict[str, Any] = {
@@ -449,7 +481,10 @@ def delete_rule(
     rules_yaml = _read_yaml(rules_path)
     rule_list: list[dict[str, Any]] = rules_yaml.get("rules", []) or []
 
-    rules_yaml["rules"] = [r for r in rule_list if r.get("id") != rule_id]
+    filtered = [r for r in rule_list if r.get("id") != rule_id]
+    if len(filtered) == len(rule_list):
+        raise ValueError(f"Rule {rule_id!r} not found in pack")
+    rules_yaml["rules"] = filtered
     _atomic_write_yaml(rules_path, rules_yaml)
 
 
@@ -476,6 +511,7 @@ def import_yaml(
 
     Validates via RulePack.load() before committing. Raises ValueError on failure.
     """
+    _validate_custom_name(custom_name)
     manifest: Any = yaml.safe_load(manifest_bytes)
     if not isinstance(manifest, dict):
         raise ValueError("Manifest must be a YAML mapping")

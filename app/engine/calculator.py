@@ -512,11 +512,23 @@ class CalculationEngine:
         expr = expr.strip()
 
         for func in ("max", "min"):
-            if expr.startswith(f"{func}(") and expr.endswith(")"):
-                inner = expr[len(func) + 1 : -1]
-                args = self._split_args(inner)
-                vals = [self._safe_eval(a.strip(), variables) for a in args]
-                return max(vals) if func == "max" else min(vals)
+            if expr.startswith(f"{func}("):
+                # Verify the closing ) matches the opening ( of this call
+                depth = 0
+                match_end = -1
+                for _i, _ch in enumerate(expr[len(func):]):
+                    if _ch == "(":
+                        depth += 1
+                    elif _ch == ")":
+                        depth -= 1
+                        if depth == 0:
+                            match_end = len(func) + _i
+                            break
+                if match_end == len(expr) - 1:
+                    inner = expr[len(func) + 1 : -1]
+                    args = self._split_args(inner)
+                    vals = [self._safe_eval(a.strip(), variables) for a in args]
+                    return max(vals) if func == "max" else min(vals)
 
         return self._eval_additive(expr, variables)
 
@@ -594,11 +606,23 @@ class CalculationEngine:
             return self._eval_atom(expr[1:], variables)
 
         for func in ("max", "min"):
-            if expr.startswith(f"{func}(") and expr.endswith(")"):
-                inner = expr[len(func) + 1 : -1]
-                args = self._split_args(inner)
-                vals = [self._safe_eval(a.strip(), variables) for a in args]
-                return max(vals) if func == "max" else min(vals)
+            if expr.startswith(f"{func}("):
+                # Verify the closing ) matches the opening ( of this call
+                depth = 0
+                match_end = -1
+                for _i, _ch in enumerate(expr[len(func):]):
+                    if _ch == "(":
+                        depth += 1
+                    elif _ch == ")":
+                        depth -= 1
+                        if depth == 0:
+                            match_end = len(func) + _i
+                            break
+                if match_end == len(expr) - 1:
+                    inner = expr[len(func) + 1 : -1]
+                    args = self._split_args(inner)
+                    vals = [self._safe_eval(a.strip(), variables) for a in args]
+                    return max(vals) if func == "max" else min(vals)
 
         if expr.startswith("(") and expr.endswith(")"):
             return self._eval_additive(expr[1:-1], variables)
