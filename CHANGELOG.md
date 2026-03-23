@@ -9,6 +9,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Added
+- **Milestone 12 — Rule Pack Editor (complete):** GUI-based rule pack management system. Create, edit, clone, import, and export YAML rule packs via web UI. Standard packs are read-only; custom variants stored in `custom_vN/` subdirectories. Type-adaptive rule editor for sum, formula, lookup, and bracket_table rules with inline bracket table editing. Calculate form integration with variant selector dropdown. Full validation via `RulePack.load()` on every save. CSRF-protected POST routes. Path traversal protection on all route parameters.
+- `app/services/rule_pack_editor.py`: CRUD service for rule packs (list, load, clone, create, save, delete, validate, import, export).
+- Rule Pack Manager page (`GET /rule-packs`) with grouped pack table, inline create form, and export/delete actions.
+- Pack Detail page with metadata card, rule list, validation results, and clone/export/delete actions.
+- Type-adaptive Rule Editor page with dynamic form sections for all four rule types.
+- YAML Import page (`GET /rule-packs/import`) with file upload and `RulePack.load()` validation.
+- "Rule Pack Variant" dropdown on calculate form for selecting custom federal packs.
+- `tests/test_rule_pack_editor.py`: 24 service-layer unit tests.
+- `tests/test_rule_pack_routes.py`: 15 route integration tests with test cleanup fixture.
 - **Hardening, QA & Auditability pass (complete):** Fixed SQL injection in SQLCipher PRAGMA, `tax_year` validation, unary negation in rule expressions, `hybrid_factory` consistency, URL-encoded error redirects, upload size limits with SQLite integrity validation, input sanitization (tags/notes caps, filename sanitization, export fallback). Added tamper-evident hash chain (`integrity_hash`, `previous_hash`) with `GET /audit/verify`. Key rotation via `POST /rotate-key` with `PRAGMA rekey`. Password cache clearing on shutdown. Explicit cipher parameters. CSRF token rotation after authentication. Made `pip-audit` blocking in CI.
 
 ### Changed

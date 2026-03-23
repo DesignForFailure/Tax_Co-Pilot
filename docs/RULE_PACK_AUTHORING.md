@@ -502,3 +502,25 @@ The validator runs the same `RulePack.load()` call the engine uses, so a pack th
 | `rule_packs/state/TX/2024/`       | No income tax                            | Minimal stub: zero tax, withholding sum, refund of over-withheld amounts |
 
 For adding a new state specifically, see `docs/STATE_AUTHORING_GUIDE.md`, which covers required rule IDs, the state template, and integration testing patterns.
+
+---
+
+## Importing Rule Packs from GitHub
+
+To manually import rule packs from the Tax Co-Pilot GitHub repository:
+
+1. Clone or download the repository:
+   ```bash
+   git clone https://github.com/your-org/Tax_Co-Pilot.git /tmp/tax-co-pilot
+   ```
+
+2. Copy the desired rule pack directory into your local installation:
+   ```bash
+   cp -r /tmp/tax-co-pilot/rule_packs/federal/2024/ ./rule_packs/federal/2024/
+   ```
+
+3. Restart the application to pick up the new packs.
+
+Alternatively, use the web UI's **Import** feature (Rule Packs > Import YAML) to upload individual manifest + rules YAML files.
+
+**Future enhancement:** A CLI helper script for automated GitHub import.

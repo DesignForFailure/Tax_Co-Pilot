@@ -48,7 +48,7 @@ from typing import Any, cast
 from fastapi import FastAPI, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
-from starlette.datastructures import FormData
+from starlette.datastructures import FormData, UploadFile
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import config as encryption_config
@@ -91,6 +91,24 @@ from app.services.encryption import (
     rotate_key,
     set_password_in_keyring,
     validate_password,
+)
+from app.services.rule_pack_editor import (
+    clone_pack,
+    create_empty_pack,
+    delete_pack,
+    delete_rule,
+    export_yaml,
+    load_pack_detail,
+    save_rule,
+)
+from app.services.rule_pack_editor import (
+    import_yaml as import_rule_yaml,
+)
+from app.services.rule_pack_editor import (
+    list_all_packs as list_rule_packs,
+)
+from app.services.rule_pack_editor import (
+    validate_pack as validate_rule_pack,
 )
 
 # ─── FastAPI app and basic hardening ───────────────────────────
@@ -156,6 +174,15 @@ STATE_PACKS_DIR = BASE_DIR / "rule_packs" / "state"
 # Cache: year -> loaded RulePack / state dict
 _federal_cache: dict[int, RulePack] = {}
 _state_cache: dict[int, dict[str, RulePack]] = {}
+
+
+def _bust_pack_cache(jurisdiction: str, year: int) -> None:
+    """Remove cached packs so next load reads from disk."""
+    j = jurisdiction.lower()
+    if j in {"federal", "fed"}:
+        _federal_cache.pop(year, None)
+    else:
+        _state_cache.pop(year, None)
 
 
 def _discover_available_years() -> list[int]:
@@ -352,7 +379,7 @@ def dashboard(request: Request) -> Response:
             run = _load_run_from_row(run_data)
 
     csrf = _get_csrf_token(request)
-    resp = templates.TemplateResponse("pages/dashboard.html", {"request": request, "run": run})
+    resp = templates.TemplateResponse(request, "pages/dashboard.html", {"run": run})
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return resp
 
@@ -360,9 +387,16 @@ def dashboard(request: Request) -> Response:
 @app.get("/calculate", response_class=HTMLResponse)
 def calculate_form(request: Request) -> HTMLResponse:
     csrf = _get_csrf_token(request)
-    resp = templates.TemplateResponse(
+    all_packs = list_rule_packs()
+    resp = templates.TemplateResponse(request, 
         "pages/calculate.html",
-        {"request": request, "csrf": csrf, "available_years": available_years, "available_states": sorted(_get_state_packs(max(available_years)).keys()) if available_years else []},
+        {
+            
+            "csrf": csrf,
+            "available_years": available_years,
+            "available_states": sorted(_get_state_packs(max(available_years)).keys()) if available_years else [],
+            "pack_variants": all_packs,
+        },
     )
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return resp
@@ -394,6 +428,75 @@ def _form_str(fd: FormData, key: str, default: str = "") -> str:
 
 def _form_money(fd: FormData, key: str, default: str = "0") -> Decimal:
     return _parse_money(str(fd.get(key, default) or default), allow_negative=False)
+
+
+def _parse_rule_form(fd: FormData) -> dict[str, Any]:
+    """Parse the rule editor form into a rule dict for YAML storage."""
+    rule_id = _form_str(fd, "rule_id")
+    rule_type = _form_str(fd, "rule_type")
+    description = _form_str(fd, "description")
+    form_line = _form_str(fd, "form_line")
+
+    rule: dict[str, Any] = {
+        "id": rule_id,
+        "type": rule_type,
+        "description": description,
+    }
+    if form_line:
+        rule["form_line"] = form_line
+
+    if rule_type == "sum":
+        items_ref = _form_str(fd, "sum_items_ref")
+        rule["inputs"] = {"items": {"ref": items_ref}}
+
+    elif rule_type == "formula":
+        rule["expression"] = _form_str(fd, "expression")
+        inputs: dict[str, Any] = {}
+        i = 0
+        while True:
+            name = str(fd.get(f"input_name_{i}", "") or "").strip()
+            if not name:
+                break
+            itype = str(fd.get(f"input_type_{i}", "ref") or "ref").strip()
+            ival = str(fd.get(f"input_value_{i}", "") or "").strip()
+            if itype == "literal":
+                inputs[name] = {"literal": ival}
+            else:
+                inputs[name] = {"ref": ival}
+            i += 1
+        rule["inputs"] = inputs
+
+    elif rule_type == "lookup":
+        rule["table"] = _form_str(fd, "lookup_table")
+        key_ref = _form_str(fd, "lookup_key_ref")
+        rule["key"] = {"ref": key_ref}
+
+    elif rule_type == "bracket_table":
+        input_ref = _form_str(fd, "bracket_input_ref")
+        key_ref = _form_str(fd, "bracket_key_ref")
+        rule["input"] = {"ref": input_ref}
+        rule["key"] = {"ref": key_ref}
+        tables: dict[str, list[dict[str, str | None]]] = {}
+        for status in ("single", "mfj", "mfs", "hoh", "qss"):
+            brackets: list[dict[str, str | None]] = []
+            row = 0
+            while True:
+                lower = str(fd.get(f"bracket_{status}_{row}_lower", "") or "").strip()
+                if not lower and row > 0:
+                    break
+                if not lower:
+                    row += 1
+                    continue
+                upper = str(fd.get(f"bracket_{status}_{row}_upper", "") or "").strip() or None
+                rate = str(fd.get(f"bracket_{status}_{row}_rate", "") or "").strip()
+                brackets.append({"lower": lower, "upper": upper, "rate": rate})
+                row += 1
+            if brackets:
+                tables[status] = brackets
+        if tables:
+            rule["tables"] = tables
+
+    return rule
 
 
 def _collect_indices(fd: FormData, prefix: str) -> list[int]:
@@ -591,7 +694,16 @@ async def calculate_submit(request: Request) -> RedirectResponse:
     residence = str(fd.get("state_of_residence", "")).strip().upper()
     if residence:
         states_needed.add(residence)
-    fed_pack = _get_federal_pack(inputs.tax_year)
+    pack_variant = _form_str(fd, "pack_variant") or "standard"
+    if pack_variant != "standard":
+        from app.services.rule_pack_editor import _pack_path
+        fed_custom_dir = _pack_path("federal", inputs.tax_year, pack_variant)
+        if fed_custom_dir.exists():
+            fed_pack = RulePack.load(fed_custom_dir)
+        else:
+            fed_pack = _get_federal_pack(inputs.tax_year)
+    else:
+        fed_pack = _get_federal_pack(inputs.tax_year)
     year_state_packs = _get_state_packs(inputs.tax_year)
     active_state_packs = {
         s: year_state_packs[s] for s in states_needed if s in year_state_packs
@@ -609,8 +721,8 @@ async def calculate_submit(request: Request) -> RedirectResponse:
 def past_runs(request: Request) -> Response:
     runs = list_return_runs()
     csrf = _get_csrf_token(request)
-    resp = templates.TemplateResponse(
-        "pages/runs.html", {"request": request, "runs": runs, "csrf": csrf}
+    resp = templates.TemplateResponse(request, 
+        "pages/runs.html", {"runs": runs, "csrf": csrf}
     )
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return resp
@@ -663,10 +775,10 @@ def compare_runs(request: Request, a: str = "", b: str = "") -> Response:
                 "is_refund_field": field == "refund_or_owed",
             }
         )
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(request, 
         "pages/run_compare.html",
         {
-            "request": request,
+            
             "run_a": run_a,
             "run_b": run_b,
             "output_diffs": output_diffs,
@@ -681,7 +793,7 @@ def view_run(request: Request, run_id: str) -> HTMLResponse:
         return HTMLResponse("Run not found", status_code=404)
 
     run = _load_run_from_row(run_data)
-    return templates.TemplateResponse("pages/dashboard.html", {"request": request, "run": run})
+    return templates.TemplateResponse(request, "pages/dashboard.html", {"run": run})
 
 
 # ─── What-If Comparison ──────────────────────────────────────
@@ -690,9 +802,9 @@ def view_run(request: Request, run_id: str) -> HTMLResponse:
 @app.get("/whatif", response_class=HTMLResponse)
 def whatif_form(request: Request) -> Response:
     csrf = _get_csrf_token(request)
-    resp = templates.TemplateResponse(
+    resp = templates.TemplateResponse(request, 
         "pages/whatif.html",
-        {"request": request, "csrf": csrf, "available_years": available_years},
+        {"csrf": csrf, "available_years": available_years},
     )
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return resp
@@ -706,10 +818,10 @@ async def whatif_submit(request: Request) -> Response:
     engine = WhatIfEngine(_get_federal_pack(inputs.tax_year))
     comparison = engine.compare_filing_status(inputs)
     csrf = _get_csrf_token(request)
-    resp = templates.TemplateResponse(
+    resp = templates.TemplateResponse(request, 
         "pages/whatif.html",
         {
-            "request": request,
+            
             "csrf": csrf,
             "comparison": comparison,
             "available_years": available_years,
@@ -726,8 +838,8 @@ async def whatif_submit(request: Request) -> Response:
 @app.get("/import-csv", response_class=HTMLResponse)
 def import_csv_form(request: Request) -> Response:
     csrf = _get_csrf_token(request)
-    resp = templates.TemplateResponse(
-        "pages/import_csv.html", {"request": request, "csrf": csrf}
+    resp = templates.TemplateResponse(request, 
+        "pages/import_csv.html", {"csrf": csrf}
     )
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return resp
@@ -742,10 +854,10 @@ async def import_csv_submit(request: Request) -> Response:
     records_raw, errors = _import_csv(csv_text, record_type)
     record_dicts = [r.model_dump() for r in records_raw]
     csrf = _get_csrf_token(request)
-    resp = templates.TemplateResponse(
+    resp = templates.TemplateResponse(request, 
         "pages/import_csv.html",
         {
-            "request": request,
+            
             "csrf": csrf,
             "records": record_dicts,
             "errors": errors,
@@ -803,8 +915,8 @@ def view_run_forms(request: Request, run_id: str) -> Response:
     from app.services.form_mapper import map_return_run
 
     packet = map_return_run(run)
-    return templates.TemplateResponse(
-        "pages/forms_view.html", {"request": request, "run": run, "packet": packet}
+    return templates.TemplateResponse(request, 
+        "pages/forms_view.html", {"run": run, "packet": packet}
     )
 
 
@@ -842,15 +954,15 @@ async def delete_run(request: Request, run_id: str) -> RedirectResponse:
 @app.get("/legal", response_class=HTMLResponse)
 def legal_notices(request: Request) -> HTMLResponse:
     """Display third-party license and legal notices."""
-    return templates.TemplateResponse("pages/legal.html", {"request": request})
+    return templates.TemplateResponse(request, "pages/legal.html", {})
 
 
 @app.get("/unlock", response_class=HTMLResponse)
 def unlock_form(request: Request, error: str | None = None) -> HTMLResponse:
     """Show password unlock form for encrypted database."""
     csrf = _get_csrf_token(request)
-    resp = templates.TemplateResponse(
-        "pages/unlock.html", {"request": request, "csrf": csrf, "error": error}
+    resp = templates.TemplateResponse(request, 
+        "pages/unlock.html", {"csrf": csrf, "error": error}
     )
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return resp
@@ -1034,9 +1146,9 @@ async def restore_database(request: Request) -> Response:
 def rotate_key_form(request: Request, error: str | None = None, success: str | None = None) -> Response:
     """Show key rotation form."""
     csrf = _get_csrf_token(request)
-    resp = templates.TemplateResponse(
+    resp = templates.TemplateResponse(request, 
         "pages/rotate_key.html",
-        {"request": request, "csrf": csrf, "error": error, "success": success},
+        {"csrf": csrf, "error": error, "success": success},
     )
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return resp
@@ -1094,6 +1206,290 @@ def audit_verify() -> Response:
         content=json.dumps({"status": status, "errors": errors}, indent=2),
         media_type="application/json",
     )
+
+
+# ── Rule Pack Editor routes ────────────────────────────────────
+# IMPORTANT: literal routes (/rule-packs/create, /rule-packs/import) MUST come
+# before the parameterized route /rule-packs/{jurisdiction}/... to avoid
+# FastAPI treating "create" or "import" as a jurisdiction path segment.
+
+
+@app.get("/rule-packs", response_class=HTMLResponse)
+def rule_packs_list(request: Request) -> HTMLResponse:
+    csrf = _get_csrf_token(request)
+    packs = list_rule_packs()
+    resp = templates.TemplateResponse(request, 
+        "pages/rule_packs.html",
+        {"csrf": csrf, "packs": packs, "available_years": available_years},
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+@app.post("/rule-packs/create")
+async def rule_packs_create(request: Request) -> RedirectResponse:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    jurisdiction = _form_str(fd, "jurisdiction")
+    year = int(_form_str(fd, "year") or "0")
+    custom_name = _form_str(fd, "custom_name")
+    info = create_empty_pack(jurisdiction, year, custom_name)
+    _bust_pack_cache(jurisdiction, year)
+    return RedirectResponse(
+        url=f"/rule-packs/{info.jurisdiction}/{info.year}/{info.variant}",
+        status_code=303,
+    )
+
+
+@app.get("/rule-packs/import", response_class=HTMLResponse)
+def rule_packs_import_form(request: Request) -> HTMLResponse:
+    """Render the YAML import form."""
+    csrf = _get_csrf_token(request)
+    resp = templates.TemplateResponse(request, 
+        "pages/rule_pack_import.html",
+        {"csrf": csrf, "error": None},
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+@app.post("/rule-packs/import", response_class=HTMLResponse)
+async def rule_packs_import_post(request: Request) -> Response:
+    """Handle YAML file upload and import as a new custom pack."""
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    custom_name = _form_str(fd, "custom_name")
+
+    manifest_field = fd.get("manifest_file")
+    rules_field = fd.get("rules_file")
+
+    csrf = _get_csrf_token(request)
+
+    def _render_error(msg: str) -> HTMLResponse:
+        resp = templates.TemplateResponse(request, 
+            "pages/rule_pack_import.html",
+            {"csrf": csrf, "error": msg},
+            status_code=400,
+        )
+        resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+        return resp
+
+    if not isinstance(manifest_field, UploadFile) or not isinstance(rules_field, UploadFile):
+        return _render_error("Both manifest_file and rules_file are required.")
+
+    manifest_bytes = await manifest_field.read()
+    rules_bytes = await rules_field.read()
+
+    try:
+        info = import_rule_yaml(manifest_bytes, rules_bytes, custom_name)
+    except ValueError as exc:
+        return _render_error(str(exc))
+
+    _bust_pack_cache(info.jurisdiction, info.year)
+    return RedirectResponse(
+        url=f"/rule-packs/{info.jurisdiction}/{info.year}/{info.variant}",
+        status_code=303,
+    )
+
+
+@app.get("/rule-packs/{jurisdiction}/{year}/{variant}", response_class=HTMLResponse)
+def rule_pack_detail(
+    request: Request, jurisdiction: str, year: int, variant: str
+) -> HTMLResponse:
+    csrf = _get_csrf_token(request)
+    detail = load_pack_detail(jurisdiction, year, variant)
+    resp = templates.TemplateResponse(request, 
+        "pages/rule_pack_detail.html",
+        {"csrf": csrf, "pack": detail},
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+@app.post("/rule-packs/{jurisdiction}/{year}/{variant}/clone")
+async def rule_pack_clone(
+    request: Request, jurisdiction: str, year: int, variant: str
+) -> RedirectResponse:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    custom_name = _form_str(fd, "custom_name")
+    info = clone_pack(jurisdiction, year, variant, custom_name)
+    _bust_pack_cache(jurisdiction, year)
+    return RedirectResponse(
+        url=f"/rule-packs/{info.jurisdiction}/{info.year}/{info.variant}",
+        status_code=303,
+    )
+
+
+@app.post("/rule-packs/{jurisdiction}/{year}/{variant}/delete")
+async def rule_pack_delete(
+    request: Request, jurisdiction: str, year: int, variant: str
+) -> RedirectResponse:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    delete_pack(jurisdiction, year, variant)
+    _bust_pack_cache(jurisdiction, year)
+    return RedirectResponse(url="/rule-packs", status_code=303)
+
+
+@app.post("/rule-packs/{jurisdiction}/{year}/{variant}/validate", response_class=HTMLResponse)
+async def rule_pack_validate(
+    request: Request, jurisdiction: str, year: int, variant: str
+) -> HTMLResponse:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    errors = validate_rule_pack(jurisdiction, year, variant)
+    detail = load_pack_detail(jurisdiction, year, variant)
+    csrf = _get_csrf_token(request)
+    resp = templates.TemplateResponse(request, 
+        "pages/rule_pack_detail.html",
+        {
+            
+            "csrf": csrf,
+            "pack": detail,
+            "validation_errors": errors,
+            "validated": True,
+        },
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+@app.get("/rule-packs/{jurisdiction}/{year}/{variant}/export")
+def rule_pack_export(
+    request: Request, jurisdiction: str, year: int, variant: str
+) -> Response:
+    manifest_bytes, rules_bytes = export_yaml(jurisdiction, year, variant)
+    combined = b"# === MANIFEST ===\n" + manifest_bytes + b"\n# === RULES ===\n" + rules_bytes
+    filename = f"{jurisdiction}_{year}_{variant}.yaml"
+    return Response(
+        content=combined,
+        media_type="application/x-yaml",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@app.get("/rule-packs/{jurisdiction}/{year}/{variant}/rules/add", response_class=HTMLResponse)
+def rule_add_form(request: Request, jurisdiction: str, year: int, variant: str) -> HTMLResponse:
+    csrf = _get_csrf_token(request)
+    detail = load_pack_detail(jurisdiction, year, variant)
+    id_prefix = "fed." if jurisdiction.lower() in {"federal", "fed"} else f"{jurisdiction.lower()}."
+    id_prefix += f"{year}."
+    resp = templates.TemplateResponse(request, 
+        "pages/rule_editor.html",
+        {
+            
+            "csrf": csrf,
+            "pack": detail,
+            "rule": None,
+            "is_new": True,
+            "id_prefix": id_prefix,
+        },
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+@app.post("/rule-packs/{jurisdiction}/{year}/{variant}/rules/add")
+async def rule_add_submit(request: Request, jurisdiction: str, year: int, variant: str) -> Response:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    rule_data = _parse_rule_form(fd)
+    try:
+        save_rule(jurisdiction, year, variant, rule_data["id"], rule_data)
+        _bust_pack_cache(jurisdiction, year)
+        return RedirectResponse(
+            url=f"/rule-packs/{jurisdiction}/{year}/{variant}",
+            status_code=303,
+        )
+    except ValueError as exc:
+        csrf = _get_csrf_token(request)
+        detail = load_pack_detail(jurisdiction, year, variant)
+        resp = templates.TemplateResponse(request, 
+            "pages/rule_editor.html",
+            {
+                
+                "csrf": csrf,
+                "pack": detail,
+                "rule": rule_data,
+                "is_new": True,
+                "error": str(exc),
+                "id_prefix": "",
+            },
+        )
+        resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+        return resp
+
+
+@app.get("/rule-packs/{jurisdiction}/{year}/{variant}/rules/{rule_id}", response_class=HTMLResponse)
+def rule_edit_form(
+    request: Request, jurisdiction: str, year: int, variant: str, rule_id: str
+) -> HTMLResponse:
+    csrf = _get_csrf_token(request)
+    detail = load_pack_detail(jurisdiction, year, variant)
+    rule = next((r for r in detail["rules"] if r["id"] == rule_id), None)
+    if rule is None:
+        return HTMLResponse(content="Rule not found", status_code=404)
+    resp = templates.TemplateResponse(request, 
+        "pages/rule_editor.html",
+        {
+            
+            "csrf": csrf,
+            "pack": detail,
+            "rule": rule,
+            "is_new": False,
+            "id_prefix": "",
+        },
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+@app.post("/rule-packs/{jurisdiction}/{year}/{variant}/rules/{rule_id}/delete")
+async def rule_delete_submit(
+    request: Request, jurisdiction: str, year: int, variant: str, rule_id: str
+) -> RedirectResponse:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    delete_rule(jurisdiction, year, variant, rule_id)
+    _bust_pack_cache(jurisdiction, year)
+    return RedirectResponse(
+        url=f"/rule-packs/{jurisdiction}/{year}/{variant}",
+        status_code=303,
+    )
+
+
+@app.post("/rule-packs/{jurisdiction}/{year}/{variant}/rules/{rule_id}")
+async def rule_save_submit(
+    request: Request, jurisdiction: str, year: int, variant: str, rule_id: str
+) -> Response:
+    fd = await request.form()
+    _verify_csrf(request, str(fd.get("csrf_token", "")))
+    rule_data = _parse_rule_form(fd)
+    try:
+        save_rule(jurisdiction, year, variant, rule_id, rule_data)
+        _bust_pack_cache(jurisdiction, year)
+        return RedirectResponse(
+            url=f"/rule-packs/{jurisdiction}/{year}/{variant}",
+            status_code=303,
+        )
+    except ValueError as exc:
+        csrf = _get_csrf_token(request)
+        detail = load_pack_detail(jurisdiction, year, variant)
+        resp = templates.TemplateResponse(request, 
+            "pages/rule_editor.html",
+            {
+                
+                "csrf": csrf,
+                "pack": detail,
+                "rule": rule_data,
+                "is_new": False,
+                "error": str(exc),
+                "id_prefix": "",
+            },
+        )
+        resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+        return resp
 
 
 @app.exception_handler(ValueError)

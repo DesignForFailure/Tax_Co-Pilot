@@ -1,0 +1,81 @@
+{% extends "layouts/base.html" %}
+{% block title %}Rule Packs{% endblock %}
+{% block content %}
+<h1 style="font-size: 24px; margin-bottom: 8px;">Rule Pack Manager</h1>
+<p class="text-dim text-sm mb-4">Browse, clone, validate, and export tax rule packs. Standard packs are read-only; clone to create a custom variant.</p>
+
+<div class="card" style="margin-bottom:20px;">
+  <div style="display:flex;gap:12px;align-items:center;">
+    <button type="button" class="btn" onclick="var f=document.getElementById('create-form');f.style.display=f.style.display==='none'?'block':'none';">Create Custom Pack</button>
+    <a href="/rule-packs/import" class="btn btn-outline">Import YAML</a>
+  </div>
+  <form id="create-form" method="POST" action="/rule-packs/create" style="display:none;margin-top:16px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <div class="form-row-3">
+      <div>
+        <label>Jurisdiction</label>
+        <select name="jurisdiction">
+          <option value="federal">Federal</option>
+          <option value="CA">California (CA)</option>
+          <option value="NY">New York (NY)</option>
+          <option value="GA">Georgia (GA)</option>
+        </select>
+      </div>
+      <div>
+        <label>Year</label>
+        <input type="number" name="year" value="2024" min="2000" max="2099">
+      </div>
+      <div>
+        <label>Custom Name</label>
+        <input type="text" name="custom_name" required placeholder="e.g. high_deduction">
+      </div>
+    </div>
+    <button type="submit" class="btn" style="margin-top:8px;">Create</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>All Rule Packs</h2>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);color:var(--text-dim);">Jurisdiction</th>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);color:var(--text-dim);">Year</th>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);color:var(--text-dim);">Variant</th>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);color:var(--text-dim);">Type</th>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);color:var(--text-dim);">Version</th>
+          <th style="text-align:right;padding:8px;border-bottom:1px solid var(--border);color:var(--text-dim);">Rules</th>
+          <th style="text-align:right;padding:8px;border-bottom:1px solid var(--border);color:var(--text-dim);">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for pack in packs %}
+        <tr style="border-top:1px solid var(--border);">
+          <td style="padding:8px;">{{ pack.jurisdiction | upper }}{% if pack.custom_name %} <small class="text-dim">({{ pack.custom_name }})</small>{% endif %}</td>
+          <td style="padding:8px;">{{ pack.year }}</td>
+          <td style="padding:8px;"><code>{{ pack.variant }}</code></td>
+          <td style="padding:8px;">{% if pack.is_custom %}<span style="color:var(--orange);">Custom</span>{% else %}<span class="text-dim">Standard</span>{% endif %}</td>
+          <td style="padding:8px;">{{ pack.version }}</td>
+          <td style="padding:8px;text-align:right;">{{ pack.rule_count }}</td>
+          <td style="padding:8px;text-align:right;">
+            <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}" class="btn btn-sm">View</a>
+            <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/export" class="btn btn-sm btn-outline">Export</a>
+            {% if pack.is_custom %}
+            <form method="POST" action="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/delete" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf }}">
+              <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete pack {{ pack.variant }}? This cannot be undone.')">Delete</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="7" style="padding:16px;text-align:center;color:var(--text-dim);">No rule packs found.</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

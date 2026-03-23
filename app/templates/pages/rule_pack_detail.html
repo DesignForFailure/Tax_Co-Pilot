@@ -1,0 +1,108 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ pack.jurisdiction | upper }} {{ pack.year }} — {{ pack.variant }}{% endblock %}
+{% block content %}
+
+<div style="margin-bottom:16px;">
+  <a href="/rule-packs" style="font-size:13px;">&larr; Back to Rule Packs</a>
+</div>
+
+<h1 style="font-size: 24px; margin-bottom: 8px;">
+  {{ pack.jurisdiction | upper }} {{ pack.year }}
+  {% if pack.is_custom %}
+  <span style="font-size:16px;color:var(--orange);">(Custom &mdash; {{ pack.custom_name or pack.variant }})</span>
+  {% else %}
+  <span style="font-size:16px;color:var(--text-dim);">(Standard)</span>
+  {% endif %}
+</h1>
+
+<div class="card" style="margin-bottom:20px;">
+  <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+    <span><strong>Version:</strong> {{ pack.version }}</span>
+    <span><strong>Checksum:</strong> <code style="font-size:12px;">{{ pack.checksum[:12] }}&hellip;</code></span>
+    <span><strong>Rules:</strong> {{ pack.rule_count }}</span>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+    <form method="POST" action="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/clone" style="display:inline-flex;gap:6px;align-items:center;">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <input type="text" name="custom_name" placeholder="custom name" required style="width:160px;padding:6px 10px;font-size:13px;">
+      <button type="submit" class="btn btn-sm">Clone as Custom</button>
+    </form>
+    <form method="POST" action="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/validate" style="display:inline;">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <button type="submit" class="btn btn-sm btn-outline">Validate</button>
+    </form>
+    <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/export" class="btn btn-sm btn-outline">Export YAML</a>
+    {% if pack.is_custom %}
+    <form method="POST" action="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/delete" style="display:inline;">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete pack {{ pack.variant }}? This cannot be undone.')">Delete</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if validated is defined and validated %}
+<div class="card" style="margin-bottom:20px;border-color:{% if validation_errors %}var(--red){% else %}var(--green){% endif %};">
+  {% if validation_errors %}
+  <h2 style="color:var(--red);">Validation Errors</h2>
+  <ul style="padding-left:20px;margin-top:8px;">
+    {% for err in validation_errors %}
+    <li style="color:var(--red);font-size:13px;margin-bottom:4px;">{{ err }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <h2 style="color:var(--green);">Pack is valid</h2>
+  <p class="text-dim text-sm" style="margin-top:6px;">All {{ pack.rule_count }} rules loaded successfully.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if not pack.is_custom %}
+<div class="card" style="margin-bottom:20px;border-color:var(--accent);background:rgba(108,140,255,0.05);">
+  <p style="font-size:13px;">This is a <strong>Standard</strong> pack (read-only). Clone it as Custom to edit or add rules.</p>
+</div>
+{% endif %}
+
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <h2>Rules ({{ pack.rule_count }})</h2>
+    {% if pack.is_custom %}
+    <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/rules/add" class="btn btn-sm">+ Add Rule</a>
+    {% endif %}
+  </div>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);color:var(--text-dim);">Rule ID</th>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);color:var(--text-dim);">Type</th>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);color:var(--text-dim);">Description</th>
+          <th style="text-align:right;padding:8px;border-bottom:1px solid var(--border);color:var(--text-dim);">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for rule in pack.rules %}
+        <tr style="border-top:1px solid var(--border);">
+          <td style="padding:8px;"><code>{{ rule.id }}</code></td>
+          <td style="padding:8px;">{{ rule.type }}</td>
+          <td style="padding:8px;color:var(--text-dim);">{{ rule.get('description', '') }}</td>
+          <td style="padding:8px;text-align:right;">
+            <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/rules/{{ rule.id }}" class="btn btn-sm">{% if pack.is_custom %}Edit{% else %}View{% endif %}</a>
+            {% if pack.is_custom %}
+            <form method="POST" action="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/rules/{{ rule.id }}/delete" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf }}">
+              <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete rule {{ rule.id }}?')">Delete</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="4" style="padding:16px;text-align:center;color:var(--text-dim);">No rules in this pack.</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
