@@ -177,16 +177,26 @@ def get_connection(password: str | None = None) -> sqlite3.Connection:
 
 
 def _compute_integrity_hash(run_data: dict) -> str:
-    """Compute SHA-256 integrity hash over substantive run content."""
-    payload = (
-        str(run_data.get("id", ""))
-        + str(run_data.get("tax_year", ""))
-        + json.dumps(run_data.get("input_snapshot", {}), sort_keys=True, ensure_ascii=False)
-        + json.dumps(run_data.get("output", {}), sort_keys=True, ensure_ascii=False)
-        + json.dumps(run_data.get("trace", []), sort_keys=True, ensure_ascii=False)
-        + str(run_data.get("rule_pack_checksum", ""))
-    )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    """Compute SHA-256 integrity hash over immutable persisted run content.
+
+    Mutable annotations (`tags`/`notes`) are intentionally excluded so
+    run annotations can change without forcing a hash-chain rewrite.
+    """
+    payload = {
+        "id": run_data.get("id", ""),
+        "tax_year": run_data.get("tax_year", ""),
+        "filing_status": run_data.get("filing_status", ""),
+        "scenario_name": run_data.get("scenario_name", "baseline"),
+        "rule_pack_version": run_data.get("rule_pack_version", ""),
+        "rule_pack_checksum": run_data.get("rule_pack_checksum", ""),
+        "created_at": run_data.get("created_at", ""),
+        "input_snapshot": run_data.get("input_snapshot", {}),
+        "output": run_data.get("output", {}),
+        "state_outputs": run_data.get("state_outputs", []),
+        "trace": run_data.get("trace", []),
+    }
+    encoded = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 def _get_latest_hash() -> str:
@@ -338,8 +348,9 @@ def verify_chain() -> list[dict]:
     """
     with closing(get_connection()) as conn:
         rows = conn.execute(
-            "SELECT id, integrity_hash, previous_hash, created_at, "
-            "tax_year, rule_pack_checksum, input_snapshot_json, output_json, trace_json "
+            "SELECT id, integrity_hash, previous_hash, created_at, tax_year, "
+            "filing_status, scenario_name, rule_pack_version, rule_pack_checksum, "
+            "input_snapshot_json, output_json, trace_json, state_outputs_json "
             "FROM return_runs ORDER BY created_at ASC, rowid ASC"
         ).fetchall()
 
@@ -363,8 +374,13 @@ def verify_chain() -> list[dict]:
         run_data = {
             "id": run_id,
             "tax_year": row["tax_year"],
+            "filing_status": row["filing_status"],
+            "scenario_name": row["scenario_name"],
+            "rule_pack_version": row["rule_pack_version"],
+            "created_at": row["created_at"],
             "input_snapshot": json.loads(row["input_snapshot_json"]),
             "output": json.loads(row["output_json"]),
+            "state_outputs": json.loads(row["state_outputs_json"]),
             "trace": json.loads(row["trace_json"]),
             "rule_pack_checksum": row["rule_pack_checksum"],
         }

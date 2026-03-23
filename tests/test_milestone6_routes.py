@@ -96,6 +96,21 @@ def test_whatif_post_csrf_rejected() -> None:
     assert r.status_code == 400
 
 
+def test_whatif_post_shows_inline_error_for_unallocated_household_fields() -> None:
+    client = _client()
+    form = dict(_BASE_FORM)
+    form["other_income"] = "1000"
+    form["s_first"] = "Jane"
+    form["s_last"] = "Doe"
+    form["s_w2_0_employer"] = "SpouseCo"
+    form["s_w2_0_wages"] = "45000"
+    form["s_w2_0_federal_withheld"] = "5000"
+    r = client.post("/whatif", data=form)
+    assert r.status_code == 400
+    assert "Cannot Compare This Scenario Yet" in r.text
+    assert "cannot safely allocate household-level" in r.text
+
+
 # ─── CSV Import ───────────────────────────────────────────────
 
 

@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests for error handling paths: bad input, missing files, CSRF edge cases."""
 
 import sqlite3
@@ -121,6 +120,42 @@ def test_calculate_invalid_tax_year() -> None:
     resp = c.post("/calculate", data=form, follow_redirects=False)
     assert resp.status_code == 400
     assert "tax year" in resp.text.lower() or "Unsupported" in resp.text
+
+
+def test_calculate_mfs_ignores_empty_hidden_spouse_rows() -> None:
+    """Blank spouse row keys should not falsely trigger the MFS spouse guard."""
+    c = _client()
+    form = {
+        **_BASE_FORM,
+        "filing_status": "mfs",
+        "s_w2_0_employer": "",
+        "s_w2_0_wages": "",
+        "s_w2_0_federal_withheld": "",
+    }
+    resp = c.post("/calculate", data=form, follow_redirects=False)
+    assert resp.status_code == 303
+
+
+def test_calculate_validation_error_is_plain_text() -> None:
+    """Validation errors render as text/plain to avoid HTML/script execution."""
+    c = _client()
+    form = {**_BASE_FORM, "p_w2_0_wages": "<script>alert(9)</script>"}
+    resp = c.post("/calculate", data=form, follow_redirects=False)
+    assert resp.status_code == 400
+    assert resp.headers.get("content-type", "").startswith("text/plain")
+
+
+def test_import_returns_error_summary_is_plain_text() -> None:
+    """Import error summaries render as text/plain to avoid HTML/script execution."""
+    c = _client()
+    payload = b'[{"id":"<script>alert(1)</script>","oops":1}]'
+    resp = c.post(
+        "/import-returns",
+        data={"csrf_token": CSRF},
+        files={"file": ("bad.json", payload, "application/json")},
+    )
+    assert resp.status_code == 200
+    assert resp.headers.get("content-type", "").startswith("text/plain")
 
 
 # ─── Annotate / Delete Nonexistent Runs ──────────────────────

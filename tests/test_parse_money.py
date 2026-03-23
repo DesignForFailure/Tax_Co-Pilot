@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# SPDX-License-Identifier: GPL-3.0-or-later
 """Unit tests for _parse_money monetary input boundary."""
 
 from decimal import Decimal

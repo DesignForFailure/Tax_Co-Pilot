@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# SPDX-License-Identifier: GPL-3.0-or-later
 """Rule pack editor service — CRUD operations for rule packs.
 
 All file I/O for rule pack management goes through this module.

@@ -15,8 +15,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# SPDX-License-Identifier: GPL-3.0-or-later
 """Route coverage tests for previously untested endpoints."""
+
+import json
 
 import pytest
 from fastapi.testclient import TestClient
@@ -148,6 +149,9 @@ def test_security_headers_present() -> None:
     assert resp.headers.get("Referrer-Policy") == "no-referrer"
     assert "Permissions-Policy" in resp.headers
     assert "Content-Security-Policy" in resp.headers
+    csp = resp.headers.get("Content-Security-Policy", "")
+    assert "script-src 'self'" in csp
+    assert "unpkg.com" not in csp
     assert resp.headers.get("Cache-Control") == "no-store"
 
 
@@ -174,3 +178,86 @@ def test_audit_verify_runs_have_hashes() -> None:
     assert r is not None
     assert r["integrity_hash"] != ""
     assert len(r["integrity_hash"]) == 64  # SHA-256 hex digest
+
+
+def test_calculate_preserves_withholding_only_1099_rows() -> None:
+    """Withholding-only 1099 rows must contribute to saved inputs and totals."""
+    from app.services.database import get_return_run
+    from main import _load_run_from_row
+
+    c = _client()
+    before_ids = {str(run["id"]) for run in list_return_runs()}
+    resp = c.post(
+        "/calculate",
+        data={
+            "csrf_token": CSRF,
+            "tax_year": "2024",
+            "filing_status": "single",
+            "p_first": "Test",
+            "p_last": "User",
+            "p_1099int_0_payer": "",
+            "p_1099int_0_interest": "",
+            "p_1099int_0_federal_withheld": "150",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+
+    after_ids = {str(run["id"]) for run in list_return_runs()}
+    new_ids = after_ids - before_ids
+    assert len(new_ids) == 1
+    run_id = new_ids.pop()
+    row = get_return_run(run_id)
+    assert row is not None
+    run = _load_run_from_row(row)
+    assert len(run.input_snapshot.taxpayers[0].form_1099_ints) == 1
+    assert run.output.total_withholding == 150
+
+
+def test_audit_verify_detects_state_output_tampering() -> None:
+    """Integrity verification should fail if persisted state outputs are modified."""
+    from app.services.database import get_connection
+
+    c = _client()
+    before_ids = {str(run["id"]) for run in list_return_runs()}
+    resp = c.post(
+        "/calculate",
+        data={
+            **_BASE_FORM,
+            "p_w2_0_state": "GA",
+            "p_w2_0_state_wages": "75000",
+            "p_w2_0_state_withheld": "2500",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+
+    after_ids = {str(run["id"]) for run in list_return_runs()}
+    new_ids = after_ids - before_ids
+    assert len(new_ids) == 1
+    run_id = new_ids.pop()
+    with get_connection() as conn:
+        tampered_state_outputs = json.dumps(
+            [
+                {
+                    "state": "GA",
+                    "state_agi": "1",
+                    "state_standard_deduction": "0",
+                    "state_personal_exemption": "0",
+                    "state_taxable_income": "1",
+                    "state_tax": "999",
+                    "state_withholding": "0",
+                    "state_refund_or_owed": "-999",
+                }
+            ]
+        )
+        conn.execute(
+            "UPDATE return_runs SET state_outputs_json = ? WHERE id = ?",
+            (tampered_state_outputs, run_id),
+        )
+
+    verify_resp = c.get("/audit/verify")
+    assert verify_resp.status_code == 200
+    data = verify_resp.json()
+    assert data["status"] == "integrity_errors"
+    assert any(err["id"] == run_id and err["error"] == "tampered" for err in data["errors"])

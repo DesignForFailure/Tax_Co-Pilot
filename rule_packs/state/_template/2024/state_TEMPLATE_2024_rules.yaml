@@ -20,18 +20,18 @@
 #
 # HOW TO USE:
 #   1. Copy this file to rule_packs/state/{ST}/2024/state_{ST}_2024_rules.yaml
-#   2. Replace every "{st}" in rule IDs with your lowercase state code
-#   3. Replace "TEMPLATE" / "{ST}" in refs with your uppercase state code
+#   2. Replace every "template" rule ID prefix with your lowercase state code
+#   3. Replace every "TEMPLATE" token in descriptions/refs with your uppercase state code
 #   4. Fill in your state's actual constants (deductions, rates, brackets)
 #   5. Delete or comment out sections that don't apply
 #
 # RULE ID CONVENTION (required by the engine):
-#   {st}.2024.agi              — State adjusted gross income
-#   {st}.2024.standard_deduction — Standard deduction
-#   {st}.2024.taxable_income   — State taxable income
-#   {st}.2024.tax              — Computed state income tax
-#   {st}.2024.withholding      — Total state tax withheld from W-2s
-#   {st}.2024.refund_or_owed   — Refund (positive) or balance due (negative)
+#   template.2024.agi              — State adjusted gross income
+#   template.2024.standard_deduction — Standard deduction
+#   template.2024.taxable_income   — State taxable income
+#   template.2024.tax              — Computed state income tax
+#   template.2024.withholding      — Total state tax withheld from W-2s
+#   template.2024.refund_or_owed   — Refund (positive) or balance due (negative)
 #
 # FOUR RULE TYPES:
 #   formula       — Arithmetic expression over named inputs
@@ -76,7 +76,7 @@ rules:
   # Inputs can reference other rules ({ ref: "rule.id" }), user input
   # ({ ref: "input.field" }), or literal values ({ literal: "100" }).
 
-  - id: "{st}.2024.agi"
+  - id: "template.2024.agi"
     description: "{ST} AGI (starts from federal AGI)"
     type: "formula"
     expression: "federal_agi"
@@ -93,7 +93,7 @@ rules:
   # A lookup picks a value from a constants table using a key.
   # The key is typically the filing status from user input.
 
-  - id: "{st}.2024.standard_deduction"
+  - id: "template.2024.standard_deduction"
     description: "{ST} standard deduction"
     type: "lookup"
     table: "constants.standard_deduction"
@@ -105,13 +105,13 @@ rules:
   # ────────────────────────────────────────────────────────────────────
   # Typically AGI minus deductions, floored at zero.
 
-  - id: "{st}.2024.taxable_income"
+  - id: "template.2024.taxable_income"
     description: "{ST} taxable income = max(AGI - deductions, 0)"
     type: "formula"
     expression: "max(agi - deduction, 0)"
     inputs:
-      agi: { ref: "{st}.2024.agi" }
-      deduction: { ref: "{st}.2024.standard_deduction" }
+      agi: { ref: "template.2024.agi" }
+      deduction: { ref: "template.2024.standard_deduction" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
@@ -130,12 +130,12 @@ rules:
   # Delete the option you don't need.
 
   # ── OPTION A: Flat-rate tax (formula) ──
-  - id: "{st}.2024.tax"
+  - id: "template.2024.tax"
     description: "{ST} income tax (flat rate)"
     type: "formula"
     expression: "taxable_income * rate"
     inputs:
-      taxable_income: { ref: "{st}.2024.taxable_income" }
+      taxable_income: { ref: "template.2024.taxable_income" }
       rate: { literal: "0.05" }          # Replace with your state's rate
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
@@ -148,10 +148,10 @@ rules:
   # applies each bracket's rate only to income within that bracket's
   # range (lower to upper). Set upper to null for the top bracket.
   #
-  # - id: "{st}.2024.tax"
+  # - id: "template.2024.tax"
   #   description: "{ST} income tax (progressive brackets)"
   #   type: "bracket_table"
-  #   input: { ref: "{st}.2024.taxable_income" }
+  #   input: { ref: "template.2024.taxable_income" }
   #   key: { ref: "input.filing_status" }
   #   rounding: "ROUND_HALF_UP"
   #   rounding_precision: 0
@@ -182,11 +182,11 @@ rules:
   # withholding amounts from W-2 inputs keyed by state code.
   # Replace {ST} with your uppercase state code.
 
-  - id: "{st}.2024.withholding"
+  - id: "template.2024.withholding"
     description: "Total {ST} tax withheld"
     type: "sum"
     inputs:
-      items: { ref: "input.withholding.state.{ST}" }
+      items: { ref: "input.withholding.state.TEMPLATE" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
@@ -196,12 +196,12 @@ rules:
   # ────────────────────────────────────────────────────────────────────
   # Positive = refund, negative = balance due.
 
-  - id: "{st}.2024.refund_or_owed"
+  - id: "template.2024.refund_or_owed"
     description: "{ST} refund (positive) or amount owed (negative)"
     type: "formula"
     expression: "withholding - tax"
     inputs:
-      withholding: { ref: "{st}.2024.withholding" }
-      tax: { ref: "{st}.2024.tax" }
+      withholding: { ref: "template.2024.withholding" }
+      tax: { ref: "template.2024.tax" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0

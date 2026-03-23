@@ -39,8 +39,30 @@ class WhatIfEngine:
     def __init__(self, federal_pack: RulePack):
         self.fed = federal_pack
 
+    def _has_unallocated_household_fields(self, base: TaxReturnInput) -> bool:
+        """Return True when MFS would need unsupported household-field allocation."""
+        shared_adjustments = any(
+            value != Decimal("0") for value in base.adjustments.model_dump().values()
+        )
+        shared_itemized = any(
+            value != Decimal("0") for value in base.itemized_deductions.model_dump().values()
+        )
+        return bool(
+            base.other_income != Decimal("0")
+            or base.estimated_tax_payments != Decimal("0")
+            or base.qualifying_children != 0
+            or shared_adjustments
+            or shared_itemized
+        )
+
     def _run_mfs_household(self, base: TaxReturnInput) -> tuple[Decimal, Decimal]:
         """Run MFS as one return per taxpayer and aggregate totals."""
+        if len(base.taxpayers) > 1 and self._has_unallocated_household_fields(base):
+            raise ValueError(
+                "MFS what-if cannot safely allocate household-level income, deductions, "
+                "payments, or dependent counts across spouses."
+            )
+
         total_tax = Decimal("0")
         total_refund_or_owed = Decimal("0")
 

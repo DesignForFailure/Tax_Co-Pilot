@@ -21,6 +21,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - **Hardening, QA & Auditability pass (complete):** Fixed SQL injection in SQLCipher PRAGMA, `tax_year` validation, unary negation in rule expressions, `hybrid_factory` consistency, URL-encoded error redirects, upload size limits with SQLite integrity validation, input sanitization (tags/notes caps, filename sanitization, export fallback). Added tamper-evident hash chain (`integrity_hash`, `previous_hash`) with `GET /audit/verify`. Key rotation via `POST /rotate-key` with `PRAGMA rekey`. Password cache clearing on shutdown. Explicit cipher parameters. CSRF token rotation after authentication. Made `pip-audit` blocking in CI.
 
 ### Fixed
+- **QA: Shipped state template now validates** — `rule_packs/state/_template/2024/` now uses a self-consistent `template.` rule namespace so repository-wide validation sweeps do not fail on the bundled starter pack.
+- **UI: Rule Pack Manager create form no longer hides supported states** — `GET /rule-packs` now derives jurisdiction options from the actual discovered packs instead of a stale hardcoded `CA/NY/GA` list.
+- **Compliance: Removed contradictory duplicate SPDX headers** — cleaned duplicate AGPL/GPL header lines from touched Python modules and tests.
+- **Correctness: Withholding-only tax forms no longer disappear during parsing** — blank-name/blank-income rows are preserved when they still carry federal or state withholding data.
+- **Correctness: Empty hidden spouse rows no longer break MFS submissions** — spouse detection now uses parsed content instead of raw dynamic-form key presence.
+- **Correctness: Integrity verification now covers immutable state/run metadata** — hash recomputation now includes filing status, scenario, rule-pack version, state outputs, and created timestamp while still excluding mutable annotations.
+- **Correctness: Multi-state execution is deterministic** — state pack loading/execution now sorts state codes to stabilize outputs and traces across processes.
+- **Safety: What-if MFS comparison now fails closed on unsupported household-only fields** — multi-taxpayer MFS what-if runs reject shared income/deduction/payment inputs that the current data model cannot allocate safely.
+- **UI: Calculate form state choices are now tax-year aware** — the residence dropdown is populated from year-specific state packs instead of always using the latest year.
+- **UX: What-if household allocation failures now render inline** — `/whatif` now shows a page-level error card for unsupported multi-spouse household-only field combinations instead of falling back to a plain-text 400 response.
+- **Docs: CI and public scope text synchronized with current behavior** — CONTRIBUTING/README/README.txt now match the blocking `pip-audit` gate, current multi-year/state support, and generic rule-pack layout.
 - **Security: Timing side-channel in key rotation** — `current_password` comparison in `/rotate-key` now uses `secrets.compare_digest` (constant-time) instead of `!=`.
 - **Security: SQL injection in encryption migrations** — Table names from `sqlite_master` are now validated against `^[A-Za-z_][A-Za-z0-9_]*$` before interpolation into SQL in `_migrate_to_sqlcipher` and `_migrate_to_python_encryption`.
 - **Integrity: Race condition in hash chain linking** — `save_return_run` now wraps `_get_latest_hash` read and INSERT in a single `BEGIN IMMEDIATE` / `COMMIT` block to prevent concurrent saves from duplicating `previous_hash`.

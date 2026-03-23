@@ -26,8 +26,8 @@ The app uses:
 - SQLite for local persistence (database file is created on first run)
 - Optional AES-256 encryption at rest via SQLCipher (see docs/ENCRYPTION.md)
 - YAML rule packs under:
-  - rule_packs/federal/2024/
-  - rule_packs/state/GA/2024/
+  - rule_packs/federal/{year}/
+  - rule_packs/state/{STATE}/{year}/
 
 3) Run the Web App (Canonical)
 ------------------------------

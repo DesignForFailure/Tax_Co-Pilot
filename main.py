@@ -47,7 +47,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from fastapi import FastAPI, Form, Request, Response
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from starlette.datastructures import FormData, UploadFile
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -134,7 +134,7 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost
 
 _CSP = (
     "default-src 'self'; "
-    "script-src 'self' https://unpkg.com; "
+    "script-src 'self'; "
     "style-src 'self' 'unsafe-inline'; "
     "img-src 'self' data:; "
     "connect-src 'self'; "
@@ -158,7 +158,7 @@ async def security_headers(request: Request, call_next: Any) -> Response:
     # Feature gating (tighten later if you add features like camera/mic)
     response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
 
-    # Content Security Policy: allow HTMX from unpkg + inline styles (base.html uses inline CSS)
+    # Content Security Policy: allow only same-origin scripts + inline styles for local templates
     response.headers.setdefault("Content-Security-Policy", _CSP)
 
     # Prevent caching of potentially sensitive tax data in shared browser caches.
@@ -219,6 +219,12 @@ def _get_state_packs(year: int) -> dict[str, RulePack]:
                     packs[state_dir.name.upper()] = RulePack.load(year_dir)
         _state_cache[year] = packs
     return _state_cache[year]
+
+
+def _available_states_by_year(years: list[int] | None = None) -> dict[int, list[str]]:
+    """Return a deterministic list of state packs for each available year."""
+    target_years = years if years is not None else available_years
+    return {year: sorted(_get_state_packs(year).keys()) for year in target_years}
 
 
 available_years = _discover_available_years()
@@ -392,13 +398,17 @@ def dashboard(request: Request) -> Response:
 def calculate_form(request: Request) -> HTMLResponse:
     csrf = _get_csrf_token(request)
     all_packs = list_rule_packs()
+    states_by_year = _available_states_by_year()
+    default_year = 2024 if 2024 in available_years else max(available_years, default=0)
     resp = templates.TemplateResponse(request, 
         "pages/calculate.html",
         {
             
             "csrf": csrf,
             "available_years": available_years,
-            "available_states": sorted(_get_state_packs(max(available_years)).keys()) if available_years else [],
+            "available_states": states_by_year.get(default_year, []),
+            "available_states_by_year": states_by_year,
+            "default_year": default_year,
             "pack_variants": all_packs,
         },
     )
@@ -525,17 +535,27 @@ def _parse_w2s(fd: FormData, prefix: str) -> list[W2Data]:
         wages = _form_money(fd, f"{p}_wages")
         withheld = _form_money(fd, f"{p}_federal_withheld")
         employer = _form_str(fd, f"{p}_employer")
+        state = _form_str(fd, f"{p}_state").upper()
+        state_wages = _form_money(fd, f"{p}_state_wages")
+        state_withheld = _form_money(fd, f"{p}_state_withheld")
         # Skip rows with no data entered
-        if wages == 0 and withheld == 0 and not employer:
+        if (
+            wages == 0
+            and withheld == 0
+            and state_wages == 0
+            and state_withheld == 0
+            and not employer
+            and not state
+        ):
             continue
         w2s.append(
             W2Data(
                 employer_name=employer,
                 wages=wages,
                 federal_withheld=withheld,
-                state=_form_str(fd, f"{p}_state").upper(),
-                state_wages=_form_money(fd, f"{p}_state_wages"),
-                state_withheld=_form_money(fd, f"{p}_state_withheld"),
+                state=state,
+                state_wages=state_wages,
+                state_withheld=state_withheld,
             )
         )
     return w2s
@@ -547,13 +567,14 @@ def _parse_1099ints(fd: FormData, prefix: str) -> list[Form1099INTData]:
         p = f"{prefix}_{idx}"
         interest = _form_money(fd, f"{p}_interest")
         payer = _form_str(fd, f"{p}_payer")
-        if interest == 0 and not payer:
+        federal_withheld = _form_money(fd, f"{p}_federal_withheld")
+        if interest == 0 and federal_withheld == 0 and not payer:
             continue
         items.append(
             Form1099INTData(
                 payer_name=payer,
                 interest_income=interest,
-                federal_withheld=_form_money(fd, f"{p}_federal_withheld"),
+                federal_withheld=federal_withheld,
             )
         )
     return items
@@ -564,15 +585,17 @@ def _parse_1099divs(fd: FormData, prefix: str) -> list[Form1099DIVData]:
     for idx in _collect_indices(fd, prefix):
         p = f"{prefix}_{idx}"
         ordinary = _form_money(fd, f"{p}_ordinary")
+        qualified = _form_money(fd, f"{p}_qualified")
+        federal_withheld = _form_money(fd, f"{p}_federal_withheld")
         payer = _form_str(fd, f"{p}_payer")
-        if ordinary == 0 and not payer:
+        if ordinary == 0 and qualified == 0 and federal_withheld == 0 and not payer:
             continue
         items.append(
             Form1099DIVData(
                 payer_name=payer,
                 ordinary_dividends=ordinary,
-                qualified_dividends=_form_money(fd, f"{p}_qualified"),
-                federal_withheld=_form_money(fd, f"{p}_federal_withheld"),
+                qualified_dividends=qualified,
+                federal_withheld=federal_withheld,
             )
         )
     return items
@@ -583,16 +606,18 @@ def _parse_1099bs(fd: FormData, prefix: str) -> list[Form1099BData]:
     for idx in _collect_indices(fd, prefix):
         p = f"{prefix}_{idx}"
         proceeds = _form_money(fd, f"{p}_proceeds")
+        cost_basis = _form_money(fd, f"{p}_basis")
+        federal_withheld = _form_money(fd, f"{p}_federal_withheld")
         desc = _form_str(fd, f"{p}_desc")
-        if proceeds == 0 and not desc:
+        if proceeds == 0 and cost_basis == 0 and federal_withheld == 0 and not desc:
             continue
         items.append(
             Form1099BData(
                 description=desc or "Capital gain",
                 proceeds=proceeds,
-                cost_basis=_form_money(fd, f"{p}_basis"),
+                cost_basis=cost_basis,
                 is_long_term=str(fd.get(f"{p}_long_term", "")) == "1",
-                federal_withheld=_form_money(fd, f"{p}_federal_withheld"),
+                federal_withheld=federal_withheld,
             )
         )
     return items
@@ -620,6 +645,18 @@ def _parse_taxpayer(fd: FormData, prefix: str, role: TaxpayerRole) -> Taxpayer:
     )
 
 
+def _taxpayer_has_form_data(taxpayer: Taxpayer) -> bool:
+    """Return True when a taxpayer contains names or parsed income records."""
+    return bool(
+        taxpayer.first_name
+        or taxpayer.last_name
+        or taxpayer.w2s
+        or taxpayer.form_1099_ints
+        or taxpayer.form_1099_divs
+        or taxpayer.form_1099_bs
+    )
+
+
 def _parse_tax_input_from_form(fd: FormData) -> TaxReturnInput:
     """Convert raw multi-part form data into a validated ``TaxReturnInput``."""
     tax_year = int(str(fd.get("tax_year", "2024") or "2024"))
@@ -630,21 +667,15 @@ def _parse_tax_input_from_form(fd: FormData) -> TaxReturnInput:
     primary = _parse_taxpayer(fd, "p", TaxpayerRole.PRIMARY)
     taxpayers: list[Taxpayer] = [primary]
 
-    s_first = _form_str(fd, "s_first")
-    s_last = _form_str(fd, "s_last")
-    has_spouse_income = bool(
-        _collect_indices(fd, "s_w2")
-        or _collect_indices(fd, "s_1099int")
-        or _collect_indices(fd, "s_1099div")
-        or _collect_indices(fd, "s_1099b")
-    )
+    spouse = _parse_taxpayer(fd, "s", TaxpayerRole.SPOUSE)
+    has_spouse_data = _taxpayer_has_form_data(spouse)
 
     # MFS returns are per-person, so this single-return form must not aggregate
     # both spouses into one run.
     if filing_status == FilingStatus.MFJ:
-        if s_first or s_last or has_spouse_income:
-            taxpayers.append(_parse_taxpayer(fd, "s", TaxpayerRole.SPOUSE))
-    elif filing_status == FilingStatus.MFS and (s_first or s_last or has_spouse_income):
+        if has_spouse_data:
+            taxpayers.append(spouse)
+    elif filing_status == FilingStatus.MFS and has_spouse_data:
         raise ValueError("MFS is per-person; submit each spouse as a separate run")
 
     adjustments = AdjustmentsData(
@@ -710,7 +741,7 @@ async def calculate_submit(request: Request) -> RedirectResponse:
         fed_pack = _get_federal_pack(inputs.tax_year)
     year_state_packs = _get_state_packs(inputs.tax_year)
     active_state_packs = {
-        s: year_state_packs[s] for s in states_needed if s in year_state_packs
+        s: year_state_packs[s] for s in sorted(states_needed) if s in year_state_packs
     }
     run = CalculationEngine(
         fed_pack, inputs, state_packs=active_state_packs
@@ -808,7 +839,7 @@ def whatif_form(request: Request) -> Response:
     csrf = _get_csrf_token(request)
     resp = templates.TemplateResponse(request, 
         "pages/whatif.html",
-        {"csrf": csrf, "available_years": available_years},
+        {"csrf": csrf, "available_years": available_years, "selected_year": 2024},
     )
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return resp
@@ -818,19 +849,28 @@ def whatif_form(request: Request) -> Response:
 async def whatif_submit(request: Request) -> Response:
     fd = await request.form()
     _verify_csrf(request, str(fd.get("csrf_token", "")))
-    inputs = _parse_tax_input_from_form(fd)
-    engine = WhatIfEngine(_get_federal_pack(inputs.tax_year))
-    comparison = engine.compare_filing_status(inputs)
     csrf = _get_csrf_token(request)
-    resp = templates.TemplateResponse(request, 
+    selected_year = int(str(fd.get("tax_year", "2024") or "2024"))
+    context: dict[str, Any] = {
+        "csrf": csrf,
+        "available_years": available_years,
+        "selected_year": selected_year,
+    }
+    status_code = 200
+    try:
+        inputs = _parse_tax_input_from_form(fd)
+        engine = WhatIfEngine(_get_federal_pack(inputs.tax_year))
+        context["comparison"] = engine.compare_filing_status(inputs)
+        context["selected_year"] = inputs.tax_year
+    except ValueError as exc:
+        context["error"] = str(exc)
+        status_code = 400
+
+    resp = templates.TemplateResponse(
+        request,
         "pages/whatif.html",
-        {
-            
-            "csrf": csrf,
-            "comparison": comparison,
-            "available_years": available_years,
-            "selected_year": inputs.tax_year,
-        },
+        context,
+        status_code=status_code,
     )
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return resp
@@ -1037,7 +1077,7 @@ async def annotate_run(request: Request, run_id: str) -> Response:
         raise ValueError(f"Notes exceed {_MAX_NOTES} characters")
     found = update_run_annotation(run_id, tags, notes)
     if not found:
-        return HTMLResponse(f"Run {run_id!r} not found", status_code=404)
+        return PlainTextResponse(f"Run {run_id!r} not found", status_code=404)
     return RedirectResponse(url="/runs", status_code=303)
 
 
@@ -1059,7 +1099,7 @@ def export_all_runs() -> Response:
 
 
 @app.post("/import-returns", response_class=HTMLResponse)
-async def import_returns(request: Request) -> HTMLResponse:
+async def import_returns(request: Request) -> Response:
     fd = await request.form()
     _verify_csrf(request, str(fd.get("csrf_token", "")))
     upload = fd.get("file")
@@ -1075,7 +1115,7 @@ async def import_returns(request: Request) -> HTMLResponse:
     try:
         entries = json.loads(content)
     except json.JSONDecodeError as e:
-        return HTMLResponse(f"Invalid JSON: {e}", status_code=400)
+        return PlainTextResponse(f"Invalid JSON: {e}", status_code=400)
     if not isinstance(entries, list):
         return HTMLResponse("Expected a JSON array", status_code=400)
     if len(entries) > _MAX_IMPORT_ENTRIES:
@@ -1104,7 +1144,7 @@ async def import_returns(request: Request) -> HTMLResponse:
     result = f"Imported {imported} run(s)."
     if errors:
         result += f" {len(errors)} error(s): " + "; ".join(errors[:5])
-    return HTMLResponse(result, status_code=200)
+    return PlainTextResponse(result, status_code=200)
 
 
 @app.get("/backup")
@@ -1163,7 +1203,7 @@ async def restore_database(request: Request) -> Response:
         # Rollback: restore the original database
         if backup_copy and backup_copy.exists():
             backup_copy.rename(DB_PATH)
-        return HTMLResponse(
+        return PlainTextResponse(
             f"Restore failed — original database has been preserved. Error: {e}. "
             "If the backup is encrypted, ensure the same password is active.",
             status_code=400,
@@ -1255,9 +1295,24 @@ def audit_verify() -> Response:
 def rule_packs_list(request: Request) -> HTMLResponse:
     csrf = _get_csrf_token(request)
     packs = list_rule_packs()
+    create_jurisdictions = [("federal", "Federal")] + [
+        (code, code)
+        for code in sorted(
+            {
+                pack.jurisdiction.upper()
+                for pack in packs
+                if pack.jurisdiction.lower() != "federal"
+            }
+        )
+    ]
     resp = templates.TemplateResponse(request, 
         "pages/rule_packs.html",
-        {"csrf": csrf, "packs": packs, "available_years": available_years},
+        {
+            "csrf": csrf,
+            "packs": packs,
+            "available_years": available_years,
+            "create_jurisdictions": create_jurisdictions,
+        },
     )
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return resp
@@ -1402,7 +1457,7 @@ def rule_pack_export(
     try:
         manifest_bytes, rules_bytes = export_yaml(jurisdiction, year, variant)
     except ValueError as exc:
-        return HTMLResponse(str(exc), status_code=404)
+        return PlainTextResponse(str(exc), status_code=404)
     combined = b"# === MANIFEST ===\n" + manifest_bytes + b"\n# === RULES ===\n" + rules_bytes
     filename = f"{jurisdiction}_{year}_{variant}.yaml"
     return Response(
@@ -1536,5 +1591,5 @@ async def rule_save_submit(
 
 
 @app.exception_handler(ValueError)
-def value_error_handler(request: Request, exc: ValueError) -> HTMLResponse:
-    return HTMLResponse(str(exc), status_code=400)
+def value_error_handler(request: Request, exc: ValueError) -> PlainTextResponse:
+    return PlainTextResponse(str(exc), status_code=400)

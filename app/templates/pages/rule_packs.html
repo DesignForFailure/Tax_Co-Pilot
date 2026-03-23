@@ -15,10 +15,9 @@
       <div>
         <label>Jurisdiction</label>
         <select name="jurisdiction">
-          <option value="federal">Federal</option>
-          <option value="CA">California (CA)</option>
-          <option value="NY">New York (NY)</option>
-          <option value="GA">Georgia (GA)</option>
+          {% for value, label in create_jurisdictions %}
+          <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
         </select>
       </div>
       <div>
