@@ -301,19 +301,24 @@ def _backfill_hash_versions(conn: sqlite3.Connection) -> None:
         "FROM return_runs WHERE hash_version = 0 AND integrity_hash != ''"
     ).fetchall()
     for row in rows:
-        run_data = {
-            "id": row["id"],
-            "tax_year": row["tax_year"],
-            "filing_status": row["filing_status"],
-            "scenario_name": row["scenario_name"],
-            "rule_pack_version": row["rule_pack_version"],
-            "rule_pack_checksum": row["rule_pack_checksum"],
-            "created_at": row["created_at"],
-            "input_snapshot": json.loads(row["input_snapshot_json"]),
-            "output": json.loads(row["output_json"]),
-            "trace": json.loads(row["trace_json"]),
-            "state_outputs": json.loads(row["state_outputs_json"]),
-        }
+        try:
+            run_data = {
+                "id": row["id"],
+                "tax_year": row["tax_year"],
+                "filing_status": row["filing_status"],
+                "scenario_name": row["scenario_name"],
+                "rule_pack_version": row["rule_pack_version"],
+                "rule_pack_checksum": row["rule_pack_checksum"],
+                "created_at": row["created_at"],
+                "input_snapshot": json.loads(row["input_snapshot_json"]),
+                "output": json.loads(row["output_json"]),
+                "trace": json.loads(row["trace_json"]),
+                "state_outputs": json.loads(row["state_outputs_json"]),
+            }
+        except (json.JSONDecodeError, TypeError):
+            # Corrupted blob — leave hash_version=0 so verify_chain reports it
+            # instead of blocking application startup.
+            continue
         stored = row["integrity_hash"]
         if _compute_integrity_hash_v2(run_data) == stored:
             conn.execute(
@@ -447,19 +452,27 @@ def verify_chain() -> list[dict]:
             })
 
         # Recompute integrity hash
-        run_data = {
-            "id": run_id,
-            "tax_year": row["tax_year"],
-            "filing_status": row["filing_status"],
-            "scenario_name": row["scenario_name"],
-            "rule_pack_version": row["rule_pack_version"],
-            "created_at": row["created_at"],
-            "input_snapshot": json.loads(row["input_snapshot_json"]),
-            "output": json.loads(row["output_json"]),
-            "state_outputs": json.loads(row["state_outputs_json"]),
-            "trace": json.loads(row["trace_json"]),
-            "rule_pack_checksum": row["rule_pack_checksum"],
-        }
+        try:
+            run_data = {
+                "id": run_id,
+                "tax_year": row["tax_year"],
+                "filing_status": row["filing_status"],
+                "scenario_name": row["scenario_name"],
+                "rule_pack_version": row["rule_pack_version"],
+                "created_at": row["created_at"],
+                "input_snapshot": json.loads(row["input_snapshot_json"]),
+                "output": json.loads(row["output_json"]),
+                "state_outputs": json.loads(row["state_outputs_json"]),
+                "trace": json.loads(row["trace_json"]),
+                "rule_pack_checksum": row["rule_pack_checksum"],
+            }
+        except (json.JSONDecodeError, TypeError):
+            errors.append({
+                "id": run_id,
+                "error": "corrupted",
+            })
+            prev_hash = stored_hash
+            continue
         row_hash_version = row["hash_version"] or _HASH_VERSION
         expected_hash = _compute_integrity_hash(run_data, version=row_hash_version)
         if not stored_hash:

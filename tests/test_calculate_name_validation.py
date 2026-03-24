@@ -70,3 +70,11 @@ def test_calculate_submit_rejects_mfs_spouse_aggregation() -> None:
     assert response.status_code == 400
     assert "text/html" in response.headers.get("content-type", "")
     assert "MFS is per-person; submit each spouse as a separate run" in response.text
+
+
+def test_validation_error_preserves_posted_year_and_filing_status() -> None:
+    response = _post_calculate(tax_year="2024", filing_status="single", p_first=" ")
+
+    assert response.status_code == 400
+    assert 'value="2024" selected' in response.text
+    assert 'value="single" selected' in response.text

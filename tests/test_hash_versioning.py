@@ -37,8 +37,11 @@ from app.services.database import (
 
 
 @pytest.fixture(autouse=True)
-def _ensure_db() -> None:
+def _ensure_db():  # type: ignore[no-untyped-def]
     init_db()
+    with closing(get_connection()) as conn:
+        conn.execute("DELETE FROM return_runs")
+    yield
     with closing(get_connection()) as conn:
         conn.execute("DELETE FROM return_runs")
 
@@ -187,3 +190,47 @@ def test_save_return_run_writes_hash_version_2() -> None:
         ).fetchone()
     assert row is not None
     assert row["hash_version"] == 2
+
+
+def test_backfill_tolerates_corrupted_json_blobs() -> None:
+    """A row with corrupted JSON must not crash init_db / backfill."""
+    from app.services.database import _backfill_hash_versions
+
+    # Insert a row with hash_version=0 and corrupted JSON
+    with closing(get_connection()) as conn:
+        conn.execute(
+            """INSERT INTO return_runs
+               (id, tax_year, filing_status, scenario_name,
+                rule_pack_version, rule_pack_checksum,
+                input_snapshot_json, output_json, trace_json, state_outputs_json,
+                created_at, tags, notes, integrity_hash, previous_hash, hash_version)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                "corrupted-row",
+                2024,
+                "single",
+                "baseline",
+                "federal-2024-v1.0",
+                "abc123",
+                "NOT VALID JSON {{{",
+                '{"ok": true}',
+                "[]",
+                "[]",
+                "2024-06-15T12:00:00Z",
+                "",
+                "",
+                "somehash",
+                "",
+                0,
+            ),
+        )
+
+        # Must not raise — corrupted row stays at hash_version=0
+        _backfill_hash_versions(conn)
+
+        row = conn.execute(
+            "SELECT hash_version FROM return_runs WHERE id = ?",
+            ("corrupted-row",),
+        ).fetchone()
+    assert row is not None
+    assert row["hash_version"] == 0

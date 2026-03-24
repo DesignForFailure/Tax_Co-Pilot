@@ -29,12 +29,13 @@
             </div>
             <div>
                 <label>Filing Status</label>
+                {% set fs = default_filing|default("mfj") %}
                 <select name="filing_status" id="filing_status" onchange="toggleSpouse()">
-                    <option value="single">Single</option>
-                    <option value="mfj" selected>Married Filing Jointly</option>
-                    <option value="mfs">Married Filing Separately</option>
-                    <option value="hoh">Head of Household</option>
-                    <option value="qss">Qualifying Surviving Spouse</option>
+                    <option value="single" {% if fs == "single" %}selected{% endif %}>Single</option>
+                    <option value="mfj" {% if fs == "mfj" %}selected{% endif %}>Married Filing Jointly</option>
+                    <option value="mfs" {% if fs == "mfs" %}selected{% endif %}>Married Filing Separately</option>
+                    <option value="hoh" {% if fs == "hoh" %}selected{% endif %}>Head of Household</option>
+                    <option value="qss" {% if fs == "qss" %}selected{% endif %}>Qualifying Surviving Spouse</option>
                 </select>
             </div>
             <div>

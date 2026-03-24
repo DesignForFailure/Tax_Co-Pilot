@@ -755,7 +755,12 @@ async def calculate_submit(request: Request) -> Response:
     except ValueError as exc:
         all_packs = list_rule_packs()
         states_by_year = _available_states_by_year()
-        default_year = 2024 if 2024 in available_years else max(available_years, default=0)
+        posted_year = int(str(fd.get("tax_year", 0)) or 0)
+        if posted_year in available_years:
+            default_year = posted_year
+        else:
+            default_year = 2024 if 2024 in available_years else max(available_years, default=0)
+        posted_filing = str(fd.get("filing_status", ""))
         resp = templates.TemplateResponse(
             request,
             "pages/calculate.html",
@@ -765,6 +770,7 @@ async def calculate_submit(request: Request) -> Response:
                 "available_states": states_by_year.get(default_year, []),
                 "available_states_by_year": states_by_year,
                 "default_year": default_year,
+                "default_filing": posted_filing,
                 "pack_variants": all_packs,
                 "error": str(exc),
             },
