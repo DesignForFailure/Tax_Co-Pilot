@@ -37,6 +37,7 @@
         nav .logo { font-weight: 700; font-size: 18px; color: var(--accent); }
         nav a { color: var(--text-dim); text-decoration: none; font-size: 14px; transition: color 0.15s; }
         nav a:hover { color: var(--text); }
+        nav a.active { color: var(--accent); font-weight: 600; }
 
         .card {
             background: var(--surface);
@@ -91,6 +92,7 @@
         }
         .btn:hover { background: var(--accent-dim); }
         .btn:active { transform: translateY(1px); }
+        .btn[disabled] { opacity: 0.6; cursor: not-allowed; }
         .btn-sm {
             padding: 6px 12px;
             font-size: 12px;
@@ -152,12 +154,13 @@
     <nav>
         <div class="container">
             <div class="logo">Tax Copilot</div>
-            <a href="/">Dashboard</a>
-            <a href="/calculate">Calculate</a>
-            <a href="/whatif">What-If</a>
-            <a href="/import-csv">Import CSV</a>
-            <a href="/runs">Runs</a>
-            <a href="/rule-packs">Rule Packs</a>
+            {% set path = request.url.path %}
+            <a href="/" {% if path == "/" or path.startswith("/runs/") %}class="active"{% endif %}>Dashboard</a>
+            <a href="/calculate" {% if path == "/calculate" %}class="active"{% endif %}>Calculate</a>
+            <a href="/whatif" {% if path == "/whatif" %}class="active"{% endif %}>What-If</a>
+            <a href="/import-csv" {% if path == "/import-csv" %}class="active"{% endif %}>Import CSV</a>
+            <a href="/runs" {% if path == "/runs" %}class="active"{% endif %}>Runs</a>
+            <a href="/rule-packs" {% if path.startswith("/rule-packs") %}class="active"{% endif %}>Rule Packs</a>
         </div>
     </nav>
     <main class="container" style="padding: 24px 0 60px;">
@@ -172,5 +175,15 @@
             <a href="/legal">Legal Notices</a>
         </div>
     </footer>
+    <script>
+    document.addEventListener('submit', function(e) {
+        var btn = e.target.querySelector('button[type="submit"]:not([disabled]), .btn[type="submit"]:not([disabled])');
+        if (btn) {
+            btn.disabled = true;
+            btn.dataset.originalText = btn.textContent;
+            btn.textContent = 'Working\u2026';
+        }
+    });
+    </script>
 </body>
 </html>

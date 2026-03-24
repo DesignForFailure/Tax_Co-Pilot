@@ -176,8 +176,30 @@ def get_connection(password: str | None = None) -> sqlite3.Connection:
         return conn
 
 
-def _compute_integrity_hash(run_data: dict) -> str:
-    """Compute SHA-256 integrity hash over immutable persisted run content.
+# Current hash version for new rows.
+_HASH_VERSION = 2
+
+
+def _compute_integrity_hash_v1(run_data: dict) -> str:
+    """Original v1 integrity hash: string concatenation of 6 core fields.
+
+    This algorithm was used before the v2 upgrade that added filing_status,
+    scenario_name, rule_pack_version, created_at, and state_outputs.
+    Kept for verifying rows written before the upgrade.
+    """
+    payload = (
+        str(run_data.get("id", ""))
+        + str(run_data.get("tax_year", ""))
+        + json.dumps(run_data.get("input_snapshot", {}), sort_keys=True, ensure_ascii=False)
+        + json.dumps(run_data.get("output", {}), sort_keys=True, ensure_ascii=False)
+        + json.dumps(run_data.get("trace", []), sort_keys=True, ensure_ascii=False)
+        + str(run_data.get("rule_pack_checksum", ""))
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _compute_integrity_hash_v2(run_data: dict) -> str:
+    """V2 integrity hash: JSON dict of 11 immutable fields.
 
     Mutable annotations (`tags`/`notes`) are intentionally excluded so
     run annotations can change without forcing a hash-chain rewrite.
@@ -197,6 +219,13 @@ def _compute_integrity_hash(run_data: dict) -> str:
     }
     encoded = json.dumps(payload, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _compute_integrity_hash(run_data: dict, version: int = _HASH_VERSION) -> str:
+    """Dispatch to the correct hash algorithm based on version."""
+    if version == 1:
+        return _compute_integrity_hash_v1(run_data)
+    return _compute_integrity_hash_v2(run_data)
 
 
 def _get_latest_hash() -> str:
@@ -249,6 +278,52 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE return_runs ADD COLUMN previous_hash TEXT NOT NULL DEFAULT ''"
             )
+        if "hash_version" not in columns:
+            # Default 0 means "unknown — needs detection" for pre-existing rows.
+            # New rows always write an explicit version.
+            conn.execute(
+                "ALTER TABLE return_runs ADD COLUMN hash_version INTEGER NOT NULL DEFAULT 0"
+            )
+            # Auto-detect version for existing rows that already have a hash.
+            _backfill_hash_versions(conn)
+
+
+def _backfill_hash_versions(conn: sqlite3.Connection) -> None:
+    """Detect hash algorithm version for rows written before hash_version existed.
+
+    Tries v2 first (current), then v1 (legacy).  Rows matching neither keep
+    hash_version=0 so verify_chain can flag them explicitly.
+    """
+    rows = conn.execute(
+        "SELECT id, integrity_hash, tax_year, filing_status, scenario_name, "
+        "rule_pack_version, rule_pack_checksum, created_at, "
+        "input_snapshot_json, output_json, trace_json, state_outputs_json "
+        "FROM return_runs WHERE hash_version = 0 AND integrity_hash != ''"
+    ).fetchall()
+    for row in rows:
+        run_data = {
+            "id": row["id"],
+            "tax_year": row["tax_year"],
+            "filing_status": row["filing_status"],
+            "scenario_name": row["scenario_name"],
+            "rule_pack_version": row["rule_pack_version"],
+            "rule_pack_checksum": row["rule_pack_checksum"],
+            "created_at": row["created_at"],
+            "input_snapshot": json.loads(row["input_snapshot_json"]),
+            "output": json.loads(row["output_json"]),
+            "trace": json.loads(row["trace_json"]),
+            "state_outputs": json.loads(row["state_outputs_json"]),
+        }
+        stored = row["integrity_hash"]
+        if _compute_integrity_hash_v2(run_data) == stored:
+            conn.execute(
+                "UPDATE return_runs SET hash_version = 2 WHERE id = ?", (row["id"],)
+            )
+        elif _compute_integrity_hash_v1(run_data) == stored:
+            conn.execute(
+                "UPDATE return_runs SET hash_version = 1 WHERE id = ?", (row["id"],)
+            )
+        # else: leave at 0 — genuinely unknown or tampered
 
 
 def save_return_run(run_data: dict) -> None:
@@ -275,8 +350,8 @@ def save_return_run(run_data: dict) -> None:
                    (id, tax_year, filing_status, scenario_name,
                     rule_pack_version, rule_pack_checksum,
                     input_snapshot_json, output_json, trace_json, state_outputs_json,
-                    created_at, tags, notes, integrity_hash, previous_hash)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    created_at, tags, notes, integrity_hash, previous_hash, hash_version)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     run_data["id"],
                     run_data["tax_year"],
@@ -293,6 +368,7 @@ def save_return_run(run_data: dict) -> None:
                     run_data.get("notes", ""),
                     integrity_hash,
                     previous_hash,
+                    _HASH_VERSION,
                 ),
             )
             conn.execute("COMMIT")
@@ -348,7 +424,7 @@ def verify_chain() -> list[dict]:
     """
     with closing(get_connection()) as conn:
         rows = conn.execute(
-            "SELECT id, integrity_hash, previous_hash, created_at, tax_year, "
+            "SELECT id, integrity_hash, previous_hash, hash_version, created_at, tax_year, "
             "filing_status, scenario_name, rule_pack_version, rule_pack_checksum, "
             "input_snapshot_json, output_json, trace_json, state_outputs_json "
             "FROM return_runs ORDER BY created_at ASC, rowid ASC"
@@ -384,7 +460,8 @@ def verify_chain() -> list[dict]:
             "trace": json.loads(row["trace_json"]),
             "rule_pack_checksum": row["rule_pack_checksum"],
         }
-        expected_hash = _compute_integrity_hash(run_data)
+        row_hash_version = row["hash_version"] or _HASH_VERSION
+        expected_hash = _compute_integrity_hash(run_data, version=row_hash_version)
         if not stored_hash:
             errors.append({
                 "id": run_id,

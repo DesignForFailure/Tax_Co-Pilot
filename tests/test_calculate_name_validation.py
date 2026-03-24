@@ -48,14 +48,16 @@ def test_calculate_submit_rejects_blank_primary_first_name() -> None:
     response = _post_calculate(p_first=" \t\n ")
 
     assert response.status_code == 400
-    assert response.text == "first name is required"
+    assert "text/html" in response.headers.get("content-type", "")
+    assert "first name is required" in response.text
 
 
 def test_calculate_submit_rejects_blank_primary_last_name() -> None:
     response = _post_calculate(p_last="\u00A0")
 
     assert response.status_code == 400
-    assert response.text == "last name is required"
+    assert "text/html" in response.headers.get("content-type", "")
+    assert "last name is required" in response.text
 
 
 def test_calculate_submit_rejects_mfs_spouse_aggregation() -> None:
@@ -66,4 +68,5 @@ def test_calculate_submit_rejects_mfs_spouse_aggregation() -> None:
     )
 
     assert response.status_code == 400
-    assert response.text == "MFS is per-person; submit each spouse as a separate run"
+    assert "text/html" in response.headers.get("content-type", "")
+    assert "MFS is per-person; submit each spouse as a separate run" in response.text

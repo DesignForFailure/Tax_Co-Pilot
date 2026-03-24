@@ -5,6 +5,13 @@
 <h1 style="font-size: 24px; margin-bottom: 8px;">Enter Tax Data</h1>
 <p class="text-dim text-sm mb-4">Add income forms for each taxpayer. Use the + buttons to add multiple entries.</p>
 
+{% if error %}
+<div class="card" style="border-color: var(--red); margin-bottom: 20px;">
+    <h2 style="color: var(--red);">Calculation Error</h2>
+    <p style="margin-top: 8px;">{{ error }}</p>
+</div>
+{% endif %}
+
 <form method="POST" action="/calculate">
     <input type="hidden" name="csrf_token" value="{{ csrf }}">
 

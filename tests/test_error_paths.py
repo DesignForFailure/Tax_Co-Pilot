@@ -136,13 +136,16 @@ def test_calculate_mfs_ignores_empty_hidden_spouse_rows() -> None:
     assert resp.status_code == 303
 
 
-def test_calculate_validation_error_is_plain_text() -> None:
-    """Validation errors render as text/plain to avoid HTML/script execution."""
+def test_calculate_validation_error_renders_form() -> None:
+    """Validation errors re-render the form with an error message (XSS-safe via Jinja2 auto-escape)."""
     c = _client()
     form = {**_BASE_FORM, "p_w2_0_wages": "<script>alert(9)</script>"}
     resp = c.post("/calculate", data=form, follow_redirects=False)
     assert resp.status_code == 400
-    assert resp.headers.get("content-type", "").startswith("text/plain")
+    assert "text/html" in resp.headers.get("content-type", "")
+    assert "Enter Tax Data" in resp.text  # re-renders the calculate form
+    assert "Calculation Error" in resp.text  # error banner shown
+    assert "<script>alert(9)</script>" not in resp.text  # XSS-safe: auto-escaped
 
 
 def test_import_returns_error_summary_is_plain_text() -> None:
