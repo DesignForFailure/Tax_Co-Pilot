@@ -377,7 +377,6 @@ The Python **[cryptography](https://github.com/pyca/cryptography)** library is u
 | python-multipart | Apache-2.0   | Form data parsing        |
 | pysqlcipher3     | zlib/libpng  | SQLCipher Python binding |
 | keyring          | MIT          | OS credential storage    |
-| htmx             | 0BSD         | Frontend interactivity   |
 
 All third-party licenses are permissive and compatible with AGPL-3.0. Full attribution details are in [docs/NOTICE.md](docs/NOTICE.md).
 

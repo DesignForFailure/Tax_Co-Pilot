@@ -32,6 +32,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - **UI: Calculate form state choices are now tax-year aware** — the residence dropdown is populated from year-specific state packs instead of always using the latest year.
 - **UX: What-if household allocation failures now render inline** — `/whatif` now shows a page-level error card for unsupported multi-spouse household-only field combinations instead of falling back to a plain-text 400 response.
 - **Docs: CI and public scope text synchronized with current behavior** — CONTRIBUTING/README/README.txt now match the blocking `pip-audit` gate, current multi-year/state support, and generic rule-pack layout.
+- **Cleanup: Removed stale HTMX runtime/dependency references** — dropped the unused script include and aligned README/legal/NOTICE entries with the actual shipped frontend stack.
 - **Security: Timing side-channel in key rotation** — `current_password` comparison in `/rotate-key` now uses `secrets.compare_digest` (constant-time) instead of `!=`.
 - **Security: SQL injection in encryption migrations** — Table names from `sqlite_master` are now validated against `^[A-Za-z_][A-Za-z0-9_]*$` before interpolation into SQL in `_migrate_to_sqlcipher` and `_migrate_to_python_encryption`.
 - **Integrity: Race condition in hash chain linking** — `save_return_run` now wraps `_get_latest_hash` read and INSERT in a single `BEGIN IMMEDIATE` / `COMMIT` block to prevent concurrent saves from duplicating `previous_hash`.
