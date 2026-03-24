@@ -52,6 +52,11 @@
                     <div><label>Wages (Box 1)</label><input type="text" name="p_w2_0_wages" placeholder="85000"></div>
                     <div><label>Federal Withheld (Box 2)</label><input type="text" name="p_w2_0_federal_withheld" placeholder="12000"></div>
                 </div>
+                <div class="form-row-3">
+                    <div><label>State (Box 15)</label><input type="text" name="p_w2_0_state" placeholder="GA" maxlength="2"></div>
+                    <div><label>State Wages (Box 16)</label><input type="text" name="p_w2_0_state_wages" placeholder="85000"></div>
+                    <div><label>State Withheld (Box 17)</label><input type="text" name="p_w2_0_state_withheld" placeholder="4000"></div>
+                </div>
             </div>
         </div>
 
@@ -105,6 +110,65 @@
             <button type="button" class="btn btn-sm btn-outline" onclick="addRow('s_1099b')">+ Add 1099-B</button>
         </div>
         <div id="s_1099b_container" class="dynamic-section"></div>
+    </div>
+
+    {# ─── Other Income ────────────────────────────────────────── #}
+    <div class="card">
+        <h2>Other Income</h2>
+        <div class="form-row">
+            <div><label>Other Income (Schedule 1)</label><input type="text" name="other_income" placeholder="0"></div>
+        </div>
+    </div>
+
+    {# ─── Above-the-Line Deductions ──────────────────────────── #}
+    <div class="card">
+        <h2>Above-the-Line Deductions</h2>
+        <p class="text-dim text-sm" style="margin-bottom:12px;">These reduce your AGI. Leave blank or 0 if not applicable.</p>
+        <div class="form-row">
+            <div><label>Student Loan Interest</label><input type="text" name="adj_student_loan" placeholder="0"></div>
+            <div><label>Educator Expenses</label><input type="text" name="adj_educator" placeholder="0"></div>
+        </div>
+        <div class="form-row">
+            <div><label>HSA Contributions</label><input type="text" name="adj_hsa" placeholder="0"></div>
+            <div><label>IRA Contributions</label><input type="text" name="adj_ira" placeholder="0"></div>
+        </div>
+        <div class="form-row">
+            <div><label>SE Tax Deduction</label><input type="text" name="adj_se_tax" placeholder="0"></div>
+        </div>
+    </div>
+
+    {# ─── Itemized Deductions (Schedule A) ───────────────────── #}
+    <div class="card">
+        <h2>Itemized Deductions (Schedule A)</h2>
+        <p class="text-dim text-sm" style="margin-bottom:12px;">Leave blank to use the standard deduction. The higher of standard or itemized will be applied automatically.</p>
+        <div class="form-row">
+            <div><label>Medical/Dental Expenses</label><input type="text" name="item_medical" placeholder="0"></div>
+            <div><label>State &amp; Local Income Taxes</label><input type="text" name="item_state_taxes" placeholder="0"></div>
+        </div>
+        <div class="form-row">
+            <div><label>Real Estate Taxes</label><input type="text" name="item_property_taxes" placeholder="0"></div>
+            <div><label>Home Mortgage Interest</label><input type="text" name="item_mortgage" placeholder="0"></div>
+        </div>
+        <div class="form-row">
+            <div><label>Charitable (Cash)</label><input type="text" name="item_charitable_cash" placeholder="0"></div>
+            <div><label>Charitable (Non-Cash)</label><input type="text" name="item_charitable_noncash" placeholder="0"></div>
+        </div>
+    </div>
+
+    {# ─── Dependents ─────────────────────────────────────────── #}
+    <div class="card">
+        <h2>Dependents</h2>
+        <div class="form-row">
+            <div><label>Qualifying Children (for Child Tax Credit)</label><input type="number" name="qualifying_children" value="0" min="0" max="20"></div>
+        </div>
+    </div>
+
+    {# ─── Estimated Payments ─────────────────────────────────── #}
+    <div class="card">
+        <h2>Estimated Tax Payments</h2>
+        <div class="form-row">
+            <div><label>Estimated Payments (1040 Line 26)</label><input type="text" name="estimated_payments" placeholder="0"></div>
+        </div>
     </div>
 
     <button class="btn" type="submit">Compare MFJ vs MFS</button>
@@ -194,6 +258,11 @@ function getTemplate(section, idx) {
             + '<div class="form-row">'
             + '<div><label>Wages (Box 1)</label><input type="text" name="' + prefix + '_wages" placeholder="85000"></div>'
             + '<div><label>Federal Withheld (Box 2)</label><input type="text" name="' + prefix + '_federal_withheld" placeholder="12000"></div>'
+            + '</div>'
+            + '<div class="form-row-3">'
+            + '<div><label>State (Box 15)</label><input type="text" name="' + prefix + '_state" placeholder="GA" maxlength="2"></div>'
+            + '<div><label>State Wages (Box 16)</label><input type="text" name="' + prefix + '_state_wages" placeholder="85000"></div>'
+            + '<div><label>State Withheld (Box 17)</label><input type="text" name="' + prefix + '_state_withheld" placeholder="4000"></div>'
             + '</div></div>';
     }
     if (section.endsWith('_1099int')) {
@@ -222,6 +291,10 @@ function getTemplate(section, idx) {
             + '<div class="form-row">'
             + '<div><label>Proceeds</label><input type="text" name="' + prefix + '_proceeds" placeholder="900"></div>'
             + '<div><label>Cost Basis</label><input type="text" name="' + prefix + '_basis" placeholder="200"></div>'
+            + '</div>'
+            + '<div class="form-row">'
+            + '<div><label>Federal Withheld</label><input type="text" name="' + prefix + '_federal_withheld" placeholder="0"></div>'
+            + '<div class="checkbox-row"><input type="checkbox" name="' + prefix + '_long_term" value="1"><label style="margin-bottom:0">Long-term (held &gt; 1 year)</label></div>'
             + '</div></div>';
     }
     return '';

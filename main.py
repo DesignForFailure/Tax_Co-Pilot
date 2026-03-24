@@ -134,7 +134,7 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost
 
 _CSP = (
     "default-src 'self'; "
-    "script-src 'self'; "
+    "script-src 'self' 'unsafe-inline'; "
     "style-src 'self' 'unsafe-inline'; "
     "img-src 'self' data:; "
     "connect-src 'self'; "
@@ -714,42 +714,70 @@ def _parse_tax_input_from_form(fd: FormData) -> TaxReturnInput:
 
 
 @app.post("/calculate")
-async def calculate_submit(request: Request) -> RedirectResponse:
+async def calculate_submit(request: Request) -> Response:
     fd = await request.form()
     _verify_csrf(request, str(fd.get("csrf_token", "")))
+    csrf = _get_csrf_token(request)
 
-    inputs = _parse_tax_input_from_form(fd)
+    try:
+        inputs = _parse_tax_input_from_form(fd)
 
-    states_needed = {
-        w.state.upper()
-        for tp in inputs.taxpayers
-        for w in tp.w2s
-        if w.state
-    }
-    residence = str(fd.get("state_of_residence", "")).strip().upper()
-    if residence:
-        states_needed.add(residence)
-    pack_variant = _form_str(fd, "pack_variant") or "standard"
-    if pack_variant != "standard":
-        from app.services.rule_pack_editor import _pack_path
-        fed_custom_dir = _pack_path("federal", inputs.tax_year, pack_variant)
-        if fed_custom_dir.exists():
-            fed_pack = RulePack.load(fed_custom_dir)
+        states_needed = {
+            w.state.upper()
+            for tp in inputs.taxpayers
+            for w in tp.w2s
+            if w.state
+        }
+        residence = str(fd.get("state_of_residence", "")).strip().upper()
+        if residence:
+            states_needed.add(residence)
+        pack_variant = _form_str(fd, "pack_variant") or "standard"
+        if pack_variant != "standard":
+            from app.services.rule_pack_editor import _pack_path
+            fed_custom_dir = _pack_path("federal", inputs.tax_year, pack_variant)
+            if fed_custom_dir.exists():
+                fed_pack = RulePack.load(fed_custom_dir)
+            else:
+                fed_pack = _get_federal_pack(inputs.tax_year)
         else:
             fed_pack = _get_federal_pack(inputs.tax_year)
-    else:
-        fed_pack = _get_federal_pack(inputs.tax_year)
-    year_state_packs = _get_state_packs(inputs.tax_year)
-    active_state_packs = {
-        s: year_state_packs[s] for s in sorted(states_needed) if s in year_state_packs
-    }
-    run = CalculationEngine(
-        fed_pack, inputs, state_packs=active_state_packs
-    ).run()
-    run_dict = json.loads(run.model_dump_json())
-    save_return_run(run_dict)
+        year_state_packs = _get_state_packs(inputs.tax_year)
+        active_state_packs = {
+            s: year_state_packs[s] for s in sorted(states_needed) if s in year_state_packs
+        }
+        run = CalculationEngine(
+            fed_pack, inputs, state_packs=active_state_packs
+        ).run()
+        run_dict = json.loads(run.model_dump_json())
+        save_return_run(run_dict)
 
-    return RedirectResponse(url="/", status_code=303)
+        return RedirectResponse(url="/", status_code=303)
+    except ValueError as exc:
+        all_packs = list_rule_packs()
+        states_by_year = _available_states_by_year()
+        posted_year = int(str(fd.get("tax_year", 0)) or 0)
+        if posted_year in available_years:
+            default_year = posted_year
+        else:
+            default_year = 2024 if 2024 in available_years else max(available_years, default=0)
+        posted_filing = str(fd.get("filing_status", ""))
+        resp = templates.TemplateResponse(
+            request,
+            "pages/calculate.html",
+            {
+                "csrf": csrf,
+                "available_years": available_years,
+                "available_states": states_by_year.get(default_year, []),
+                "available_states_by_year": states_by_year,
+                "default_year": default_year,
+                "default_filing": posted_filing,
+                "pack_variants": all_packs,
+                "error": str(exc),
+            },
+            status_code=400,
+        )
+        resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+        return resp
 
 
 @app.get("/runs", response_class=HTMLResponse)
@@ -901,11 +929,11 @@ async def import_csv_submit(request: Request) -> Response:
     resp = templates.TemplateResponse(request, 
         "pages/import_csv.html",
         {
-            
             "csrf": csrf,
             "records": record_dicts,
             "errors": errors,
             "record_type": record_type,
+            "csv_text": csv_text,
         },
     )
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")

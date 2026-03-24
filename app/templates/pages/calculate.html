@@ -5,6 +5,13 @@
 <h1 style="font-size: 24px; margin-bottom: 8px;">Enter Tax Data</h1>
 <p class="text-dim text-sm mb-4">Add income forms for each taxpayer. Use the + buttons to add multiple entries.</p>
 
+{% if error %}
+<div class="card" style="border-color: var(--red); margin-bottom: 20px;">
+    <h2 style="color: var(--red);">Calculation Error</h2>
+    <p style="margin-top: 8px;">{{ error }}</p>
+</div>
+{% endif %}
+
 <form method="POST" action="/calculate">
     <input type="hidden" name="csrf_token" value="{{ csrf }}">
 
@@ -22,12 +29,13 @@
             </div>
             <div>
                 <label>Filing Status</label>
+                {% set fs = default_filing|default("mfj") %}
                 <select name="filing_status" id="filing_status" onchange="toggleSpouse()">
-                    <option value="single">Single</option>
-                    <option value="mfj" selected>Married Filing Jointly</option>
-                    <option value="mfs">Married Filing Separately</option>
-                    <option value="hoh">Head of Household</option>
-                    <option value="qss">Qualifying Surviving Spouse</option>
+                    <option value="single" {% if fs == "single" %}selected{% endif %}>Single</option>
+                    <option value="mfj" {% if fs == "mfj" %}selected{% endif %}>Married Filing Jointly</option>
+                    <option value="mfs" {% if fs == "mfs" %}selected{% endif %}>Married Filing Separately</option>
+                    <option value="hoh" {% if fs == "hoh" %}selected{% endif %}>Head of Household</option>
+                    <option value="qss" {% if fs == "qss" %}selected{% endif %}>Qualifying Surviving Spouse</option>
                 </select>
             </div>
             <div>

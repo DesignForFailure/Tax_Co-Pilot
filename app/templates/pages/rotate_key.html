@@ -1,33 +1,56 @@
 {% extends "layouts/base.html" %}
 {% block title %}Rotate Encryption Key{% endblock %}
 {% block content %}
-<div style="max-width: 500px; margin: 2rem auto;">
-  <h2>Rotate Encryption Key</h2>
-  {% if error %}
-  <div style="color: #c00; border: 1px solid #c00; padding: 0.5rem; margin-bottom: 1rem;">
-    {{ error }}
-  </div>
-  {% endif %}
-  {% if success %}
-  <div style="color: #060; border: 1px solid #060; padding: 0.5rem; margin-bottom: 1rem;">
-    Key rotated successfully.
-  </div>
-  {% endif %}
-  <form method="post" action="/rotate-key">
-    <input type="hidden" name="csrf_token" value="{{ csrf }}">
-    <div style="margin-bottom: 1rem;">
-      <label for="current_password">Current Password</label><br>
-      <input type="password" id="current_password" name="current_password" required style="width: 100%;">
+<div style="max-width: 500px; margin: 80px auto;">
+    <div class="card">
+        <div style="text-align: center; margin-bottom: 24px;">
+            <h2 style="margin-bottom: 8px;">Rotate Encryption Key</h2>
+            <p class="text-dim text-sm">Change the password used to encrypt your tax database</p>
+        </div>
+
+        {% if error %}
+        <div style="background: var(--red); color: white; padding: 12px; border-radius: 10px; margin-bottom: 16px; font-size: 14px;">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        {% if success %}
+        <div style="background: var(--green); color: #0f1117; padding: 12px; border-radius: 10px; margin-bottom: 16px; font-size: 14px; font-weight: 600;">
+            Key rotated successfully.
+        </div>
+        {% endif %}
+
+        <form method="POST" action="/rotate-key">
+            <input type="hidden" name="csrf_token" value="{{ csrf }}">
+
+            <div style="margin-bottom: 16px;">
+                <label for="current_password">Current Password</label>
+                <input type="password" id="current_password" name="current_password" required
+                       placeholder="Enter current password" style="font-size: 16px;">
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label for="new_password">New Password</label>
+                <input type="password" id="new_password" name="new_password" required
+                       placeholder="Enter new password" style="font-size: 16px;">
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label for="confirm_new_password">Confirm New Password</label>
+                <input type="password" id="confirm_new_password" name="confirm_new_password" required
+                       placeholder="Confirm new password" style="font-size: 16px;">
+            </div>
+
+            <button type="submit" class="btn" style="width: 100%; padding: 12px; font-size: 15px;">
+                Rotate Key
+            </button>
+        </form>
+
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+            <p class="text-dim text-sm" style="text-align: center;">
+                Password must be at least 12 characters. This re-encrypts the entire database.
+            </p>
+        </div>
     </div>
-    <div style="margin-bottom: 1rem;">
-      <label for="new_password">New Password</label><br>
-      <input type="password" id="new_password" name="new_password" required style="width: 100%;">
-    </div>
-    <div style="margin-bottom: 1rem;">
-      <label for="confirm_new_password">Confirm New Password</label><br>
-      <input type="password" id="confirm_new_password" name="confirm_new_password" required style="width: 100%;">
-    </div>
-    <button type="submit">Rotate Key</button>
-  </form>
 </div>
 {% endblock %}

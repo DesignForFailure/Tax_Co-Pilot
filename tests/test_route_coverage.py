@@ -137,6 +137,51 @@ def test_unlock_post_empty_password() -> None:
     assert "error=" in resp.headers.get("location", "")
 
 
+# ─── Rotate Key ──────────────────────────────────────────────
+
+
+def test_rotate_key_get() -> None:
+    """GET /rotate-key returns 200."""
+    c = _client()
+    resp = c.get("/rotate-key")
+    assert resp.status_code == 200
+    assert "Rotate" in resp.text
+
+
+def test_rotate_key_post_mismatch() -> None:
+    """POST /rotate-key with mismatched passwords redirects with error."""
+    c = _client()
+    resp = c.post(
+        "/rotate-key",
+        data={
+            "csrf_token": CSRF,
+            "current_password": "oldpassword123",
+            "new_password": "newpassword1234",
+            "confirm_new_password": "differentpassword",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert "error=" in resp.headers.get("location", "")
+
+
+def test_rotate_key_post_same_password() -> None:
+    """POST /rotate-key where new == current redirects with error."""
+    c = _client()
+    resp = c.post(
+        "/rotate-key",
+        data={
+            "csrf_token": CSRF,
+            "current_password": "samepassword123",
+            "new_password": "samepassword123",
+            "confirm_new_password": "samepassword123",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert "error=" in resp.headers.get("location", "")
+
+
 # ─── Security Headers ────────────────────────────────────────
 
 
@@ -150,7 +195,7 @@ def test_security_headers_present() -> None:
     assert "Permissions-Policy" in resp.headers
     assert "Content-Security-Policy" in resp.headers
     csp = resp.headers.get("Content-Security-Policy", "")
-    assert "script-src 'self'" in csp
+    assert "script-src 'self' 'unsafe-inline'" in csp
     assert "unpkg.com" not in csp
     assert resp.headers.get("Cache-Control") == "no-store"
 

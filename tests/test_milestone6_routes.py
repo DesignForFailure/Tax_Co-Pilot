@@ -178,6 +178,17 @@ def test_import_csv_post_shows_parse_errors() -> None:
     assert "Line 2" in r.text  # error references CSV line 2
 
 
+def test_import_csv_preserves_input_text() -> None:
+    client = _client()
+    csv_text = "employer_name,wages,federal_withheld\nAcme,50000,8000"
+    r = client.post(
+        "/import-csv",
+        data={"csrf_token": CSRF, "record_type": "W2", "csv_text": csv_text},
+    )
+    assert r.status_code == 200
+    assert "Acme,50000,8000" in r.text
+
+
 def test_import_csv_post_csrf_rejected() -> None:
     client = _client()
     r = client.post(
