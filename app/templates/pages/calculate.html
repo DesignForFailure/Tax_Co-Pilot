@@ -14,9 +14,9 @@
         <div class="form-row">
             <div>
                 <label>Tax Year</label>
-                <select name="tax_year">
+                <select name="tax_year" id="tax_year" onchange="refreshStateOptions()">
                     {% for yr in available_years|sort(reverse=true) %}
-                    <option value="{{ yr }}" {% if yr == 2024 %}selected{% endif %}>{{ yr }}</option>
+                    <option value="{{ yr }}" {% if yr == default_year %}selected{% endif %}>{{ yr }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -32,7 +32,7 @@
             </div>
             <div>
                 <label>State of Residence</label>
-                <select name="state_of_residence">
+                <select name="state_of_residence" id="state_of_residence">
                     <option value="">— None —</option>
                     {% for st in available_states %}
                     <option value="{{ st }}">{{ st }}</option>
@@ -284,8 +284,32 @@ function toggleSpouse() {
     }
 }
 
+var availableStatesByYear = {{ available_states_by_year | tojson }};
+
+function refreshStateOptions() {
+    var yearSelect = document.getElementById('tax_year');
+    var stateSelect = document.getElementById('state_of_residence');
+    var previous = stateSelect.value;
+    var states = availableStatesByYear[yearSelect.value] || [];
+
+    stateSelect.innerHTML = '<option value="">— None —</option>';
+    states.forEach(function (stateCode) {
+        var opt = document.createElement('option');
+        opt.value = stateCode;
+        opt.textContent = stateCode;
+        stateSelect.appendChild(opt);
+    });
+
+    if (states.indexOf(previous) !== -1) {
+        stateSelect.value = previous;
+    }
+}
+
 /* Show spouse section on load if MFJ is pre-selected */
-document.addEventListener('DOMContentLoaded', toggleSpouse);
+document.addEventListener('DOMContentLoaded', function () {
+    refreshStateOptions();
+    toggleSpouse();
+});
 </script>
 
 {% endblock %}

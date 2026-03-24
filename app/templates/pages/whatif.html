@@ -6,6 +6,13 @@
 <p class="text-dim text-sm mb-4">Enter your household tax data below. The engine will automatically compare
     Married Filing Jointly (MFJ) and Married Filing Separately (MFS) and show you the savings.</p>
 
+{% if error %}
+<div class="card" style="border-color: var(--red); margin-bottom: 20px;">
+    <h2 style="color: var(--red);">Cannot Compare This Scenario Yet</h2>
+    <p style="margin-top: 8px;">{{ error }}</p>
+</div>
+{% endif %}
+
 <form method="POST" action="/whatif">
     <input type="hidden" name="csrf_token" value="{{ csrf }}">
     {# Filing status is fixed to mfj for the form — engine overrides it internally #}

@@ -81,12 +81,12 @@ Each tax run produces an immutable **Calculation Artifact** containing:
 
 The initial MVP focuses on proving the architecture:
 
-- One tax year
+- Multiple tax years (currently 2023 and 2024 rule packs)
 - Simplified federal 1040-style calculation
 - W-2 and basic 1099 income
 - Withholding and estimated payments
 - Two-person filing support
-- One state module stub
+- Multiple state packs with expanding coverage
 - Local web UI
 - Full calculation trace
 
@@ -309,8 +309,6 @@ Tax_Co-Pilot/
 ├── README.txt
 ├── ROADMAP.md
 ├── SECURITY.md
-├── data/
-│   └── tax_copilot.db
 ├── main.py
 ├── pyproject.toml
 ├── requirements-dev.txt
@@ -379,7 +377,6 @@ The Python **[cryptography](https://github.com/pyca/cryptography)** library is u
 | python-multipart | Apache-2.0   | Form data parsing        |
 | pysqlcipher3     | zlib/libpng  | SQLCipher Python binding |
 | keyring          | MIT          | OS credential storage    |
-| htmx             | 0BSD         | Frontend interactivity   |
 
 All third-party licenses are permissive and compatible with AGPL-3.0. Full attribution details are in [docs/NOTICE.md](docs/NOTICE.md).
 

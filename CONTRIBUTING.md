@@ -65,11 +65,11 @@ Current CI behavior:
   - `ruff check .`
   - `mypy .`
   - `pytest` (with JUnit output and optional coverage XML)
-- Runs `pip-audit` as **non-blocking** for now (`continue-on-error: true`).
+- Runs `pip-audit` as a blocking quality gate.
 - Uploads `test-results/` artifacts (JUnit + coverage when enabled).
 
 ### What this means for contributors
 
 - Treat `ruff`, `mypy`, and `pytest` as required checks before opening a PR.
-- Expect `pip-audit` findings to be visible in CI logs, but not to fail the workflow initially.
+- Expect `pip-audit` findings to fail CI until the dependency issue is fixed or explicitly addressed.
 - If you disable coverage or artifact upload in CI env flags, ensure the change is intentional and documented in your PR.

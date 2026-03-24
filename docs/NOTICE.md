@@ -27,8 +27,7 @@ endorsement by the respective authors or organizations.
 9. [SQLCipher Python Binding — pysqlcipher3](#9-sqlcipher-python-binding--pysqlcipher3)
 10. [Cryptography Library](#10-cryptography-library)
 11. [Credential Storage — keyring](#11-credential-storage--keyring)
-12. [Frontend — htmx](#12-frontend--htmx)
-13. [Transitive Dependencies](#13-transitive-dependencies)
+12. [Transitive Dependencies](#12-transitive-dependencies)
 
 ---
 
@@ -240,21 +239,7 @@ Copyright Jason R. Coombs
 
 ---
 
-## 12. Frontend — htmx
-
-```
-Copyright Big Sky Software
-```
-
-- **License:** 0BSD (Zero-Clause BSD)
-- **Website:** https://htmx.org/
-- **Source:** https://github.com/bigskysoftware/htmx
-
-The 0BSD license imposes no attribution or redistribution requirements.
-
----
-
-## 13. Transitive Dependencies
+## 12. Transitive Dependencies
 
 The following packages are pulled in as transitive dependencies of the above
 libraries:
@@ -279,7 +264,6 @@ with the project's AGPL-3.0-or-later license:
 | Apache-2.0                 | Yes                  | python-multipart, OpenSSL 3.x                                |
 | Apache-2.0 OR BSD-3-Clause | Yes                  | cryptography                                                 |
 | zlib/libpng                | Yes                  | pysqlcipher3                                                 |
-| 0BSD                       | Yes                  | htmx                                                         |
 | Public Domain              | Yes                  | SQLite                                                       |
 
 **No license incompatibilities were found.**

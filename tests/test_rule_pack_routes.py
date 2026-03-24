@@ -46,6 +46,14 @@ def test_rule_packs_list_page() -> None:
     assert "federal" in r.text.lower()
 
 
+def test_rule_packs_create_form_lists_supported_jurisdictions() -> None:
+    c = _client()
+    r = c.get("/rule-packs")
+    assert r.status_code == 200
+    assert 'option value="AK"' in r.text
+    assert 'option value="WY"' in r.text
+
+
 def test_pack_detail_page() -> None:
     c = _client()
     r = c.get("/rule-packs/federal/2024/standard")

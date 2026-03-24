@@ -18,7 +18,7 @@
 # 1. Copy this entire _template directory to rule_packs/state/{ST}/2024/
 # 2. Rename files: state_TEMPLATE_2024_*.yaml → state_{ST}_2024_*.yaml
 # 3. Replace "TEMPLATE" with your 2-letter state code (e.g., "CA")
-# 4. Replace all "{st}" in rule IDs with your lowercase state code
+# 4. Replace the "template" rule ID prefix with your lowercase state code
 # 5. Update constants and expressions for your state's tax law
 
 version: "0.1.0"

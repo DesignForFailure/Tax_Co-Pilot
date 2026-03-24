@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # State Expansion — Design Spec
 
 **Date:** 2026-03-16

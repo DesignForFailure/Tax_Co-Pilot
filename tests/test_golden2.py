@@ -33,6 +33,8 @@ import tempfile
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
+
 from app.engine.calculator import CalculationEngine
 from app.engine.rule_loader import RulePack
 from app.engine.whatif import WhatIfEngine
@@ -297,6 +299,39 @@ def test_whatif_mfj_vs_mfs() -> None:
     assert comparison.scenario_a.total_tax < comparison.scenario_b.total_tax
     assert comparison.recommendation == comparison.scenario_a.scenario_name
     assert comparison.savings > 0
+
+
+def test_whatif_rejects_unallocated_household_fields() -> None:
+    base = TaxReturnInput(
+        tax_year=2024,
+        filing_status=FilingStatus.MFJ,
+        other_income=Decimal("1000"),
+        taxpayers=[
+            Taxpayer(
+                role=TaxpayerRole.PRIMARY,
+                first_name="A",
+                last_name="B",
+                w2s=[
+                    W2Data(
+                        employer_name="X", wages=Decimal("50000"), federal_withheld=Decimal("6000")
+                    )
+                ],
+            ),
+            Taxpayer(
+                role=TaxpayerRole.SPOUSE,
+                first_name="C",
+                last_name="D",
+                w2s=[
+                    W2Data(
+                        employer_name="Y", wages=Decimal("35000"), federal_withheld=Decimal("4000")
+                    )
+                ],
+            ),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="cannot safely allocate household-level"):
+        WhatIfEngine(FED).compare_filing_status(base)
 
 
 # ═══════════════════════════════════════════════════════════════

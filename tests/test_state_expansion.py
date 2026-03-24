@@ -15,6 +15,7 @@ from app.models.domain import (
     TaxReturnInput,
     W2Data,
 )
+from main import _available_states_by_year
 
 BASE = Path(__file__).resolve().parent.parent
 FED = RulePack.load(BASE / "rule_packs" / "federal" / "2024")
@@ -185,6 +186,7 @@ def test_multi_state_w2s_produce_both_outputs() -> None:
     )
     run = CalculationEngine(FED, inp, state_packs={"GA": GA, "TX": TX}).run()
     assert len(run.state_outputs) == 2
+    assert [s.state for s in run.state_outputs] == ["GA", "TX"]
     states = {s.state for s in run.state_outputs}
     assert states == {"GA", "TX"}
 
@@ -194,6 +196,14 @@ def test_multi_state_w2s_produce_both_outputs() -> None:
     assert ga.state_withholding == Decimal("1500")
     assert tx.state_tax == Decimal("0")
     assert tx.state_withholding == Decimal("0")
+
+
+def test_available_states_are_year_specific() -> None:
+    """UI state choices should match the selected tax year's loaded packs."""
+    states_by_year = _available_states_by_year()
+    assert states_by_year[2023] == ["GA"]
+    assert "CA" not in states_by_year[2023]
+    assert "CA" in states_by_year[2024]
 
 
 def test_state_not_in_available_packs_is_ignored() -> None:

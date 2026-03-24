@@ -149,7 +149,7 @@ class CalculationEngine:
             return outs
 
         # Resolve withholding for every state in state_packs.
-        for state_code in self.state_packs:
+        for state_code in sorted(self.state_packs):
             sc = state_code.upper()
             self.resolved[f"input.withholding.state.{sc}"] = sum(
                 (
@@ -161,7 +161,8 @@ class CalculationEngine:
                 Decimal("0"),
             )
 
-        for state_code, sp in self.state_packs.items():
+        for state_code in sorted(self.state_packs):
+            sp = self.state_packs[state_code]
             orig_pack = self.rp
             self.rp = sp
             try:

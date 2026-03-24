@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests for rule pack editor service."""
 
 from __future__ import annotations
@@ -25,6 +24,7 @@ from pathlib import Path
 import pytest
 import yaml  # type: ignore
 
+from app.engine.rule_loader import RulePack
 from app.services.rule_pack_editor import (
     PackInfo,
     _pack_path,
@@ -185,6 +185,13 @@ def test_validate_pack_invalid(tmp_packs: Path) -> None:
     errors = validate_pack("federal", 2024, "custom_v99", base_dir=tmp_packs)
     assert len(errors) > 0
     assert "prefix" in errors[0].lower() or "WRONG" in errors[0]
+
+
+def test_repository_state_template_pack_is_valid() -> None:
+    template_dir = Path(__file__).resolve().parent.parent / "rule_packs" / "state" / "_template" / "2024"
+    pack = RulePack.load(template_dir)
+    assert pack.id_prefix == "template."
+    assert "template.2024.agi" in pack.rules
 
 
 def test_export_yaml(tmp_packs: Path) -> None:
