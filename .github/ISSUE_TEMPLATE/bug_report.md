@@ -7,6 +7,8 @@ assignees: ''
 
 ---
 
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+
 **Describe the bug**
 A clear and concise description of what the bug is.
 

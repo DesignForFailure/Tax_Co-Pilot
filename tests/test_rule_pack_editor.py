@@ -110,7 +110,7 @@ def test_list_all_packs_discovers_custom(tmp_packs: Path) -> None:
     custom_dir = tmp_packs / "federal" / "2024" / "custom_v1"
     custom_dir.mkdir()
     manifest = {
-        "version": "1",
+        "version": "1.0.0",
         "tax_year": 2024,
         "jurisdiction": "federal",
         "custom": True,
@@ -143,7 +143,7 @@ def test_list_all_packs_skips_underscore_dirs(tmp_packs: Path) -> None:
     tmpl = tmp_packs / "state" / "_template" / "2024"
     tmpl.mkdir(parents=True)
     (tmpl / "manifest.yaml").write_text(
-        yaml.dump({"version": "1", "tax_year": 2024, "jurisdiction": "template"})
+        yaml.dump({"version": "1.0.0", "tax_year": 2024, "jurisdiction": "template"})
     )
     (tmpl / "rules.yaml").write_text(yaml.dump({"rules": []}))
     packs = list_all_packs(base_dir=tmp_packs)
@@ -167,7 +167,7 @@ def test_validate_pack_invalid(tmp_packs: Path) -> None:
     bad_dir = tmp_packs / "federal" / "2024" / "custom_v99"
     bad_dir.mkdir()
     (bad_dir / "manifest.yaml").write_text(
-        yaml.dump({"version": "1", "tax_year": 2024, "jurisdiction": "federal"})
+        yaml.dump({"version": "1.0.0", "tax_year": 2024, "jurisdiction": "federal"})
     )
     (bad_dir / "rules.yaml").write_text(
         yaml.dump(
@@ -185,6 +185,20 @@ def test_validate_pack_invalid(tmp_packs: Path) -> None:
     errors = validate_pack("federal", 2024, "custom_v99", base_dir=tmp_packs)
     assert len(errors) > 0
     assert "prefix" in errors[0].lower() or "WRONG" in errors[0]
+
+
+def test_validate_pack_rejects_non_semver_version(tmp_packs: Path) -> None:
+    bad_dir = tmp_packs / "federal" / "2024" / "custom_v98"
+    bad_dir.mkdir()
+    (bad_dir / "manifest.yaml").write_text(
+        yaml.dump({"version": "1", "tax_year": 2024, "jurisdiction": "federal"})
+    )
+    (bad_dir / "rules.yaml").write_text(yaml.dump({"constants": {}, "rules": []}))
+
+    errors = validate_pack("federal", 2024, "custom_v98", base_dir=tmp_packs)
+    assert errors == [
+        "manifest.yaml 'version' must be a Semantic Version such as '1.0.0' or '1.0.0-alpha.1'"
+    ]
 
 
 def test_repository_state_template_pack_is_valid() -> None:
@@ -211,26 +225,31 @@ def test_clone_pack_creates_custom_v1(tmp_packs: Path) -> None:
     info = clone_pack("federal", 2024, "standard", "my_scenario", base_dir=tmp_packs)
     assert info.variant == "custom_v1"
     assert info.is_custom is True
+    assert info.version == "1.0.0"
     custom_dir = tmp_packs / "federal" / "2024" / "custom_v1"
     assert (custom_dir / "manifest.yaml").exists()
     assert (custom_dir / "rules.yaml").exists()
     m = yaml.safe_load((custom_dir / "manifest.yaml").read_text())
+    assert m["version"] == "1.0.0"
     assert m["custom"] is True
     assert m["custom_name"] == "my_scenario"
 
 
-def test_clone_auto_increments_version(tmp_packs: Path) -> None:
+def test_clone_auto_increments_variant(tmp_packs: Path) -> None:
     clone_pack("federal", 2024, "standard", "first", base_dir=tmp_packs)
     info2 = clone_pack("federal", 2024, "standard", "second", base_dir=tmp_packs)
     assert info2.variant == "custom_v2"
+    assert info2.version == "1.0.0"
     assert (tmp_packs / "federal" / "2024" / "custom_v2").exists()
 
 
 def test_create_empty_pack(tmp_packs: Path) -> None:
     info = create_empty_pack("federal", 2024, "blank_pack", base_dir=tmp_packs)
     assert info.is_custom is True
+    assert info.version == "0.1.0"
     custom_dir = tmp_packs / "federal" / "2024" / info.variant
     m = yaml.safe_load((custom_dir / "manifest.yaml").read_text())
+    assert m["version"] == "0.1.0"
     assert m["jurisdiction"] == "federal"
     r = yaml.safe_load((custom_dir / "rules.yaml").read_text())
     assert r["rules"] == []
@@ -283,7 +302,7 @@ def test_delete_custom_pack(tmp_packs: Path) -> None:
 
 def test_import_yaml_valid(tmp_packs: Path) -> None:
     manifest_bytes = yaml.dump(
-        {"version": "1", "tax_year": 2024, "jurisdiction": "federal"}
+        {"version": "1.2.3", "tax_year": 2024, "jurisdiction": "federal"}
     ).encode()
     rules_bytes = yaml.dump(
         {
@@ -301,7 +320,12 @@ def test_import_yaml_valid(tmp_packs: Path) -> None:
     ).encode()
     info = import_yaml(manifest_bytes, rules_bytes, custom_name="imported", base_dir=tmp_packs)
     assert info.is_custom is True
+    assert info.version == "1.2.3"
     assert (tmp_packs / "federal" / "2024" / info.variant / "manifest.yaml").exists()
+    manifest = yaml.safe_load(
+        (tmp_packs / "federal" / "2024" / info.variant / "manifest.yaml").read_text()
+    )
+    assert manifest["version"] == "1.2.3"
 
 
 def test_import_yaml_invalid_rejected(tmp_packs: Path) -> None:

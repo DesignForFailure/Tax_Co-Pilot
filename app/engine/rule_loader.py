@@ -39,6 +39,7 @@ Future improvements:
 from __future__ import annotations
 
 import hashlib
+import re
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -53,6 +54,16 @@ _ALLOWED_EXPR_CHARS = set(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_+-*/(),. "
 )
 _ALLOWED_FUNCS = {"max", "min"}
+_SEMVER_RE = re.compile(
+    r"^(0|[1-9]\d*)\."
+    r"(0|[1-9]\d*)\."
+    r"(0|[1-9]\d*)"
+    r"(?:-"
+    r"(?:(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)"
+    r"(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)"
+    r")?"
+    r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
+)
 
 
 class RulePackError(ValueError):
@@ -347,10 +358,17 @@ class RulePack:
         manifest = _read_yaml(manifest_path)
         rules_yaml = _read_yaml(rules_path)
 
-        version = str(manifest.get("version", "0.0.0"))
+        version = str(manifest.get("version", "")).strip()
         tax_year = int(manifest.get("tax_year", 0))
         jurisdiction = str(manifest.get("jurisdiction", "")).strip()
 
+        if not version:
+            raise RulePackError("manifest.yaml must include non-empty 'version'")
+        if not _SEMVER_RE.fullmatch(version):
+            raise RulePackError(
+                "manifest.yaml 'version' must be a Semantic Version such as "
+                "'1.0.0' or '1.0.0-alpha.1'"
+            )
         if tax_year <= 0:
             raise RulePackError("manifest.yaml must include a positive 'tax_year'")
         if not jurisdiction:

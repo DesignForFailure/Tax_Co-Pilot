@@ -1,3 +1,4 @@
+{# SPDX-License-Identifier: AGPL-3.0-or-later #}
 {% extends "layouts/base.html" %}
 {% block title %}Rule Packs{% endblock %}
 {% block content %}
@@ -40,7 +41,7 @@
     <div class="section-header">
         <div>
             <h2>Create a Custom Variant</h2>
-            <p class="text-dim text-sm">Start an empty editable pack when cloning an existing pack is not the right fit.</p>
+            <p class="text-dim text-sm">Start an empty editable pack when cloning an existing pack is not the right fit. New empty variants begin at manifest version <code>0.1.0</code>.</p>
         </div>
         <a href="#pack-list" class="btn btn-sm btn-outline">Jump to Pack List</a>
     </div>
@@ -97,7 +98,7 @@
                     <th>Year</th>
                     <th>Variant</th>
                     <th>Type</th>
-                    <th>Version</th>
+                    <th>SemVer</th>
                     <th class="align-right">Rules</th>
                     <th class="align-right">Actions</th>
                 </tr>

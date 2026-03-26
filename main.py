@@ -52,6 +52,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.datastructures import FormData, UploadFile
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from app import __version__
 from app.config import config as encryption_config
 from app.engine.calculator import CalculationEngine
 from app.engine.rule_loader import RulePack
@@ -125,7 +126,7 @@ async def _lifespan(a: FastAPI) -> AsyncIterator[None]:  # noqa: ARG001
     clear_cached_password()
 
 
-app = FastAPI(title="Tax Copilot", version="0.1.0", lifespan=_lifespan)
+app = FastAPI(title="Tax Copilot", version=__version__, lifespan=_lifespan)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
 
 # ─── Security headers (defense-in-depth) ───────────────────────

@@ -41,6 +41,7 @@ _JURISDICTION_RE = re.compile(r"^[a-zA-Z]{2,10}$")
 _VARIANT_RE = re.compile(r"^(standard|custom_v\d+)$")
 _RULE_ID_RE = re.compile(r"^[a-z]{2,10}\.\d{4}\.[a-z0-9_.]+$")
 _FEDERAL_JURISDICTIONS = {"federal", "fed"}
+_DEFAULT_CUSTOM_PACK_VERSION = "0.1.0"
 
 
 def _validate_custom_name(name: str) -> None:
@@ -274,8 +275,8 @@ def export_yaml(
     return manifest_path.read_bytes(), rules_path.read_bytes()
 
 
-def _next_custom_version(pack_parent_dir: Path) -> int:
-    """Find the next available custom_vN number in a year directory."""
+def _next_custom_variant_number(pack_parent_dir: Path) -> int:
+    """Find the next available custom_vN suffix in a year directory."""
     existing = [
         int(d.name.split("_v")[1])
         for d in pack_parent_dir.iterdir()
@@ -312,11 +313,12 @@ def clone_pack(
     source_dir = _pack_path(jurisdiction, year, source_variant, base_dir=base_dir)
     if not source_dir.exists():
         raise ValueError(f"Source pack not found: {source_dir}")
+    source_pack = RulePack.load(source_dir)
 
-    # Determine parent dir (the year directory) for version scanning
+    # Determine parent dir (the year directory) for variant scanning.
     parent_dir = source_dir if source_variant == "standard" else source_dir.parent
-    version = _next_custom_version(parent_dir)
-    variant = f"custom_v{version}"
+    variant_number = _next_custom_variant_number(parent_dir)
+    variant = f"custom_v{variant_number}"
 
     target_dir = parent_dir / variant
     try:
@@ -341,7 +343,6 @@ def clone_pack(
         candidates = list(source_dir.glob("*manifest*.yaml"))
         source_manifest = candidates[0] if candidates else source_dir / "manifest.yaml"
     manifest_data = _read_yaml(source_manifest)
-    manifest_data["version"] = str(version)
     manifest_data["custom"] = True
     manifest_data["custom_name"] = custom_name
     _atomic_write_yaml(target_dir / "manifest.yaml", manifest_data)
@@ -361,7 +362,7 @@ def clone_pack(
         year=year,
         variant=variant,
         is_custom=True,
-        version=str(version),
+        version=source_pack.version,
         custom_name=custom_name,
         rule_count=rule_count,
     )
@@ -376,8 +377,8 @@ def create_empty_pack(
     if not parent_dir.exists():
         parent_dir.mkdir(parents=True, exist_ok=True)
 
-    version = _next_custom_version(parent_dir)
-    variant = f"custom_v{version}"
+    variant_number = _next_custom_variant_number(parent_dir)
+    variant = f"custom_v{variant_number}"
     target_dir = parent_dir / variant
     try:
         target_dir.mkdir(parents=True, exist_ok=False)
@@ -388,7 +389,7 @@ def create_empty_pack(
 
     j_lower = jurisdiction.lower()
     manifest: dict[str, Any] = {
-        "version": str(version),
+        "version": _DEFAULT_CUSTOM_PACK_VERSION,
         "tax_year": year,
         "jurisdiction": "federal" if j_lower in _FEDERAL_JURISDICTIONS else jurisdiction.upper(),
         "custom": True,
@@ -404,7 +405,7 @@ def create_empty_pack(
         year=year,
         variant=variant,
         is_custom=True,
-        version=str(version),
+        version=_DEFAULT_CUSTOM_PACK_VERSION,
         custom_name=custom_name,
         rule_count=0,
     )
@@ -525,21 +526,20 @@ def import_yaml(
     if not parent_dir.exists():
         parent_dir.mkdir(parents=True, exist_ok=True)
 
-    version = _next_custom_version(parent_dir)
-    variant = f"custom_v{version}"
+    variant_number = _next_custom_variant_number(parent_dir)
+    variant = f"custom_v{variant_number}"
     target_dir = parent_dir / variant
     target_dir.mkdir(parents=True, exist_ok=False)
 
     # Write files
     manifest["custom"] = True
     manifest["custom_name"] = custom_name
-    manifest["version"] = str(version)
     _atomic_write_yaml(target_dir / "manifest.yaml", manifest)
     (target_dir / "rules.yaml").write_bytes(rules_bytes)
 
     # Validate — if invalid, clean up
     try:
-        RulePack.load(target_dir)
+        pack = RulePack.load(target_dir)
     except Exception as exc:
         shutil.rmtree(target_dir, ignore_errors=True)
         raise ValueError(f"Validation failed: {exc}") from exc
@@ -556,7 +556,7 @@ def import_yaml(
         year=tax_year,
         variant=variant,
         is_custom=True,
-        version=str(version),
+        version=pack.version,
         custom_name=custom_name,
         rule_count=rule_count,
     )

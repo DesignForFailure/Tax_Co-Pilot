@@ -211,7 +211,7 @@ def test_import_page_renders() -> None:
 def test_import_upload_valid() -> None:
     c = _client()
     manifest = _yaml.dump(
-        {"version": "1", "tax_year": 2024, "jurisdiction": "federal"}
+        {"version": "1.2.3", "tax_year": 2024, "jurisdiction": "federal"}
     ).encode()
     rules = _yaml.dump(
         {

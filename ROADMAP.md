@@ -7,7 +7,7 @@ This roadmap reflects the near-term plan for evolving Tax_Co-Pilot from MVP/alph
 
 ## Current Stage
 
-**Status:** MVP / alpha (`0.1.x-alpha`)  
+**Status:** MVP / alpha (current SemVer line: `0.1.x`)  
 **Focus:** Prove correctness, reproducibility, and auditability of core architecture.
 
 ---

@@ -16,3 +16,5 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """Tax Copilot application package."""
+
+__version__ = "0.1.0"
