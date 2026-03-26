@@ -2,23 +2,53 @@
 {% block title %}What-If Comparison{% endblock %}
 {% block content %}
 
-<h1 style="font-size: 24px; margin-bottom: 8px;">What-If: MFJ vs MFS</h1>
-<p class="text-dim text-sm mb-4">Enter your household tax data below. The engine will automatically compare
-    Married Filing Jointly (MFJ) and Married Filing Separately (MFS) and show you the savings.</p>
+<section class="page-header">
+    <div>
+        <div class="eyebrow">What-If Analysis</div>
+        <h1 class="page-title">Compare MFJ and MFS from a single guided page.</h1>
+        <p class="page-subtitle">
+            This workflow mirrors the main calculation page, but it keeps the comparison results close to the form so
+            you can revise assumptions and rerun the scenario without losing context.
+        </p>
+    </div>
+    <div class="action-row">
+        <a href="/dashboard" class="btn btn-outline">Dashboard</a>
+        <a href="/calculate" class="btn btn-outline">Standard Calculation</a>
+    </div>
+</section>
+
+<section class="card">
+    <div class="section-header">
+        <div>
+            <h2>Page Navigation</h2>
+            <p class="text-dim text-sm">Jump between filing info, taxpayers, household fields, and the comparison results.</p>
+        </div>
+        <a href="#comparison-results" class="btn btn-sm btn-outline">Jump to Results</a>
+    </div>
+    <div class="jump-nav">
+        <a href="#whatif-filing" class="jump-link">Filing</a>
+        <a href="#whatif-primary" class="jump-link">Primary Taxpayer</a>
+        <a href="#whatif-spouse" class="jump-link">Spouse</a>
+        <a href="#whatif-other-income" class="jump-link">Other Income</a>
+        <a href="#whatif-adjustments" class="jump-link">Adjustments</a>
+        <a href="#whatif-itemized" class="jump-link">Itemized Deductions</a>
+        <a href="#whatif-dependents" class="jump-link">Dependents</a>
+        <a href="#whatif-payments" class="jump-link">Payments</a>
+    </div>
+</section>
 
 {% if error %}
-<div class="card" style="border-color: var(--red); margin-bottom: 20px;">
+<div class="notice notice-error">
     <h2 style="color: var(--red);">Cannot Compare This Scenario Yet</h2>
-    <p style="margin-top: 8px;">{{ error }}</p>
+    <p>{{ error }}</p>
 </div>
 {% endif %}
 
 <form method="POST" action="/whatif">
     <input type="hidden" name="csrf_token" value="{{ csrf }}">
-    {# Filing status is fixed to mfj for the form — engine overrides it internally #}
     <input type="hidden" name="filing_status" value="mfj">
 
-    <div class="card">
+    <div class="card section-anchor" id="whatif-filing">
         <h2>Filing Information</h2>
         <div class="form-row">
             <div>
@@ -32,8 +62,7 @@
         </div>
     </div>
 
-    {# ─── Primary Taxpayer ───────────────────────────────────── #}
-    <div class="card">
+    <div class="card section-anchor" id="whatif-primary">
         <h2>Primary Taxpayer</h2>
         <div class="form-row">
             <div><label>First Name</label><input type="text" name="p_first" required></div>
@@ -79,8 +108,7 @@
         <div id="p_1099b_container" class="dynamic-section"></div>
     </div>
 
-    {# ─── Spouse Taxpayer ────────────────────────────────────── #}
-    <div class="card">
+    <div class="card section-anchor" id="whatif-spouse">
         <h2>Spouse</h2>
         <div class="form-row">
             <div><label>First Name</label><input type="text" name="s_first"></div>
@@ -112,16 +140,14 @@
         <div id="s_1099b_container" class="dynamic-section"></div>
     </div>
 
-    {# ─── Other Income ────────────────────────────────────────── #}
-    <div class="card">
+    <div class="card section-anchor" id="whatif-other-income">
         <h2>Other Income</h2>
         <div class="form-row">
             <div><label>Other Income (Schedule 1)</label><input type="text" name="other_income" placeholder="0"></div>
         </div>
     </div>
 
-    {# ─── Above-the-Line Deductions ──────────────────────────── #}
-    <div class="card">
+    <div class="card section-anchor" id="whatif-adjustments">
         <h2>Above-the-Line Deductions</h2>
         <p class="text-dim text-sm" style="margin-bottom:12px;">These reduce your AGI. Leave blank or 0 if not applicable.</p>
         <div class="form-row">
@@ -137,8 +163,7 @@
         </div>
     </div>
 
-    {# ─── Itemized Deductions (Schedule A) ───────────────────── #}
-    <div class="card">
+    <div class="card section-anchor" id="whatif-itemized">
         <h2>Itemized Deductions (Schedule A)</h2>
         <p class="text-dim text-sm" style="margin-bottom:12px;">Leave blank to use the standard deduction. The higher of standard or itemized will be applied automatically.</p>
         <div class="form-row">
@@ -155,30 +180,34 @@
         </div>
     </div>
 
-    {# ─── Dependents ─────────────────────────────────────────── #}
-    <div class="card">
+    <div class="card section-anchor" id="whatif-dependents">
         <h2>Dependents</h2>
         <div class="form-row">
             <div><label>Qualifying Children (for Child Tax Credit)</label><input type="number" name="qualifying_children" value="0" min="0" max="20"></div>
         </div>
     </div>
 
-    {# ─── Estimated Payments ─────────────────────────────────── #}
-    <div class="card">
+    <div class="card section-anchor" id="whatif-payments">
         <h2>Estimated Tax Payments</h2>
         <div class="form-row">
             <div><label>Estimated Payments (1040 Line 26)</label><input type="text" name="estimated_payments" placeholder="0"></div>
         </div>
     </div>
 
-    <button class="btn" type="submit">Compare MFJ vs MFS</button>
+    <div class="action-row">
+        <button class="btn" type="submit">Compare MFJ vs MFS</button>
+        <a href="/runs" class="btn btn-outline">Saved Runs</a>
+    </div>
 </form>
 
-{# ─── Results ─────────────────────────────────────────────── #}
 {% if comparison %}
-<div style="margin-top: 32px;">
-    <h2 style="font-size: 20px; margin-bottom: 16px;">Comparison Results</h2>
-
+<section class="card section-anchor" id="comparison-results" style="margin-top: 28px;">
+    <div class="section-header">
+        <div>
+            <h2>Comparison Results</h2>
+            <p class="text-dim text-sm">Review the headline outputs first, then inspect the per-field diff table.</p>
+        </div>
+    </div>
     <div class="summary-grid">
         <div class="summary-item">
             <div class="label">MFJ — Federal Tax</div>
@@ -209,38 +238,36 @@
             </div>
         </div>
     </div>
-
-    <div class="card">
-        <h2>Diffs</h2>
-        <table style="width:100%;border-collapse:collapse;">
+    <div class="table-wrap">
+        <table class="data-table">
             <thead>
                 <tr>
-                    <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Metric</th>
-                    <th style="text-align:right;padding:8px;border-bottom:1px solid var(--border);">MFJ</th>
-                    <th style="text-align:right;padding:8px;border-bottom:1px solid var(--border);">MFS</th>
+                    <th>Metric</th>
+                    <th class="align-right">MFJ</th>
+                    <th class="align-right">MFS</th>
                 </tr>
             </thead>
             <tbody>
             {% for d in comparison.diffs %}
                 <tr>
-                    <td style="padding:8px;border-bottom:1px solid var(--border);">{{ d.metric }}</td>
-                    <td style="padding:8px;border-bottom:1px solid var(--border);text-align:right;">${{ "{:,.0f}".format(d.mfj|float) }}</td>
-                    <td style="padding:8px;border-bottom:1px solid var(--border);text-align:right;">${{ "{:,.0f}".format(d.mfs|float) }}</td>
+                    <td>{{ d.metric }}</td>
+                    <td class="align-right">${{ "{:,.0f}".format(d.mfj|float) }}</td>
+                    <td class="align-right">${{ "{:,.0f}".format(d.mfs|float) }}</td>
                 </tr>
             {% endfor %}
             </tbody>
         </table>
     </div>
 
-    <div class="card" style="border-color: var(--accent);">
+    <div class="notice" style="margin-top: 20px; border-left: 4px solid var(--accent);">
         <h2>Recommendation: <span style="color: var(--accent);">{{ comparison.recommendation.upper() }}</span></h2>
-        <p style="margin-top: 8px;">
+        <p>
             Filing as <strong>{{ comparison.recommendation.upper() }}</strong> saves
             <strong style="color: var(--green);">${{ "{:,.0f}".format(comparison.savings) }}</strong>
             in federal tax compared to the other option.
         </p>
     </div>
-</div>
+</section>
 {% endif %}
 
 <script>

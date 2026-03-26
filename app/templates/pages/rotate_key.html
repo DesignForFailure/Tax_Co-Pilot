@@ -1,56 +1,92 @@
 {% extends "layouts/base.html" %}
 {% block title %}Rotate Encryption Key{% endblock %}
 {% block content %}
-<div style="max-width: 500px; margin: 80px auto;">
-    <div class="card">
-        <div style="text-align: center; margin-bottom: 24px;">
-            <h2 style="margin-bottom: 8px;">Rotate Encryption Key</h2>
-            <p class="text-dim text-sm">Change the password used to encrypt your tax database</p>
-        </div>
 
-        {% if error %}
-        <div style="background: var(--red); color: white; padding: 12px; border-radius: 10px; margin-bottom: 16px; font-size: 14px;">
-            {{ error }}
-        </div>
-        {% endif %}
-
-        {% if success %}
-        <div style="background: var(--green); color: #0f1117; padding: 12px; border-radius: 10px; margin-bottom: 16px; font-size: 14px; font-weight: 600;">
-            Key rotated successfully.
-        </div>
-        {% endif %}
-
-        <form method="POST" action="/rotate-key">
-            <input type="hidden" name="csrf_token" value="{{ csrf }}">
-
-            <div style="margin-bottom: 16px;">
-                <label for="current_password">Current Password</label>
-                <input type="password" id="current_password" name="current_password" required
-                       placeholder="Enter current password" style="font-size: 16px;">
-            </div>
-
-            <div style="margin-bottom: 16px;">
-                <label for="new_password">New Password</label>
-                <input type="password" id="new_password" name="new_password" required
-                       placeholder="Enter new password" style="font-size: 16px;">
-            </div>
-
-            <div style="margin-bottom: 16px;">
-                <label for="confirm_new_password">Confirm New Password</label>
-                <input type="password" id="confirm_new_password" name="confirm_new_password" required
-                       placeholder="Confirm new password" style="font-size: 16px;">
-            </div>
-
-            <button type="submit" class="btn" style="width: 100%; padding: 12px; font-size: 15px;">
-                Rotate Key
-            </button>
-        </form>
-
-        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
-            <p class="text-dim text-sm" style="text-align: center;">
-                Password must be at least 12 characters. This re-encrypts the entire database.
+<div class="content-narrow">
+    <section class="page-header">
+        <div>
+            <div class="eyebrow">Encryption</div>
+            <h1 class="page-title">Rotate the database key without leaving the workspace shell.</h1>
+            <p class="page-subtitle">
+                Change the password that protects the encrypted database. This re-encrypts the entire file, so keep
+                the current password available before you start.
             </p>
         </div>
+        <div class="action-row">
+            <a href="/dashboard" class="btn btn-outline">Back to Dashboard</a>
+        </div>
+    </section>
+
+    {% if error %}
+    <div class="notice notice-error">
+        <h2 class="heading-danger">Rotation Error</h2>
+        <p class="text-dim text-sm">{{ error }}</p>
     </div>
+    {% endif %}
+
+    {% if success %}
+    <div class="notice notice-success">
+        <h2 class="heading-success">Key Rotated</h2>
+        <p class="text-dim text-sm">{{ success }}</p>
+    </div>
+    {% endif %}
+
+    <section class="hero">
+        <div class="stack-lg">
+            <div>
+                <div class="eyebrow">Before You Continue</div>
+                <h2 class="card-title">Use a new strong password and verify it carefully.</h2>
+                <p class="page-subtitle">
+                    Rotation updates the database encryption key in place. If the new password is lost, the encrypted
+                    data becomes inaccessible.
+                </p>
+            </div>
+            <div class="panel-grid-2">
+                <div class="meta-card">
+                    <div class="meta-label">Minimum Length</div>
+                    <div class="meta-value">12+</div>
+                </div>
+                <div class="meta-card">
+                    <div class="meta-label">Scope</div>
+                    <div class="meta-value">Entire DB</div>
+                </div>
+            </div>
+            <div class="card card-warning">
+                <h2>Operational Note</h2>
+                <p class="text-dim text-sm">
+                    Rotate the key only after the database is unlocked and stable. Interrupted rotations can leave the
+                    database unavailable until the original key or a good backup is restored.
+                </p>
+            </div>
+        </div>
+
+        <aside class="hero-panel stack-md">
+            <div>
+                <div class="eyebrow">Rotate Key</div>
+                <h2 class="card-title">Update the encryption password.</h2>
+            </div>
+            <form method="POST" action="/rotate-key" class="stack-md">
+                <input type="hidden" name="csrf_token" value="{{ csrf }}">
+
+                <div>
+                    <label for="current_password">Current Password</label>
+                    <input type="password" id="current_password" name="current_password" required placeholder="Enter current password">
+                </div>
+
+                <div>
+                    <label for="new_password">New Password</label>
+                    <input type="password" id="new_password" name="new_password" required placeholder="Enter new password">
+                </div>
+
+                <div>
+                    <label for="confirm_new_password">Confirm New Password</label>
+                    <input type="password" id="confirm_new_password" name="confirm_new_password" required placeholder="Confirm new password">
+                </div>
+
+                <button type="submit" class="btn full-width">Rotate Key</button>
+            </form>
+        </aside>
+    </section>
 </div>
+
 {% endblock %}

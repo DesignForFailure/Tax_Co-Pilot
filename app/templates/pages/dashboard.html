@@ -2,100 +2,241 @@
 {% block title %}Dashboard{% endblock %}
 {% block content %}
 
-<h1 style="font-size: 24px; margin-bottom: 8px;">Tax Year {{ run.tax_year if run else "—" }}</h1>
-<p class="text-dim text-sm mb-4">Federal{% if run and run.state_outputs %} + State{% endif %} Return</p>
+{% set brand_art %}
+ ________                          ______                     _______   __  __              __     
+╱        │                        ╱      ╲                   ╱       ╲ ╱  │╱  │            ╱  │    
+$$$$$$$$╱______   __    __       ╱$$$$$$  │  ______          $$$$$$$  │$$╱ $$ │  ______   _$$ │_   
+   $$ │ ╱      ╲ ╱  ╲  ╱  │      $$ │  $$╱  ╱      ╲  ______ $$ │__$$ │╱  │$$ │ ╱      ╲ ╱ $$   │  
+   $$ │ $$$$$$  │$$  ╲╱$$╱       $$ │      ╱$$$$$$  │╱      │$$    $$╱ $$ │$$ │╱$$$$$$  │$$$$$$╱   
+   $$ │ ╱    $$ │ $$  $$<        $$ │   __ $$ │  $$ │$$$$$$╱ $$$$$$$╱  $$ │$$ │$$ │  $$ │  $$ │ __ 
+   $$ │╱$$$$$$$ │ ╱$$$$  ╲       $$ ╲__╱  │$$ ╲__$$ │        $$ │      $$ │$$ │$$ ╲__$$ │  $$ │╱  │
+   $$ │$$    $$ │╱$$╱ $$  │______$$    $$╱ $$    $$╱         $$ │      $$ │$$ │$$    $$╱   $$  $$╱ 
+   $$╱  $$$$$$$╱ $$╱   $$╱╱      │$$$$$$╱   $$$$$$╱          $$╱       $$╱ $$╱  $$$$$$╱     $$$$╱  
+                          $$$$$$╱
+{% endset %}
 
 {% if run %}
-<div style="display:flex;gap:10px;margin-bottom:16px;">
-    <a href="/runs/{{ run.id }}/export/json" class="btn btn-sm btn-outline">Export JSON</a>
-    <a href="/runs/{{ run.id }}/export/html" class="btn btn-sm btn-outline">Export HTML</a>
-    <a href="/runs/{{ run.id }}/forms" class="btn btn-sm btn-outline">View Forms</a>
-    <a href="/runs" class="btn btn-sm btn-outline">All Runs</a>
-    <a href="/calculate" class="btn btn-sm btn-outline">New Calculation</a>
-</div>
-<div class="summary-grid">
-    {% for label, val in [
-        ("Gross Income", run.output.gross_income),
-        ("AGI", run.output.agi),
-        ("Standard Deduction", run.output.standard_deduction),
-        ("Deduction Applied (" + ("Itemized" if run.output.deduction_applied > run.output.standard_deduction else "Standard") + ")", run.output.deduction_applied),
-        ("Taxable Income", run.output.taxable_income),
-        ("Tax Before Credits", run.output.tax_before_credits),
-        ("Child Tax Credit", run.output.child_tax_credit),
-        ("Federal Tax (After Credits)", run.output.federal_tax),
-        ("Withholding", run.output.total_withholding),
-    ] %}
-    <div class="summary-item">
-        <div class="label">{{ label }}</div>
-        <div class="value">${{ "{:,.0f}".format(val) }}</div>
+<section class="page-header">
+    <div>
+        <div class="eyebrow">{% if is_latest %}Dashboard{% else %}Saved Run{% endif %}</div>
+        <h1 class="page-title">
+            Tax year {{ run.tax_year }} {% if is_latest %}overview{% else %}record{% endif %}
+        </h1>
+        <p class="page-subtitle">
+            {{ run.filing_status.upper() }} return created {{ run.created_at }} with rule pack {{ run.rule_pack_version }}.
+            The dashboard stays focused on outcomes; the full audit trail lives on a dedicated page.
+        </p>
     </div>
-    {% endfor %}
-    <div class="summary-item">
-        <div class="label">{% if run.output.refund_or_owed >= 0 %}Refund{% else %}Owed{% endif %}</div>
-        <div class="value {% if run.output.refund_or_owed >= 0 %}positive{% else %}negative{% endif %}">
-            {% if run.output.refund_or_owed >= 0 %}
-                ${{ "{:,.0f}".format(run.output.refund_or_owed) }}
-            {% else %}
-                -${{ "{:,.0f}".format(run.output.refund_or_owed|abs) }}
+    <div class="action-row">
+        {% if not is_latest %}
+        <a href="/dashboard" class="btn btn-outline">Latest Dashboard</a>
+        {% endif %}
+        <a href="/runs" class="btn btn-outline">All Runs</a>
+        <a href="/calculate" class="btn">New Calculation</a>
+    </div>
+</section>
+
+<section class="hero">
+    <div class="stack-lg">
+        <div>
+            <div class="eyebrow">{% if is_latest %}Latest saved run{% else %}Run detail{% endif %}</div>
+            <h2 class="card-title" style="font-size: 2rem; margin-bottom: 8px;">
+                Federal{% if run.state_outputs %} + state{% endif %} return snapshot
+            </h2>
+            <p class="page-subtitle">
+                Use the quick links below to jump between the high-level summary, any state outputs, and a compact
+                preview of the audit trail before opening the full trace view.
+            </p>
+        </div>
+        <div class="jump-nav">
+            <a href="#federal-summary" class="jump-link">Federal Summary</a>
+            {% if run.state_outputs %}
+            <a href="#state-returns" class="jump-link">State Returns</a>
             {% endif %}
+            <a href="#audit-preview" class="jump-link">Audit Preview</a>
+        </div>
+        <div class="action-row">
+            <a href="/runs/{{ run.id }}/export/json" class="btn btn-sm btn-outline">Export JSON</a>
+            <a href="/runs/{{ run.id }}/export/html" class="btn btn-sm btn-outline">Export HTML</a>
+            <a href="/runs/{{ run.id }}/forms" class="btn btn-sm btn-outline">View Forms</a>
+            <a href="/runs/{{ run.id }}/audit" class="btn btn-sm">Open Full Audit</a>
+        </div>
+        <div class="action-row">
+            <span class="pill">{{ run.trace|length }} trace steps</span>
+            <span class="pill">{{ run.rule_pack_checksum[:12] }}...</span>
+            <span class="pill">{% if is_latest %}Latest run{% else %}Saved history item{% endif %}</span>
         </div>
     </div>
-</div>
-
-{% if run.state_outputs %}
-{% for st in run.state_outputs %}
-<h2 style="font-size: 20px; margin-top: 24px; margin-bottom: 8px;">{{ st.state }} State Return</h2>
-<div class="summary-grid">
-    {% for label, val in [
-        ("State AGI", st.state_agi),
-        ("Standard Deduction", st.state_standard_deduction),
-        ("Taxable Income", st.state_taxable_income),
-        ("State Tax", st.state_tax),
-        ("State Withholding", st.state_withholding),
-    ] %}
-    <div class="summary-item">
-        <div class="label">{{ label }}</div>
-        <div class="value">${{ "{:,.0f}".format(val) }}</div>
-    </div>
-    {% endfor %}
-    <div class="summary-item">
-        <div class="label">{% if st.state_refund_or_owed >= 0 %}Refund{% else %}Owed{% endif %}</div>
-        <div class="value {% if st.state_refund_or_owed >= 0 %}positive{% else %}negative{% endif %}">
-            {% if st.state_refund_or_owed >= 0 %}
-                ${{ "{:,.0f}".format(st.state_refund_or_owed) }}
-            {% else %}
-                -${{ "{:,.0f}".format(st.state_refund_or_owed|abs) }}
-            {% endif %}
+    <aside class="hero-panel brand-art-panel">
+        <div>
+            <div class="eyebrow">Decorative Nameplate</div>
+            <div class="text-dim text-sm">The dashboard now carries the README wordmark styling directly in the UI.</div>
         </div>
-    </div>
-</div>
-{% endfor %}
-{% endif %}
-
-<div class="card">
-    <h2>Audit Trace</h2>
-    <p class="text-dim text-sm" style="margin-bottom: 12px;">Each line below is a rule evaluation with inputs and a short explanation.</p>
-    {% for t in run.trace %}
-        <div style="padding: 10px 0; border-top: 1px solid var(--border);">
-            <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-                <div>
-                    <strong style="font-size: 13px;">{{ t.rule_id }}</strong>
-                    <div class="text-dim" style="font-size: 12px;">{{ t.description }}</div>
-                </div>
-                <div style="text-align:right;">
-                    <div style="font-weight:700;">{{ t.result["value"] }}</div>
+        <pre class="brand-art">{{ brand_art | trim }}</pre>
+        <div class="brand-word">Tax Co-Pilot</div>
+        <div class="meta-list">
+            <div class="meta-card">
+                <div class="meta-label">Refund / Owed</div>
+                <div class="meta-value {% if run.output.refund_or_owed >= 0 %}positive{% else %}negative{% endif %}">
+                    {% if run.output.refund_or_owed >= 0 %}
+                    ${{ "{:,.0f}".format(run.output.refund_or_owed) }}
+                    {% else %}
+                    -${{ "{:,.0f}".format(run.output.refund_or_owed|abs) }}
+                    {% endif %}
                 </div>
             </div>
-            <div class="text-dim" style="font-size: 12px; margin-top: 6px;">{{ t.explanation }}</div>
+            <div class="meta-card">
+                <div class="meta-label">Filing Status</div>
+                <div class="meta-value">{{ run.filing_status.upper() }}</div>
+            </div>
         </div>
+    </aside>
+</section>
+
+<section class="section-anchor" id="federal-summary">
+    <div class="summary-grid">
+        {% for label, val in [
+            ("Gross Income", run.output.gross_income),
+            ("AGI", run.output.agi),
+            ("Standard Deduction", run.output.standard_deduction),
+            ("Deduction Applied (" + ("Itemized" if run.output.deduction_applied > run.output.standard_deduction else "Standard") + ")", run.output.deduction_applied),
+            ("Taxable Income", run.output.taxable_income),
+            ("Tax Before Credits", run.output.tax_before_credits),
+            ("Child Tax Credit", run.output.child_tax_credit),
+            ("Federal Tax (After Credits)", run.output.federal_tax),
+            ("Withholding", run.output.total_withholding),
+        ] %}
+        <div class="summary-item">
+            <div class="label">{{ label }}</div>
+            <div class="value">${{ "{:,.0f}".format(val) }}</div>
+        </div>
+        {% endfor %}
+        <div class="summary-item">
+            <div class="label">{% if run.output.refund_or_owed >= 0 %}Refund{% else %}Amount Owed{% endif %}</div>
+            <div class="value {% if run.output.refund_or_owed >= 0 %}positive{% else %}negative{% endif %}">
+                {% if run.output.refund_or_owed >= 0 %}
+                ${{ "{:,.0f}".format(run.output.refund_or_owed) }}
+                {% else %}
+                -${{ "{:,.0f}".format(run.output.refund_or_owed|abs) }}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+{% if run.state_outputs %}
+<section class="card section-anchor" id="state-returns">
+    <div class="section-header">
+        <div>
+            <h2>State Returns</h2>
+            <p class="text-dim text-sm">Each state output is grouped separately so combined filings stay readable.</p>
+        </div>
+    </div>
+    {% for st in run.state_outputs %}
+    <div class="stack-sm" {% if not loop.first %}style="margin-top: 22px;"{% endif %}>
+        <h3>{{ st.state }} State Return</h3>
+        <div class="summary-grid">
+            {% for label, val in [
+                ("State AGI", st.state_agi),
+                ("Standard Deduction", st.state_standard_deduction),
+                ("Taxable Income", st.state_taxable_income),
+                ("State Tax", st.state_tax),
+                ("State Withholding", st.state_withholding),
+            ] %}
+            <div class="summary-item">
+                <div class="label">{{ label }}</div>
+                <div class="value">${{ "{:,.0f}".format(val) }}</div>
+            </div>
+            {% endfor %}
+            <div class="summary-item">
+                <div class="label">{% if st.state_refund_or_owed >= 0 %}Refund{% else %}Amount Owed{% endif %}</div>
+                <div class="value {% if st.state_refund_or_owed >= 0 %}positive{% else %}negative{% endif %}">
+                    {% if st.state_refund_or_owed >= 0 %}
+                    ${{ "{:,.0f}".format(st.state_refund_or_owed) }}
+                    {% else %}
+                    -${{ "{:,.0f}".format(st.state_refund_or_owed|abs) }}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
     {% endfor %}
-</div>
+</section>
+{% endif %}
+
+<section class="card section-anchor" id="audit-preview">
+    <div class="section-header">
+        <div>
+            <h2>Audit Preview</h2>
+            <p class="text-dim text-sm">
+                The dashboard only shows a collapsed sample so the summary stays easy to scan. Open the full audit trail for the complete trace.
+            </p>
+        </div>
+        <a href="/runs/{{ run.id }}/audit" class="btn btn-sm btn-outline">Full Audit Trail</a>
+    </div>
+    <details class="disclosure">
+        <summary>
+            <div>
+                <div class="trace-summary-title">Preview first {{ 6 if run.trace|length > 6 else run.trace|length }} of {{ run.trace|length }} rule evaluations</div>
+                <div class="text-dim text-sm">Collapsed by default to keep the dashboard focused on outcomes.</div>
+            </div>
+            <div class="trace-result">Expand</div>
+        </summary>
+        <div class="trace-body">
+            {% for t in run.trace[:6] %}
+            <div class="trace-preview-item">
+                <div style="display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                    <div>
+                        <div class="trace-summary-title">{{ t.rule_id }}</div>
+                        <div class="text-dim text-sm">{{ t.description }}</div>
+                    </div>
+                    <div class="trace-result">{{ t.result["value"] }}</div>
+                </div>
+                <p class="text-dim text-sm" style="margin-top: 8px;">{{ t.explanation }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </details>
+</section>
 
 {% else %}
-<div class="card">
-    <h2>No runs yet</h2>
-    <p class="text-dim">Head to <a href="/calculate">Calculate</a> to run your first scenario.</p>
-</div>
+<section class="page-header">
+    <div>
+        <div class="eyebrow">Dashboard</div>
+        <h1 class="page-title">No runs yet</h1>
+        <p class="page-subtitle">
+            The dashboard will populate after your first saved calculation. Start a return from the calculation page
+            or browse the landing page for other workflow links.
+        </p>
+    </div>
+    <div class="action-row">
+        <a href="/calculate" class="btn">Start Calculation</a>
+        <a href="/" class="btn btn-outline">Back to Home</a>
+    </div>
+</section>
+
+<section class="hero">
+    <div class="stack-lg">
+        <div>
+            <div class="eyebrow">Ready to begin</div>
+            <h2 class="card-title" style="font-size: 2rem; margin-bottom: 8px;">Create a run, then return here for the summary.</h2>
+            <p class="page-subtitle">
+                Saved calculations flow back into this dashboard automatically. Once you have a run, this page will show the
+                federal summary, any state outputs, and a compact audit preview with a dedicated full-trace page.
+            </p>
+        </div>
+        <div class="action-row">
+            <a href="/calculate" class="btn">New Calculation</a>
+            <a href="/whatif" class="btn btn-outline">What-If Comparison</a>
+            <a href="/runs" class="btn btn-outline">Saved Runs</a>
+        </div>
+    </div>
+    <aside class="hero-panel brand-art-panel">
+        <div class="eyebrow">Decorative Nameplate</div>
+        <pre class="brand-art">{{ brand_art | trim }}</pre>
+        <div class="brand-word">Tax Co-Pilot</div>
+    </aside>
+</section>
 {% endif %}
 
 {% endblock %}

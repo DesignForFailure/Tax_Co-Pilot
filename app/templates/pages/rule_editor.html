@@ -1,176 +1,269 @@
 {% extends "layouts/base.html" %}
 {% block title %}{% if is_new %}Add Rule{% else %}Edit Rule{% endif %}{% endblock %}
 {% block content %}
-<div style="margin-bottom:16px;">
-  <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}" style="font-size:13px;">&larr; Back to Pack</a>
-</div>
-
-<h1 style="font-size:24px;margin-bottom:16px;">
-  {% if is_new %}Add Rule{% else %}Edit Rule{% endif %} &mdash; {{ pack.jurisdiction | upper }} {{ pack.year }} ({{ pack.variant }})
-</h1>
-
-{% if error is defined and error %}
-<div class="card" style="border-color:var(--red,#e74c3c);margin-bottom:20px;">
-  <p style="color:var(--red,#e74c3c);">{{ error }}</p>
-</div>
-{% endif %}
-
 {% set r = rule or {} %}
 {% set rtype = r.get('type', 'formula') if r else 'formula' %}
 {% set readonly = not pack.is_custom %}
 
-{% if readonly %}
-<div class="card" style="margin-bottom:20px;border-color:var(--accent);background:rgba(108,140,255,0.05);">
-  <p style="font-size:13px;">This is a <strong>Standard</strong> pack (read-only). Clone it as Custom to edit rules.</p>
+<section class="page-header">
+    <div>
+        <div class="eyebrow">Rule Editor</div>
+        <h1 class="page-title">
+            {% if is_new %}Add Rule{% else %}Edit Rule{% endif %} for {{ pack.jurisdiction | upper }} {{ pack.year }} · {{ pack.variant }}
+        </h1>
+        <p class="page-subtitle">
+            Review the rule identity, choose the correct rule type, and update the supporting inputs in one place.
+            Standard packs remain view-only to keep the shipped baseline immutable.
+        </p>
+    </div>
+    <div class="action-row">
+        <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}" class="btn btn-outline">Back to Pack</a>
+    </div>
+</section>
+
+<section class="summary-grid">
+    <div class="summary-item">
+        <div class="label">Pack Mode</div>
+        <div class="value value-compact">{% if readonly %}Read Only{% else %}Editable{% endif %}</div>
+    </div>
+    <div class="summary-item">
+        <div class="label">Rule Type</div>
+        <div class="value value-compact">{{ rtype }}</div>
+    </div>
+    <div class="summary-item">
+        <div class="label">Jurisdiction</div>
+        <div class="value value-compact">{{ pack.jurisdiction | upper }}</div>
+    </div>
+    <div class="summary-item">
+        <div class="label">Year</div>
+        <div class="value">{{ pack.year }}</div>
+    </div>
+</section>
+
+{% if error is defined and error %}
+<div class="notice notice-error">
+    <h2 class="heading-danger">Rule Save Error</h2>
+    <p class="text-dim text-sm">{{ error }}</p>
 </div>
 {% endif %}
 
-<form method="POST" action="{% if is_new %}/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/rules/add{% else %}/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/rules/{{ r.id }}{% endif %}">
-  <input type="hidden" name="csrf_token" value="{{ csrf }}">
+{% if readonly %}
+<section class="card card-accent">
+    <h2>Standard Pack Protection</h2>
+    <p class="text-dim text-sm">Clone this pack as a custom variant before editing rules or adding new ones.</p>
+</section>
+{% endif %}
 
-  <div class="card" style="margin-bottom:20px;">
-    <h2>Rule Identity</h2>
-    <div class="form-row">
-      <div>
-        <label>Rule ID</label>
-        <input type="text" name="rule_id" value="{{ r.get('id', id_prefix) if r else id_prefix }}" {% if not is_new %}readonly{% endif %} {% if not readonly %}required{% endif %} style="width:100%;">
-      </div>
-      <div>
-        <label>Type</label>
-        <select name="rule_type" id="rule_type" onchange="switchType(this.value)" {% if readonly %}disabled{% endif %}>
-          <option value="sum" {% if rtype == 'sum' %}selected{% endif %}>sum</option>
-          <option value="formula" {% if rtype == 'formula' %}selected{% endif %}>formula</option>
-          <option value="lookup" {% if rtype == 'lookup' %}selected{% endif %}>lookup</option>
-          <option value="bracket_table" {% if rtype == 'bracket_table' %}selected{% endif %}>bracket_table</option>
-        </select>
-      </div>
-    </div>
-    <div class="form-row" style="margin-top:8px;">
-      <div><label>Description</label><input type="text" name="description" value="{{ r.get('description', '') }}" {% if readonly %}readonly{% endif %} style="width:100%;"></div>
-      <div><label>Form Line</label><input type="text" name="form_line" value="{{ r.get('form_line', '') }}" {% if readonly %}readonly{% endif %} placeholder="e.g. 1040 Line 1a"></div>
-    </div>
-  </div>
+<form id="rule-editor-form" method="POST" action="{% if is_new %}/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/rules/add{% else %}/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/rules/{{ r.id }}{% endif %}">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
 
-  <!-- SUM section -->
-  <div class="card type-section" id="section-sum" style="margin-bottom:20px;{% if rtype != 'sum' %}display:none;{% endif %}">
-    <h2>Sum Inputs</h2>
-    <label>Items Reference</label>
-    <input type="text" name="sum_items_ref" value="{% if rtype == 'sum' and r.get('inputs') %}{{ r['inputs'].get('items', {}).get('ref', '') }}{% endif %}" {% if readonly %}readonly{% endif %} placeholder="e.g. input.w2.wages" style="width:100%;">
-  </div>
-
-  <!-- FORMULA section -->
-  <div class="card type-section" id="section-formula" style="margin-bottom:20px;{% if rtype != 'formula' %}display:none;{% endif %}">
-    <h2>Formula</h2>
-    <label>Expression</label>
-    <input type="text" name="expression" value="{{ r.get('expression', '') }}" {% if readonly %}readonly{% endif %} placeholder="e.g. max(gains, neg_limit)" style="width:100%;">
-    <p style="font-size:12px;color:var(--muted,#888);margin-top:4px;">Allowed: letters, digits, +, -, *, /, (, ), comma, dot, space. Functions: max, min.</p>
-    <h3 style="margin-top:12px;">Inputs</h3>
-    <div id="formula-inputs">
-      {% if rtype == 'formula' and r.get('inputs') %}
-        {% for name, val in r['inputs'].items() %}
-        <div class="form-row formula-input-row" style="margin-bottom:4px;">
-          <div><input type="text" name="input_name_{{ loop.index0 }}" value="{{ name }}" {% if readonly %}readonly{% endif %} placeholder="variable name"></div>
-          <div>
-            <select name="input_type_{{ loop.index0 }}" {% if readonly %}disabled{% endif %}>
-              <option value="ref" {% if val.get('ref') is not none and val.get('literal') is none %}selected{% endif %}>ref</option>
-              <option value="literal" {% if val.get('literal') is not none %}selected{% endif %}>literal</option>
-            </select>
-          </div>
-          <div><input type="text" name="input_value_{{ loop.index0 }}" value="{{ val.get('ref', val.get('literal', '')) }}" {% if readonly %}readonly{% endif %} placeholder="value"></div>
-          {% if not readonly %}
-          <div><button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.formula-input-row').remove()">×</button></div>
-          {% endif %}
+    <section class="card section-anchor" id="rule-identity">
+        <div class="section-header">
+            <div>
+                <h2>Rule Identity</h2>
+                <p class="text-dim text-sm">Define the stable rule ID, the rule type, and any form-line mapping used in trace output.</p>
+            </div>
+            {% if readonly %}
+            <span class="pill">Read Only</span>
+            {% else %}
+            <span class="pill pill-accent">Editable</span>
+            {% endif %}
         </div>
-        {% endfor %}
-      {% endif %}
-    </div>
-    {% if not readonly %}
-    <button type="button" class="btn btn-sm" onclick="addFormulaInput()" style="margin-top:8px;">+ Add Input</button>
-    {% endif %}
-  </div>
+        <div class="form-row">
+            <div>
+                <label>Rule ID</label>
+                <input type="text" name="rule_id" value="{{ r.get('id', id_prefix) if r else id_prefix }}" {% if not is_new %}readonly{% endif %} {% if not readonly %}required{% endif %}>
+            </div>
+            <div>
+                <label>Type</label>
+                <select name="rule_type" id="rule_type" onchange="switchType(this.value)" {% if readonly %}disabled{% endif %}>
+                    <option value="sum" {% if rtype == 'sum' %}selected{% endif %}>sum</option>
+                    <option value="formula" {% if rtype == 'formula' %}selected{% endif %}>formula</option>
+                    <option value="lookup" {% if rtype == 'lookup' %}selected{% endif %}>lookup</option>
+                    <option value="bracket_table" {% if rtype == 'bracket_table' %}selected{% endif %}>bracket_table</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div>
+                <label>Description</label>
+                <input type="text" name="description" value="{{ r.get('description', '') }}" {% if readonly %}readonly{% endif %}>
+            </div>
+            <div>
+                <label>Form Line</label>
+                <input type="text" name="form_line" value="{{ r.get('form_line', '') }}" {% if readonly %}readonly{% endif %} placeholder="e.g. 1040 Line 1a">
+            </div>
+        </div>
+    </section>
 
-  <!-- LOOKUP section -->
-  <div class="card type-section" id="section-lookup" style="margin-bottom:20px;{% if rtype != 'lookup' %}display:none;{% endif %}">
-    <h2>Lookup</h2>
-    <div class="form-row">
-      <div><label>Table Path</label><input type="text" name="lookup_table" value="{{ r.get('table', '') }}" {% if readonly %}readonly{% endif %} placeholder="e.g. constants.standard_deduction"></div>
-      <div><label>Key Reference</label><input type="text" name="lookup_key_ref" value="{% if r.get('key') %}{{ r['key'].get('ref', '') }}{% endif %}" {% if readonly %}readonly{% endif %} placeholder="e.g. input.filing_status"></div>
-    </div>
-  </div>
+    <section class="card type-section" id="section-sum" {% if rtype != 'sum' %}hidden{% endif %}>
+        <h2>Sum Inputs</h2>
+        <p class="text-dim text-sm mb-4">Use this rule type when the result is the total of a referenced collection.</p>
+        <label>Items Reference</label>
+        <input type="text" name="sum_items_ref" value="{% if rtype == 'sum' and r.get('inputs') %}{{ r['inputs'].get('items', {}).get('ref', '') }}{% endif %}" {% if readonly %}readonly{% endif %} placeholder="e.g. input.w2.wages">
+    </section>
 
-  <!-- BRACKET TABLE section -->
-  <div class="card type-section" id="section-bracket_table" style="margin-bottom:20px;{% if rtype != 'bracket_table' %}display:none;{% endif %}">
-    <h2>Bracket Table</h2>
-    <div class="form-row">
-      <div><label>Input Reference</label><input type="text" name="bracket_input_ref" value="{% if r.get('input') %}{{ r['input'].get('ref', '') }}{% endif %}" {% if readonly %}readonly{% endif %} placeholder="e.g. fed.2024.taxable_income"></div>
-      <div><label>Key Reference</label><input type="text" name="bracket_key_ref" value="{% if r.get('key') %}{{ r['key'].get('ref', '') }}{% endif %}" {% if readonly %}readonly{% endif %} placeholder="e.g. input.filing_status"></div>
-    </div>
-    {% for status in ['single', 'mfj', 'mfs', 'hoh', 'qss'] %}
-    <h3 style="margin-top:12px;">{{ status | upper }}</h3>
-    <table style="width:100%;border-collapse:collapse;" id="bracket-table-{{ status }}">
-      <thead>
-        <tr>
-          <th style="text-align:left;padding:4px;font-size:13px;">Lower</th>
-          <th style="text-align:left;padding:4px;font-size:13px;">Upper</th>
-          <th style="text-align:left;padding:4px;font-size:13px;">Rate</th>
-          {% if not readonly %}<th></th>{% endif %}
-        </tr>
-      </thead>
-      <tbody>
-        {% if rtype == 'bracket_table' and r.get('tables', {}).get(status) %}
-          {% for b in r['tables'][status] %}
-          <tr>
-            <td style="padding:2px;"><input type="text" name="bracket_{{ status }}_{{ loop.index0 }}_lower" value="{{ b.lower }}" {% if readonly %}readonly{% endif %} style="width:100%;"></td>
-            <td style="padding:2px;"><input type="text" name="bracket_{{ status }}_{{ loop.index0 }}_upper" value="{{ b.upper if b.upper is not none else '' }}" {% if readonly %}readonly{% endif %} style="width:100%;"></td>
-            <td style="padding:2px;"><input type="text" name="bracket_{{ status }}_{{ loop.index0 }}_rate" value="{{ b.rate }}" {% if readonly %}readonly{% endif %} style="width:100%;"></td>
+    <section class="card type-section" id="section-formula" {% if rtype != 'formula' %}hidden{% endif %}>
+        <div class="section-header">
+            <div>
+                <h2>Formula</h2>
+                <p class="text-dim text-sm">Map named inputs into an expression that can use `max()` and `min()`.</p>
+            </div>
             {% if not readonly %}
-            <td style="padding:2px;"><button type="button" class="btn btn-sm btn-danger" onclick="this.closest('tr').remove()">×</button></td>
+            <button type="button" class="btn btn-sm btn-outline" onclick="addFormulaInput()">Add Input</button>
             {% endif %}
-          </tr>
-          {% endfor %}
+        </div>
+        <div class="stack-md">
+            <div>
+                <label>Expression</label>
+                <input type="text" name="expression" value="{{ r.get('expression', '') }}" {% if readonly %}readonly{% endif %} placeholder="e.g. max(gains, neg_limit)">
+                <p class="field-hint">Allowed characters: letters, digits, math operators, parentheses, commas, periods, and spaces.</p>
+            </div>
+            <div>
+                <h3>Inputs</h3>
+                <div id="formula-inputs">
+                    {% if rtype == 'formula' and r.get('inputs') %}
+                        {% for name, val in r['inputs'].items() %}
+                        <div class="form-grid-4 formula-input-row">
+                            <div>
+                                <label>Variable Name</label>
+                                <input type="text" name="input_name_{{ loop.index0 }}" value="{{ name }}" {% if readonly %}readonly{% endif %} placeholder="variable name">
+                            </div>
+                            <div>
+                                <label>Source Type</label>
+                                <select name="input_type_{{ loop.index0 }}" {% if readonly %}disabled{% endif %}>
+                                    <option value="ref" {% if val.get('ref') is not none and val.get('literal') is none %}selected{% endif %}>ref</option>
+                                    <option value="literal" {% if val.get('literal') is not none %}selected{% endif %}>literal</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label>Value</label>
+                                <input type="text" name="input_value_{{ loop.index0 }}" value="{{ val.get('ref', val.get('literal', '')) }}" {% if readonly %}readonly{% endif %} placeholder="value">
+                            </div>
+                            {% if not readonly %}
+                            <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.formula-input-row').remove()">Remove</button>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="card type-section" id="section-lookup" {% if rtype != 'lookup' %}hidden{% endif %}>
+        <h2>Lookup</h2>
+        <p class="text-dim text-sm mb-4">Use lookup rules to pull values from constants or tables keyed by another field.</p>
+        <div class="form-row">
+            <div>
+                <label>Table Path</label>
+                <input type="text" name="lookup_table" value="{{ r.get('table', '') }}" {% if readonly %}readonly{% endif %} placeholder="e.g. constants.standard_deduction">
+            </div>
+            <div>
+                <label>Key Reference</label>
+                <input type="text" name="lookup_key_ref" value="{% if r.get('key') %}{{ r['key'].get('ref', '') }}{% endif %}" {% if readonly %}readonly{% endif %} placeholder="e.g. input.filing_status">
+            </div>
+        </div>
+    </section>
+
+    <section class="card type-section" id="section-bracket_table" {% if rtype != 'bracket_table' %}hidden{% endif %}>
+        <div class="section-header">
+            <div>
+                <h2>Bracket Table</h2>
+                <p class="text-dim text-sm">Define rate tables by filing status using lower, upper, and rate values for each bracket row.</p>
+            </div>
+        </div>
+        <div class="form-row">
+            <div>
+                <label>Input Reference</label>
+                <input type="text" name="bracket_input_ref" value="{% if r.get('input') %}{{ r['input'].get('ref', '') }}{% endif %}" {% if readonly %}readonly{% endif %} placeholder="e.g. fed.2024.taxable_income">
+            </div>
+            <div>
+                <label>Key Reference</label>
+                <input type="text" name="bracket_key_ref" value="{% if r.get('key') %}{{ r['key'].get('ref', '') }}{% endif %}" {% if readonly %}readonly{% endif %} placeholder="e.g. input.filing_status">
+            </div>
+        </div>
+
+        <div class="stack-md">
+            {% for status in ['single', 'mfj', 'mfs', 'hoh', 'qss'] %}
+            <div>
+                <div class="section-header">
+                    <h3>{{ status | upper }}</h3>
+                    {% if not readonly %}
+                    <button type="button" class="btn btn-sm btn-outline" onclick="addBracketRow('{{ status }}')">Add Row</button>
+                    {% endif %}
+                </div>
+                <div class="table-wrap">
+                    <table class="data-table" id="bracket-table-{{ status }}">
+                        <thead>
+                            <tr>
+                                <th>Lower</th>
+                                <th>Upper</th>
+                                <th>Rate</th>
+                                {% if not readonly %}
+                                <th class="align-right">Actions</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if rtype == 'bracket_table' and r.get('tables', {}).get(status) %}
+                                {% for b in r['tables'][status] %}
+                                <tr>
+                                    <td><input type="text" name="bracket_{{ status }}_{{ loop.index0 }}_lower" value="{{ b.lower }}" {% if readonly %}readonly{% endif %}></td>
+                                    <td><input type="text" name="bracket_{{ status }}_{{ loop.index0 }}_upper" value="{{ b.upper if b.upper is not none else '' }}" {% if readonly %}readonly{% endif %}></td>
+                                    <td><input type="text" name="bracket_{{ status }}_{{ loop.index0 }}_rate" value="{{ b.rate }}" {% if readonly %}readonly{% endif %}></td>
+                                    {% if not readonly %}
+                                    <td class="align-right"><button type="button" class="btn btn-sm btn-danger" onclick="this.closest('tr').remove()">Remove</button></td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td><input type="text" name="bracket_{{ status }}_0_lower" value="0" {% if readonly %}readonly{% endif %}></td>
+                                    <td><input type="text" name="bracket_{{ status }}_0_upper" value="" {% if readonly %}readonly{% endif %}></td>
+                                    <td><input type="text" name="bracket_{{ status }}_0_rate" value="" {% if readonly %}readonly{% endif %}></td>
+                                    {% if not readonly %}
+                                    <td class="align-right"><button type="button" class="btn btn-sm btn-danger" onclick="this.closest('tr').remove()">Remove</button></td>
+                                    {% endif %}
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <div class="action-row section-anchor" id="save-actions">
+        {% if not readonly %}
+        <button type="submit" class="btn">Save Rule</button>
+        <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}" class="btn btn-outline">Cancel</a>
         {% else %}
-          <tr>
-            <td style="padding:2px;"><input type="text" name="bracket_{{ status }}_0_lower" value="0" {% if readonly %}readonly{% endif %} style="width:100%;"></td>
-            <td style="padding:2px;"><input type="text" name="bracket_{{ status }}_0_upper" value="" {% if readonly %}readonly{% endif %} style="width:100%;"></td>
-            <td style="padding:2px;"><input type="text" name="bracket_{{ status }}_0_rate" value="" {% if readonly %}readonly{% endif %} style="width:100%;"></td>
-            {% if not readonly %}
-            <td style="padding:2px;"><button type="button" class="btn btn-sm btn-danger" onclick="this.closest('tr').remove()">×</button></td>
-            {% endif %}
-          </tr>
+        <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}" class="btn btn-outline">Back to Pack</a>
         {% endif %}
-      </tbody>
-    </table>
-    {% if not readonly %}
-    <button type="button" class="btn btn-sm" onclick="addBracketRow('{{ status }}')" style="margin-top:4px;">+ Add Row</button>
-    {% endif %}
-    {% endfor %}
-  </div>
-
-  {% if not readonly %}
-  <div style="display:flex;gap:12px;">
-    <button type="submit" class="btn">Save</button>
-    <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}" class="btn btn-outline">Cancel</a>
-  </div>
-  {% else %}
-  <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}" class="btn btn-outline">Back</a>
-  {% endif %}
+    </div>
 </form>
 
 <script>
 function switchType(type) {
-  document.querySelectorAll('.type-section').forEach(function(s) { s.style.display = 'none'; });
+  document.querySelectorAll('.type-section').forEach(function (section) {
+    section.hidden = true;
+  });
   var sec = document.getElementById('section-' + type);
-  if (sec) sec.style.display = 'block';
+  if (sec) {
+    sec.hidden = false;
+  }
 }
 
 var formulaIdx = {{ (r.get('inputs', {}) | length) if (r and rtype == 'formula') else 0 }};
 function addFormulaInput() {
   var container = document.getElementById('formula-inputs');
-  var html = '<div class="form-row formula-input-row" style="margin-bottom:4px;">'
-    + '<div><input type="text" name="input_name_' + formulaIdx + '" placeholder="variable name"></div>'
-    + '<div><select name="input_type_' + formulaIdx + '"><option value="ref">ref</option><option value="literal">literal</option></select></div>'
-    + '<div><input type="text" name="input_value_' + formulaIdx + '" placeholder="value"></div>'
-    + '<div><button type="button" class="btn btn-sm btn-danger" onclick="this.closest(\'.formula-input-row\').remove()">×</button></div>'
+  var html = '<div class="form-grid-4 formula-input-row">'
+    + '<div><label>Variable Name</label><input type="text" name="input_name_' + formulaIdx + '" placeholder="variable name"></div>'
+    + '<div><label>Source Type</label><select name="input_type_' + formulaIdx + '"><option value="ref">ref</option><option value="literal">literal</option></select></div>'
+    + '<div><label>Value</label><input type="text" name="input_value_' + formulaIdx + '" placeholder="value"></div>'
+    + '<button type="button" class="btn btn-sm btn-danger" onclick="this.closest(\\'.formula-input-row\\').remove()">Remove</button>'
     + '</div>';
   container.insertAdjacentHTML('beforeend', html);
   formulaIdx++;
@@ -189,10 +282,10 @@ function addBracketRow(status) {
   var idx = bracketCounters[status];
   var tbody = document.querySelector('#bracket-table-' + status + ' tbody');
   var tr = document.createElement('tr');
-  tr.innerHTML = '<td style="padding:2px;"><input type="text" name="bracket_' + status + '_' + idx + '_lower" style="width:100%;"></td>'
-    + '<td style="padding:2px;"><input type="text" name="bracket_' + status + '_' + idx + '_upper" style="width:100%;"></td>'
-    + '<td style="padding:2px;"><input type="text" name="bracket_' + status + '_' + idx + '_rate" style="width:100%;"></td>'
-    + '<td style="padding:2px;"><button type="button" class="btn btn-sm btn-danger" onclick="this.closest(\'tr\').remove()">×</button></td>';
+  tr.innerHTML = '<td><input type="text" name="bracket_' + status + '_' + idx + '_lower"></td>'
+    + '<td><input type="text" name="bracket_' + status + '_' + idx + '_upper"></td>'
+    + '<td><input type="text" name="bracket_' + status + '_' + idx + '_rate"></td>'
+    + '<td class="align-right"><button type="button" class="btn btn-sm btn-danger" onclick="this.closest(\\'tr\\').remove()">Remove</button></td>';
   tbody.appendChild(tr);
   bracketCounters[status] = idx + 1;
 }

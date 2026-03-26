@@ -1,59 +1,75 @@
 {% extends "layouts/base.html" %}
 {% block title %}Import Rule Pack{% endblock %}
 {% block content %}
-<h1 style="font-size: 24px; margin-bottom: 8px;">Import Rule Pack</h1>
-<p class="text-dim text-sm mb-4">Upload a manifest and rules YAML file to create a new custom pack.</p>
+
+<section class="page-header">
+    <div>
+        <div class="eyebrow">Rule Pack Import</div>
+        <h1 class="page-title">Import an external pack without crowding the workflow.</h1>
+        <p class="page-subtitle">
+            Upload a manifest file and a rules file to create a new custom variant. The imported pack is validated
+            before it is saved so broken YAML stays out of the active workspace.
+        </p>
+    </div>
+    <div class="action-row">
+        <a href="/rule-packs" class="btn btn-outline">Back to Manager</a>
+    </div>
+</section>
 
 {% if error %}
-<div class="card" style="border-left: 3px solid var(--red, #e55); margin-bottom: 16px;">
-  <p style="color: var(--red, #e55); margin: 0;"><strong>Import error:</strong> {{ error }}</p>
+<div class="notice notice-error">
+    <h2 class="heading-danger">Import Error</h2>
+    <p class="text-dim text-sm">{{ error }}</p>
 </div>
 {% endif %}
 
-<div class="card" style="margin-bottom: 20px;">
-  <form method="POST" action="/rule-packs/import" enctype="multipart/form-data">
-    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+<section class="panel-grid-2">
+    <div class="card">
+        <h2>Upload Files</h2>
+        <form method="POST" action="/rule-packs/import" enctype="multipart/form-data" class="stack-md">
+            <input type="hidden" name="csrf_token" value="{{ csrf }}">
 
-    <div style="margin-bottom: 16px;">
-      <label for="manifest_file">Manifest YAML <span style="color:var(--red,#e55);">*</span></label>
-      <input type="file" id="manifest_file" name="manifest_file" accept=".yaml,.yml" required
-             style="display:block; margin-top:4px;">
-      <small class="text-dim">The manifest file (e.g. <code>manifest.yaml</code>) containing jurisdiction, tax_year, and version.</small>
+            <div>
+                <label for="manifest_file">Manifest YAML</label>
+                <input type="file" id="manifest_file" name="manifest_file" accept=".yaml,.yml" required>
+                <p class="field-hint">Include jurisdiction, `tax_year`, and `version` in the manifest.</p>
+            </div>
+
+            <div>
+                <label for="rules_file">Rules YAML</label>
+                <input type="file" id="rules_file" name="rules_file" accept=".yaml,.yml" required>
+                <p class="field-hint">This file should contain the pack constants and rule definitions.</p>
+            </div>
+
+            <div>
+                <label for="custom_name">Custom Name</label>
+                <input type="text" id="custom_name" name="custom_name" class="input-compact" placeholder="e.g. my_custom_pack">
+                <p class="field-hint">Optional label shown in the manager and calculate form.</p>
+            </div>
+
+            <div class="action-row">
+                <button type="submit" class="btn">Import Pack</button>
+                <a href="/rule-packs" class="btn btn-outline">Cancel</a>
+            </div>
+        </form>
     </div>
 
-    <div style="margin-bottom: 16px;">
-      <label for="rules_file">Rules YAML <span style="color:var(--red,#e55);">*</span></label>
-      <input type="file" id="rules_file" name="rules_file" accept=".yaml,.yml" required
-             style="display:block; margin-top:4px;">
-      <small class="text-dim">The rules file (e.g. <code>rules.yaml</code>) containing constants and rule definitions.</small>
+    <div class="card">
+        <h2>Importing from GitHub</h2>
+        <p class="text-dim text-sm">To import a pack from a repository checkout or GitHub raw files:</p>
+        <ol class="list-compact text-sm text-dim">
+            <li>Open the rule pack directory that contains the manifest and rules YAML files.</li>
+            <li>Download or copy the raw <code>manifest.yaml</code> file.</li>
+            <li>Download or copy the raw <code>rules.yaml</code> file.</li>
+            <li>Upload both files here and optionally assign a custom display name.</li>
+            <li>Review validation errors on this page before retrying if the import is rejected.</li>
+        </ol>
+        <hr>
+        <p class="text-dim text-sm">
+            Imported packs are always created as <strong>custom</strong> variants so they never overwrite the shipped
+            standard logic.
+        </p>
     </div>
+</section>
 
-    <div style="margin-bottom: 16px;">
-      <label for="custom_name">Custom Name</label>
-      <input type="text" id="custom_name" name="custom_name" placeholder="e.g. my_custom_pack"
-             style="display:block; margin-top:4px; width:100%; max-width:320px;">
-      <small class="text-dim">Optional label shown in the pack list.</small>
-    </div>
-
-    <div style="display:flex; gap:12px; align-items:center;">
-      <button type="submit" class="btn">Import Pack</button>
-      <a href="/rule-packs" class="btn btn-outline">Cancel</a>
-    </div>
-  </form>
-</div>
-
-<div class="card">
-  <h2 style="font-size:16px; margin-bottom:8px;">Importing from GitHub</h2>
-  <p class="text-dim text-sm">To import a rule pack from a GitHub repository:</p>
-  <ol style="padding-left:20px; font-size:13px; line-height:1.8;">
-    <li>Navigate to the rule pack directory in the repository.</li>
-    <li>Download the raw <code>manifest.yaml</code> file (click <em>Raw</em>, then <em>Save As</em>).</li>
-    <li>Download the raw <code>rules.yaml</code> file the same way.</li>
-    <li>Upload both files above and give the pack a custom name.</li>
-    <li>The pack will be validated before being saved — invalid YAML or rule errors will be shown here.</li>
-  </ol>
-  <p class="text-dim text-sm" style="margin-top:8px;">
-    Imported packs are always created as <strong>custom</strong> variants so they never overwrite standard packs.
-  </p>
-</div>
 {% endblock %}

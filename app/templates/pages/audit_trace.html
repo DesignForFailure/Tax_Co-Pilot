@@ -1,0 +1,88 @@
+{% extends "layouts/base.html" %}
+{% block title %}Audit Trail{% endblock %}
+{% block content %}
+
+<section class="page-header">
+    <div>
+        <div class="eyebrow">Audit Trail</div>
+        <h1 class="page-title">Run-level trace for tax year {{ run.tax_year }}</h1>
+        <p class="page-subtitle">
+            Each rule evaluation is collapsed by default for readability. Expand any row to inspect the
+            explanation, raw inputs, and intermediate values behind the final result.
+        </p>
+    </div>
+    <div class="action-row">
+        <a href="/runs/{{ run.id }}" class="btn">Back to Run</a>
+        <a href="/runs/{{ run.id }}/forms" class="btn btn-outline">View Forms</a>
+        <a href="/runs/{{ run.id }}/export/html" class="btn btn-outline">Export HTML</a>
+    </div>
+</section>
+
+<section class="card">
+    <div class="meta-list">
+        <div class="meta-card">
+            <div class="meta-label">Created</div>
+            <div class="meta-value">{{ run.created_at }}</div>
+        </div>
+        <div class="meta-card">
+            <div class="meta-label">Filing Status</div>
+            <div class="meta-value">{{ run.filing_status.upper() }}</div>
+        </div>
+        <div class="meta-card">
+            <div class="meta-label">Rule Pack</div>
+            <div class="meta-value">{{ run.rule_pack_version }}</div>
+        </div>
+        <div class="meta-card">
+            <div class="meta-label">Trace Steps</div>
+            <div class="meta-value">{{ run.trace|length }}</div>
+        </div>
+    </div>
+</section>
+
+<section class="card section-anchor" id="trace-list">
+    <div class="section-header">
+        <div>
+            <h2>Detailed Rule Evaluations</h2>
+            <p class="text-dim text-sm">Open only the steps you need. The final result is shown directly in each summary row.</p>
+        </div>
+    </div>
+
+    {% if run.trace %}
+    <div>
+        {% for t in run.trace %}
+        <details class="disclosure">
+            <summary>
+                <div>
+                    <div class="trace-summary-title">{{ loop.index }}. {{ t.rule_id }}</div>
+                    <div class="text-dim text-sm">{{ t.description }}</div>
+                </div>
+                <div class="trace-result">{{ t.result["value"] }}</div>
+            </summary>
+            <div class="trace-body stack-md">
+                <div class="action-row">
+                    {% if t.form_line %}
+                    <span class="pill">{{ t.form_line }}</span>
+                    {% endif %}
+                    <span class="pill">{{ t.rule_pack_version }}</span>
+                </div>
+                <p>{{ t.explanation }}</p>
+                <div class="panel-grid-2">
+                    <div>
+                        <h3>Inputs</h3>
+                        <pre class="code-block">{{ t.inputs | tojson(indent=2) }}</pre>
+                    </div>
+                    <div>
+                        <h3>Intermediates</h3>
+                        <pre class="code-block">{{ t.intermediates | tojson(indent=2) }}</pre>
+                    </div>
+                </div>
+            </div>
+        </details>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-dim">No trace rows are available for this run.</p>
+    {% endif %}
+</section>
+
+{% endblock %}

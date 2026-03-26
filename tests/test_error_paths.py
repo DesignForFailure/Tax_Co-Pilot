@@ -143,7 +143,7 @@ def test_calculate_validation_error_renders_form() -> None:
     resp = c.post("/calculate", data=form, follow_redirects=False)
     assert resp.status_code == 400
     assert "text/html" in resp.headers.get("content-type", "")
-    assert "Enter Tax Data" in resp.text  # re-renders the calculate form
+    assert "Enter tax data" in resp.text  # re-renders the calculate form
     assert "Calculation Error" in resp.text  # error banner shown
     assert "<script>alert(9)</script>" not in resp.text  # XSS-safe: auto-escaped
 

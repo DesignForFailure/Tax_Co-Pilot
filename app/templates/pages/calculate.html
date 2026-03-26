@@ -2,22 +2,54 @@
 {% block title %}Calculate{% endblock %}
 {% block content %}
 
-<h1 style="font-size: 24px; margin-bottom: 8px;">Enter Tax Data</h1>
-<p class="text-dim text-sm mb-4">Add income forms for each taxpayer. Use the + buttons to add multiple entries.</p>
+<section class="page-header">
+    <div>
+        <div class="eyebrow">Calculation</div>
+        <h1 class="page-title">Enter tax data without losing your place.</h1>
+        <p class="page-subtitle">
+            The form is broken into anchored sections so long filings stay easy to navigate. Use the jump links,
+            then add as many income rows as needed for each taxpayer.
+        </p>
+    </div>
+    <div class="action-row">
+        <a href="/dashboard" class="btn btn-outline">Dashboard</a>
+        <a href="/runs" class="btn btn-outline">Saved Runs</a>
+    </div>
+</section>
+
+<section class="card">
+    <div class="section-header">
+        <div>
+            <h2>Page Navigation</h2>
+            <p class="text-dim text-sm">Jump between filing details, taxpayer sections, deductions, and the final submit area.</p>
+        </div>
+        <a href="#submit-calc" class="btn btn-sm btn-outline">Skip to Submit</a>
+    </div>
+    <div class="jump-nav">
+        <a href="#filing-information" class="jump-link">Filing</a>
+        <a href="#primary-taxpayer" class="jump-link">Primary Taxpayer</a>
+        <a href="#spouse_section" class="jump-link">Spouse</a>
+        <a href="#other-income" class="jump-link">Other Income</a>
+        <a href="#adjustments" class="jump-link">Adjustments</a>
+        <a href="#itemized-deductions" class="jump-link">Itemized Deductions</a>
+        <a href="#dependents" class="jump-link">Dependents</a>
+        <a href="#payments" class="jump-link">Payments</a>
+    </div>
+</section>
 
 {% if error %}
-<div class="card" style="border-color: var(--red); margin-bottom: 20px;">
+<div class="notice notice-error">
     <h2 style="color: var(--red);">Calculation Error</h2>
-    <p style="margin-top: 8px;">{{ error }}</p>
+    <p>{{ error }}</p>
 </div>
 {% endif %}
 
 <form method="POST" action="/calculate">
     <input type="hidden" name="csrf_token" value="{{ csrf }}">
 
-    {# ─── Filing Information ─────────────────────────────────── #}
-    <div class="card">
+    <div class="card section-anchor" id="filing-information">
         <h2>Filing Information</h2>
+        <p class="text-dim text-sm mb-4">Choose the tax year, filing status, residence state, and active federal pack variant before entering line items.</p>
         <div class="form-row">
             <div>
                 <label>Tax Year</label>
@@ -59,15 +91,13 @@
         </div>
     </div>
 
-    {# ─── Primary Taxpayer ───────────────────────────────────── #}
-    <div class="card">
+    <div class="card section-anchor" id="primary-taxpayer">
         <h2>Primary Taxpayer</h2>
         <div class="form-row">
             <div><label>First Name</label><input type="text" name="p_first" required></div>
             <div><label>Last Name</label><input type="text" name="p_last" required></div>
         </div>
 
-        {# W-2s #}
         <div class="section-header">
             <h3>W-2 Forms</h3>
             <button type="button" class="btn btn-sm btn-outline" onclick="addRow('p_w2')">+ Add W-2</button>
@@ -88,21 +118,18 @@
             </div>
         </div>
 
-        {# 1099-INT #}
         <div class="section-header">
             <h3>1099-INT (Interest)</h3>
             <button type="button" class="btn btn-sm btn-outline" onclick="addRow('p_1099int')">+ Add 1099-INT</button>
         </div>
         <div id="p_1099int_container" class="dynamic-section"></div>
 
-        {# 1099-DIV #}
         <div class="section-header">
             <h3>1099-DIV (Dividends)</h3>
             <button type="button" class="btn btn-sm btn-outline" onclick="addRow('p_1099div')">+ Add 1099-DIV</button>
         </div>
         <div id="p_1099div_container" class="dynamic-section"></div>
 
-        {# 1099-B #}
         <div class="section-header">
             <h3>1099-B (Capital Gains)</h3>
             <button type="button" class="btn btn-sm btn-outline" onclick="addRow('p_1099b')">+ Add 1099-B</button>
@@ -110,8 +137,7 @@
         <div id="p_1099b_container" class="dynamic-section"></div>
     </div>
 
-    {# ─── Spouse Taxpayer ────────────────────────────────────── #}
-    <div class="card spouse-section" id="spouse_section">
+    <div class="card spouse-section section-anchor" id="spouse_section">
         <h2>Spouse</h2>
         <p class="text-dim text-sm" style="margin-bottom:12px;">Shown for MFJ only. For MFS, submit one spouse per run.</p>
         <div class="form-row">
@@ -119,28 +145,24 @@
             <div><label>Last Name</label><input type="text" name="s_last"></div>
         </div>
 
-        {# Spouse W-2s #}
         <div class="section-header">
             <h3>W-2 Forms</h3>
             <button type="button" class="btn btn-sm btn-outline" onclick="addRow('s_w2')">+ Add W-2</button>
         </div>
         <div id="s_w2_container" class="dynamic-section"></div>
 
-        {# Spouse 1099-INT #}
         <div class="section-header">
             <h3>1099-INT (Interest)</h3>
             <button type="button" class="btn btn-sm btn-outline" onclick="addRow('s_1099int')">+ Add 1099-INT</button>
         </div>
         <div id="s_1099int_container" class="dynamic-section"></div>
 
-        {# Spouse 1099-DIV #}
         <div class="section-header">
             <h3>1099-DIV (Dividends)</h3>
             <button type="button" class="btn btn-sm btn-outline" onclick="addRow('s_1099div')">+ Add 1099-DIV</button>
         </div>
         <div id="s_1099div_container" class="dynamic-section"></div>
 
-        {# Spouse 1099-B #}
         <div class="section-header">
             <h3>1099-B (Capital Gains)</h3>
             <button type="button" class="btn btn-sm btn-outline" onclick="addRow('s_1099b')">+ Add 1099-B</button>
@@ -148,16 +170,14 @@
         <div id="s_1099b_container" class="dynamic-section"></div>
     </div>
 
-    {# ─── Other Income ────────────────────────────────────────── #}
-    <div class="card">
+    <div class="card section-anchor" id="other-income">
         <h2>Other Income</h2>
         <div class="form-row">
             <div><label>Other Income (Schedule 1)</label><input type="text" name="other_income" placeholder="0"></div>
         </div>
     </div>
 
-    {# ─── Above-the-Line Deductions ──────────────────────────── #}
-    <div class="card">
+    <div class="card section-anchor" id="adjustments">
         <h2>Above-the-Line Deductions</h2>
         <p class="text-dim text-sm" style="margin-bottom:12px;">These reduce your AGI. Leave blank or 0 if not applicable.</p>
         <div class="form-row">
@@ -173,8 +193,7 @@
         </div>
     </div>
 
-    {# ─── Itemized Deductions (Schedule A) ───────────────────── #}
-    <div class="card">
+    <div class="card section-anchor" id="itemized-deductions">
         <h2>Itemized Deductions (Schedule A)</h2>
         <p class="text-dim text-sm" style="margin-bottom:12px;">Leave blank to use the standard deduction. The higher of standard or itemized will be applied automatically.</p>
         <div class="form-row">
@@ -191,27 +210,27 @@
         </div>
     </div>
 
-    {# ─── Dependents ─────────────────────────────────────────── #}
-    <div class="card">
+    <div class="card section-anchor" id="dependents">
         <h2>Dependents</h2>
         <div class="form-row">
             <div><label>Qualifying Children (for Child Tax Credit)</label><input type="number" name="qualifying_children" value="0" min="0" max="20"></div>
         </div>
     </div>
 
-    {# ─── Estimated Payments ─────────────────────────────────── #}
-    <div class="card">
+    <div class="card section-anchor" id="payments">
         <h2>Estimated Tax Payments</h2>
         <div class="form-row">
             <div><label>Estimated Payments (1040 Line 26)</label><input type="text" name="estimated_payments" placeholder="0"></div>
         </div>
     </div>
 
-    <button class="btn" type="submit">Calculate</button>
+    <div class="action-row section-anchor" id="submit-calc">
+        <button class="btn" type="submit">Calculate</button>
+        <a href="/dashboard" class="btn btn-outline">Back to Dashboard</a>
+    </div>
 </form>
 
 <script>
-/* Dynamic form row management for all income types. */
 var counters = {
     p_w2: 1, p_1099int: 0, p_1099div: 0, p_1099b: 0,
     s_w2: 0, s_1099int: 0, s_1099div: 0, s_1099b: 0
@@ -313,7 +332,6 @@ function refreshStateOptions() {
     }
 }
 
-/* Show spouse section on load if MFJ is pre-selected */
 document.addEventListener('DOMContentLoaded', function () {
     refreshStateOptions();
     toggleSpouse();

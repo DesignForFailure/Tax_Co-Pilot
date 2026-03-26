@@ -18,6 +18,7 @@
 """Route coverage tests for previously untested endpoints."""
 
 import json
+from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -50,6 +51,29 @@ def _client() -> TestClient:
     return c
 
 
+@pytest.fixture
+def _locked_database(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    import app.services.database as db_module
+    import main as main_module
+    from app.services.encryption import DatabaseState
+
+    monkeypatch.setattr(main_module.encryption_config, "enabled", True)
+    monkeypatch.setattr(db_module.config, "enabled", True)
+    monkeypatch.setattr(
+        main_module,
+        "detect_encryption_state",
+        lambda _path: DatabaseState.ENCRYPTED_SQLCIPHER,
+    )
+    monkeypatch.setattr(
+        db_module,
+        "detect_encryption_state",
+        lambda _path: DatabaseState.ENCRYPTED_SQLCIPHER,
+    )
+    db_module.clear_cached_password()
+    yield
+    db_module.clear_cached_password()
+
+
 def _create_run() -> str:
     c = _client()
     c.post("/calculate", data=_BASE_FORM, follow_redirects=False)
@@ -58,23 +82,100 @@ def _create_run() -> str:
     return str(runs[0]["id"])
 
 
-# ─── Dashboard ────────────────────────────────────────────────
+# ─── Home / Dashboard ─────────────────────────────────────────
+
+
+def test_home_page() -> None:
+    """GET / returns the landing page."""
+    c = _client()
+    resp = c.get("/")
+    assert resp.status_code == 200
+    assert "Workspace Home" in resp.text
+
+
+def test_home_page_locked_state_prompts_unlock(_locked_database: None) -> None:
+    """GET / while locked should prompt unlock instead of claiming there are no runs."""
+    c = _client()
+    resp = c.get("/")
+    assert resp.status_code == 200
+    assert "Unlock the database to inspect saved runs and recent activity." in resp.text
+    assert "No saved runs are available yet." not in resp.text
+    assert "No returns have been saved yet." not in resp.text
 
 
 def test_dashboard_empty() -> None:
-    """GET / with no runs returns 200."""
+    """GET /dashboard with no runs returns 200."""
     c = _client()
-    resp = c.get("/")
+    resp = c.get("/dashboard")
     assert resp.status_code == 200
+    assert "Dashboard" in resp.text
 
 
 def test_dashboard_with_run() -> None:
-    """GET / with a saved run returns 200 and shows run data."""
+    """GET /dashboard with a saved run returns 200 and shows run data."""
     _create_run()
     c = _client()
-    resp = c.get("/")
+    resp = c.get("/dashboard")
     assert resp.status_code == 200
     assert "2024" in resp.text
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/dashboard",
+        "/runs",
+        "/runs/compare?a=a&b=b",
+        "/runs/fake-id",
+        "/runs/fake-id/audit",
+        "/runs/fake-id/export/json",
+        "/runs/fake-id/export/html",
+        "/runs/fake-id/forms",
+        "/runs/fake-id/export/forms",
+        "/export-all",
+        "/audit/verify",
+    ],
+)
+def test_locked_db_get_routes_redirect_to_unlock(_locked_database: None, path: str) -> None:
+    """Locked DB-backed GET routes should redirect to the unlock page."""
+    c = _client()
+    resp = c.get(path, follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers.get("location") == "/unlock"
+
+
+@pytest.mark.parametrize("path", ["/runs/fake-id/delete", "/runs/fake-id/annotate"])
+def test_locked_db_post_routes_redirect_to_unlock(_locked_database: None, path: str) -> None:
+    """Locked DB-backed POST routes should redirect to the unlock page."""
+    c = _client()
+    resp = c.post(
+        path,
+        data={"csrf_token": CSRF, "tags": "review", "notes": "locked"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert resp.headers.get("location") == "/unlock"
+
+
+def test_locked_import_returns_redirects_to_unlock(_locked_database: None) -> None:
+    """Import returns should redirect to unlock before attempting DB writes."""
+    c = _client()
+    resp = c.post(
+        "/import-returns",
+        data={"csrf_token": CSRF},
+        files={"file": ("runs.json", b"[]", "application/json")},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert resp.headers.get("location") == "/unlock"
+
+
+def test_locked_calculate_submit_redirects_to_unlock(_locked_database: None) -> None:
+    """Submitting a calculation while locked should redirect to unlock."""
+    c = _client()
+    resp = c.post("/calculate", data=_BASE_FORM, follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers.get("location") == "/unlock"
 
 
 # ─── Runs List ────────────────────────────────────────────────
@@ -96,6 +197,15 @@ def test_run_detail_valid() -> None:
     c = _client()
     resp = c.get(f"/runs/{run_id}")
     assert resp.status_code == 200
+
+
+def test_run_audit_valid() -> None:
+    """GET /runs/{id}/audit for a valid run returns 200."""
+    run_id = _create_run()
+    c = _client()
+    resp = c.get(f"/runs/{run_id}/audit")
+    assert resp.status_code == 200
+    assert "Audit Trail" in resp.text
 
 
 def test_run_detail_invalid() -> None:
@@ -257,6 +367,16 @@ def test_calculate_preserves_withholding_only_1099_rows() -> None:
     run = _load_run_from_row(row)
     assert len(run.input_snapshot.taxpayers[0].form_1099_ints) == 1
     assert run.output.total_withholding == 150
+
+
+def test_calculate_spouse_jump_link_matches_section() -> None:
+    """The spouse jump link should target the rendered spouse section anchor."""
+    c = _client()
+    resp = c.get("/calculate")
+    assert resp.status_code == 200
+    assert 'href="#spouse_section"' in resp.text
+    assert 'id="spouse_section"' in resp.text
+    assert 'href="#spouse-section"' not in resp.text
 
 
 def test_audit_verify_detects_state_output_tampering() -> None:

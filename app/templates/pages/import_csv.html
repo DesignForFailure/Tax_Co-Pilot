@@ -2,8 +2,20 @@
 {% block title %}Import CSV{% endblock %}
 {% block content %}
 
-<h1 style="font-size: 24px; margin-bottom: 8px;">Import CSV</h1>
-<p class="text-dim text-sm mb-4">Paste CSV data below to import income records. Select the record type that matches your CSV columns.</p>
+<section class="page-header">
+    <div>
+        <div class="eyebrow">CSV Import</div>
+        <h1 class="page-title">Bring income records in with less clutter.</h1>
+        <p class="page-subtitle">
+            Paste raw CSV rows, choose the matching record type, and review parsed results on the same page before
+            moving into a full return calculation.
+        </p>
+    </div>
+    <div class="action-row">
+        <a href="/calculate" class="btn btn-outline">Go to Calculate</a>
+        <a href="/runs" class="btn btn-outline">Saved Runs</a>
+    </div>
+</section>
 
 <form method="POST" action="/import-csv">
     <input type="hidden" name="csrf_token" value="{{ csrf }}">
@@ -23,24 +35,30 @@
 
         <div>
             <label>CSV Data</label>
-            <p class="text-dim text-sm" style="margin-bottom: 6px;">
+            <p class="text-dim text-sm" style="margin-bottom: 10px;">
                 W-2 columns: <code>employer_name,wages,federal_withheld,state,state_wages,state_withheld</code><br>
                 1099-B columns: <code>description,proceeds,cost_basis,is_long_term</code><br>
                 1099-INT columns: <code>payer_name,interest_income,federal_withheld</code><br>
                 1099-DIV columns: <code>payer_name,ordinary_dividends,qualified_dividends,federal_withheld</code>
             </p>
-            <textarea name="csv_text" rows="10" style="width:100%;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:monospace;font-size:13px;resize:vertical;" placeholder="employer_name,wages,federal_withheld&#10;Acme Corp,85000,12000">{{ csv_text if csv_text is defined else "" }}</textarea>
+            <textarea
+                name="csv_text"
+                rows="10"
+                class="code-block"
+                style="resize: vertical;"
+                placeholder="employer_name,wages,federal_withheld&#10;Acme Corp,85000,12000"
+            >{{ csv_text if csv_text is defined else "" }}</textarea>
         </div>
 
-        <div style="margin-top: 14px;">
+        <div class="action-row" style="margin-top: 18px;">
             <button type="submit" class="btn">Import</button>
+            <a href="/dashboard" class="btn btn-outline">Dashboard</a>
         </div>
     </div>
 </form>
 
-{# ─── Errors ──────────────────────────────────────────────── #}
 {% if errors is defined and errors %}
-<div class="card" style="border-color: var(--red); margin-top: 20px;">
+<div class="notice notice-error">
     <h2 style="color: var(--red);">Parse Errors</h2>
     <ul style="margin-top: 10px; padding-left: 20px;">
     {% for err in errors %}
@@ -50,19 +68,18 @@
 </div>
 {% endif %}
 
-{# ─── Results ─────────────────────────────────────────────── #}
 {% if records is defined and records %}
-<div class="card" style="margin-top: 20px;">
+<div class="card">
     <h2>Imported Records ({{ records|length }})</h2>
     <p class="text-dim text-sm" style="margin-bottom: 12px;">
         Records parsed successfully. <a href="/calculate">Go to Calculate</a> to run a full tax return.
     </p>
-    <div style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <div class="table-wrap">
+        <table class="data-table">
             <thead>
                 <tr>
                 {% for key in records[0].keys() %}
-                    <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);color:var(--text-dim);">{{ key }}</th>
+                    <th>{{ key }}</th>
                 {% endfor %}
                 </tr>
             </thead>
@@ -70,7 +87,7 @@
             {% for rec in records %}
                 <tr>
                 {% for val in rec.values() %}
-                    <td style="padding:8px;border-bottom:1px solid var(--border);">{{ val }}</td>
+                    <td>{{ val }}</td>
                 {% endfor %}
                 </tr>
             {% endfor %}
@@ -79,7 +96,7 @@
     </div>
 </div>
 {% elif records is defined and not records and not errors %}
-<div class="card" style="margin-top: 20px;">
+<div class="card">
     <p class="text-dim">No records found. Check that your CSV has a header row and at least one data row.</p>
 </div>
 {% endif %}
