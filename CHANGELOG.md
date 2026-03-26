@@ -11,6 +11,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Added
+- UI workspace refresh: added a dedicated landing page (`GET /`), moved the latest-run summary to `GET /dashboard`, and added `GET /runs/{run_id}/audit` for a full audit-trace page with collapsed rule-evaluation rows.
 - **Milestone 12 — Rule Pack Editor (complete):** GUI-based rule pack management system. Create, edit, clone, import, and export YAML rule packs via web UI. Standard packs are read-only; custom variants stored in `custom_vN/` subdirectories. Type-adaptive rule editor for sum, formula, lookup, and bracket_table rules with inline bracket table editing. Calculate form integration with variant selector dropdown. Full validation via `RulePack.load()` on every save. CSRF-protected POST routes. Path traversal protection on all route parameters.
 - `app/services/rule_pack_editor.py`: CRUD service for rule packs (list, load, clone, create, save, delete, validate, import, export).
 - Rule Pack Manager page (`GET /rule-packs`) with grouped pack table, inline create form, and export/delete actions.
@@ -21,6 +22,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - `tests/test_rule_pack_editor.py`: 24 service-layer unit tests.
 - `tests/test_rule_pack_routes.py`: 15 route integration tests with test cleanup fixture.
 - **Hardening, QA & Auditability pass (complete):** Fixed SQL injection in SQLCipher PRAGMA, `tax_year` validation, unary negation in rule expressions, `hybrid_factory` consistency, URL-encoded error redirects, upload size limits with SQLite integrity validation, input sanitization (tags/notes caps, filename sanitization, export fallback). Added tamper-evident hash chain (`integrity_hash`, `previous_hash`) with `GET /audit/verify`. Key rotation via `POST /rotate-key` with `PRAGMA rekey`. Password cache clearing on shutdown. Explicit cipher parameters. CSRF token rotation after authentication. Made `pip-audit` blocking in CI.
+
+### Changed
+- UI/UX refresh across the shared layout and primary pages: added browser-aware light/dark theme support with a manual theme toggle, introduced clearer top-level navigation, added jump links on long data-entry pages, reduced spacing clutter on dashboard/runs/forms/import/legal pages, and folded the README ASCII wordmark into the dashboard presentation.
 
 ### Fixed
 - **QA: Shipped state template now validates** — `rule_packs/state/_template/2024/` now uses a self-consistent `template.` rule namespace so repository-wide validation sweeps do not fail on the bundled starter pack.

@@ -2,99 +2,134 @@
 {% block title %}Runs{% endblock %}
 {% block content %}
 
-<h1 style="font-size: 24px; margin-bottom: 8px;">Past Runs</h1>
+<section class="page-header">
+    <div>
+        <div class="eyebrow">Run History</div>
+        <h1 class="page-title">Browse, compare, export, and annotate saved runs.</h1>
+        <p class="page-subtitle">
+            The run list keeps operational actions separate from the dashboard so the latest summary stays clean while
+            history management remains easy to scan.
+        </p>
+    </div>
+    <div class="action-row">
+        <a href="/dashboard" class="btn btn-outline">Dashboard</a>
+        <a href="/calculate" class="btn">New Calculation</a>
+    </div>
+</section>
 
 {% if runs %}
-<div style="margin-bottom: 12px;">
-    <button class="btn btn-sm btn-outline" onclick="compareSelected()">Compare Selected (2)</button>
-    <span id="compare-hint" class="text-dim text-sm" style="margin-left: 10px;">Check exactly two runs to compare.</span>
+<div class="card">
+    <div class="section-header">
+        <div>
+            <h2>Comparison Mode</h2>
+            <p id="compare-hint" class="text-dim text-sm">Check exactly two runs, then open the comparison view.</p>
+        </div>
+        <button class="btn btn-sm btn-outline" onclick="compareSelected()">Compare Selected</button>
+    </div>
 </div>
 {% endif %}
 
-<div style="margin-bottom: 12px;">
-    <a href="/export-all" class="btn btn-sm btn-outline">Export All Runs (JSON)</a>
-    <a href="/backup" class="btn btn-sm btn-outline">Backup Database</a>
-</div>
-<div style="margin-bottom: 12px;">
-    <form method="POST" action="/import-returns" enctype="multipart/form-data" style="display:inline;">
-        <input type="hidden" name="csrf_token" value="{{ csrf }}">
-        <input type="file" name="file" accept=".json" style="font-size:12px;">
-        <button type="submit" class="btn btn-sm btn-outline">Import Runs</button>
-    </form>
-    &nbsp;
-    <form method="POST" action="/restore" enctype="multipart/form-data" style="display:inline;"
-          onsubmit="return confirm('This will REPLACE your entire database. All current runs will be lost. Continue?')">
-        <input type="hidden" name="csrf_token" value="{{ csrf }}">
-        <input type="file" name="file" accept=".db,.sqlite" style="font-size:12px;">
-        <button type="submit" class="btn btn-sm btn-danger" style="font-size:11px;">Restore Database</button>
-    </form>
+<div class="card">
+    <div class="section-header">
+        <div>
+            <h2>Data Management</h2>
+            <p class="text-dim text-sm">Export the run history, back up the database, or import validated files into the local store.</p>
+        </div>
+    </div>
+    <div class="action-row" style="margin-bottom: 14px;">
+        <a href="/export-all" class="btn btn-sm btn-outline">Export All Runs (JSON)</a>
+        <a href="/backup" class="btn btn-sm btn-outline">Backup Database</a>
+    </div>
+    <div class="action-row">
+        <form method="POST" action="/import-returns" enctype="multipart/form-data" class="action-row" style="margin: 0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf }}">
+            <input type="file" name="file" accept=".json" style="font-size:12px; max-width: 220px;">
+            <button type="submit" class="btn btn-sm btn-outline">Import Runs</button>
+        </form>
+        <form method="POST" action="/restore" enctype="multipart/form-data" class="action-row" style="margin: 0;"
+              onsubmit="return confirm('This will REPLACE your entire database. All current runs will be lost. Continue?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf }}">
+            <input type="file" name="file" accept=".db,.sqlite" style="font-size:12px; max-width: 220px;">
+            <button type="submit" class="btn btn-sm btn-danger">Restore Database</button>
+        </form>
+    </div>
 </div>
 
 <div class="card">
     {% if runs %}
-        <table style="width:100%;border-collapse:collapse;">
-            <thead>
-                <tr>
-                    <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);width:32px;"></th>
-                    <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Created</th>
-                    <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Filing Status</th>
-                    <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Rule Pack</th>
-                    <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Tags / Notes</th>
-                    <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for r in runs %}
-                <tr>
-                    <td style="padding:8px;border-bottom:1px solid var(--border);">
-                        <input type="checkbox" class="compare-cb" value="{{ r.id }}" onchange="updateCompare()">
-                    </td>
-                    <td style="padding:8px;border-bottom:1px solid var(--border);">{{ r.created_at }}</td>
-                    <td style="padding:8px;border-bottom:1px solid var(--border);">{{ r.filing_status }}</td>
-                    <td style="padding:8px;border-bottom:1px solid var(--border);">{{ r.rule_pack_version }}</td>
-                    <td style="padding:8px;border-bottom:1px solid var(--border);">
-                        <form method="POST" action="/runs/{{ r.id }}/annotate" style="display:inline;">
-                            <input type="hidden" name="csrf_token" value="{{ csrf }}">
-                            <input type="text" name="tags" value="{{ r.tags or '' }}" placeholder="tags" style="width:80px;font-size:11px;">
-                            <input type="text" name="notes" value="{{ r.notes or '' }}" placeholder="notes" style="width:120px;font-size:11px;">
-                            <button type="submit" class="btn btn-sm btn-outline" style="font-size:10px;padding:2px 6px;">Save</button>
-                        </form>
-                    </td>
-                    <td style="padding:8px;border-bottom:1px solid var(--border);">
-                        <a href="/runs/{{ r.id }}">View</a>
-                        &nbsp;
-                        <form method="POST" action="/runs/{{ r.id }}/delete" style="display:inline;"
-                              onsubmit="return confirm('Delete this run? This cannot be undone.')">
-                            <input type="hidden" name="csrf_token" value="{{ csrf }}">
-                            <button type="submit" class="btn btn-sm btn-danger" style="font-size:11px;padding:4px 10px;">Delete</button>
-                        </form>
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 52px;">Select</th>
+                        <th>Created</th>
+                        <th>Filing Status</th>
+                        <th>Rule Pack</th>
+                        <th>Tags / Notes</th>
+                        <th class="align-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for r in runs %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" class="compare-cb" value="{{ r.id }}" onchange="updateCompare()">
+                        </td>
+                        <td>{{ r.created_at }}</td>
+                        <td>{{ r.filing_status }}</td>
+                        <td>{{ r.rule_pack_version }}</td>
+                        <td>
+                            <form method="POST" action="/runs/{{ r.id }}/annotate" class="stack-sm">
+                                <input type="hidden" name="csrf_token" value="{{ csrf }}">
+                                <input type="text" name="tags" value="{{ r.tags or '' }}" placeholder="tags">
+                                <input type="text" name="notes" value="{{ r.notes or '' }}" placeholder="notes">
+                                <button type="submit" class="btn btn-sm btn-outline">Save Notes</button>
+                            </form>
+                        </td>
+                        <td class="align-right">
+                            <div class="action-row" style="justify-content: flex-end;">
+                                <a href="/runs/{{ r.id }}" class="btn btn-sm">View</a>
+                                <a href="/runs/{{ r.id }}/audit" class="btn btn-sm btn-outline">Audit</a>
+                                <form method="POST" action="/runs/{{ r.id }}/delete" style="display:inline;"
+                                      onsubmit="return confirm('Delete this run? This cannot be undone.')">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
     {% else %}
-        <p class="text-dim">No runs saved yet.</p>
+        <h2>No runs saved yet</h2>
+        <p class="text-dim">Run history will appear here after your first saved calculation.</p>
     {% endif %}
 </div>
 
 <script>
 function updateCompare() {
     var boxes = document.querySelectorAll('.compare-cb:checked');
-    /* Enforce a maximum of 2 selections */
-    if (boxes.length > 2) {
-        this.checked = false;
-        return;
+    var hint = document.getElementById('compare-hint');
+    if (hint) {
+        if (boxes.length === 0) {
+            hint.textContent = 'Check exactly two runs, then open the comparison view.';
+        } else if (boxes.length === 1) {
+            hint.textContent = 'Select one more run to enable a side-by-side comparison.';
+        } else {
+            hint.textContent = 'Two runs selected. Open the comparison view when ready.';
+        }
     }
 }
 
-/* Called from each checkbox onchange — enforce max 2 via event target */
 document.addEventListener('change', function(e) {
     if (!e.target.classList.contains('compare-cb')) return;
     var boxes = document.querySelectorAll('.compare-cb:checked');
     if (boxes.length > 2) {
         e.target.checked = false;
     }
+    updateCompare();
 });
 
 function compareSelected() {
@@ -107,6 +142,8 @@ function compareSelected() {
     var b = boxes[1].value;
     window.location.href = '/runs/compare?a=' + encodeURIComponent(a) + '&b=' + encodeURIComponent(b);
 }
+
+document.addEventListener('DOMContentLoaded', updateCompare);
 </script>
 
 {% endblock %}

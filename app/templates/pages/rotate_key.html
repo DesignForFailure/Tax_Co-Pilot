@@ -1,21 +1,22 @@
 {% extends "layouts/base.html" %}
 {% block title %}Rotate Encryption Key{% endblock %}
 {% block content %}
-<div style="max-width: 500px; margin: 80px auto;">
+<div style="max-width: 540px; margin: 40px auto;">
     <div class="card">
         <div style="text-align: center; margin-bottom: 24px;">
+            <div class="eyebrow" style="margin-bottom: 10px;">Encryption</div>
             <h2 style="margin-bottom: 8px;">Rotate Encryption Key</h2>
             <p class="text-dim text-sm">Change the password used to encrypt your tax database</p>
         </div>
 
         {% if error %}
-        <div style="background: var(--red); color: white; padding: 12px; border-radius: 10px; margin-bottom: 16px; font-size: 14px;">
+        <div class="notice notice-error" style="margin-bottom: 16px;">
             {{ error }}
         </div>
         {% endif %}
 
         {% if success %}
-        <div style="background: var(--green); color: #0f1117; padding: 12px; border-radius: 10px; margin-bottom: 16px; font-size: 14px; font-weight: 600;">
+        <div class="notice notice-success" style="margin-bottom: 16px; font-weight: 600;">
             Key rotated successfully.
         </div>
         {% endif %}

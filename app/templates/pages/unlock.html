@@ -3,16 +3,16 @@
 {% block title %}Unlock Database{% endblock %}
 
 {% block content %}
-<div style="max-width: 480px; margin: 80px auto;">
+<div style="max-width: 520px; margin: 40px auto;">
     <div class="card">
         <div style="text-align: center; margin-bottom: 24px;">
-            <div style="font-size: 48px; margin-bottom: 12px;">🔒</div>
+            <div class="eyebrow" style="margin-bottom: 10px;">Encrypted Database</div>
             <h2 style="margin-bottom: 8px;">Database Password Required</h2>
             <p class="text-dim text-sm">Enter your encryption password to access tax data</p>
         </div>
 
         {% if error %}
-        <div style="background: var(--red); color: white; padding: 12px; border-radius: 10px; margin-bottom: 16px; font-size: 14px;">
+        <div class="notice notice-error" style="margin-bottom: 16px;">
             {{ error }}
         </div>
         {% endif %}
@@ -40,7 +40,7 @@
 
         <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
             <p class="text-dim text-sm" style="text-align: center;">
-                ⚠️ If you've forgotten your password, there is no recovery mechanism.
+                If you've forgotten your password, there is no recovery mechanism.
                 Your encrypted data will be permanently inaccessible.
             </p>
         </div>

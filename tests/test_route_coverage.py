@@ -58,21 +58,30 @@ def _create_run() -> str:
     return str(runs[0]["id"])
 
 
-# ─── Dashboard ────────────────────────────────────────────────
+# ─── Home / Dashboard ─────────────────────────────────────────
 
 
-def test_dashboard_empty() -> None:
-    """GET / with no runs returns 200."""
+def test_home_page() -> None:
+    """GET / returns the landing page."""
     c = _client()
     resp = c.get("/")
     assert resp.status_code == 200
+    assert "Workspace Home" in resp.text
+
+
+def test_dashboard_empty() -> None:
+    """GET /dashboard with no runs returns 200."""
+    c = _client()
+    resp = c.get("/dashboard")
+    assert resp.status_code == 200
+    assert "Dashboard" in resp.text
 
 
 def test_dashboard_with_run() -> None:
-    """GET / with a saved run returns 200 and shows run data."""
+    """GET /dashboard with a saved run returns 200 and shows run data."""
     _create_run()
     c = _client()
-    resp = c.get("/")
+    resp = c.get("/dashboard")
     assert resp.status_code == 200
     assert "2024" in resp.text
 
@@ -96,6 +105,15 @@ def test_run_detail_valid() -> None:
     c = _client()
     resp = c.get(f"/runs/{run_id}")
     assert resp.status_code == 200
+
+
+def test_run_audit_valid() -> None:
+    """GET /runs/{id}/audit for a valid run returns 200."""
+    run_id = _create_run()
+    c = _client()
+    resp = c.get(f"/runs/{run_id}/audit")
+    assert resp.status_code == 200
+    assert "Audit Trail" in resp.text
 
 
 def test_run_detail_invalid() -> None:

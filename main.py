@@ -362,34 +362,76 @@ def _startup() -> None:
         init_db()
 
 
-@app.get("/", response_class=HTMLResponse)
-def dashboard(request: Request) -> Response:
-    # Check if database unlock is needed
-    if encryption_config.enabled:
-        db_state = detect_encryption_state(DB_PATH)
-        if db_state == DatabaseState.ENCRYPTED_SQLCIPHER:
-            from app.services.database import get_cached_password
+def _database_locked() -> bool:
+    """Return True when the encrypted database requires an unlock step."""
+    if not encryption_config.enabled:
+        return False
 
-            if not get_cached_password():
-                # Redirect to unlock page
-                return RedirectResponse(url="/unlock", status_code=303)
-        if db_state == DatabaseState.ENCRYPTED_PYTHON:
-            return HTMLResponse(
-                "Python-layer encrypted databases are unsupported at runtime. "
-                "Migrate to SQLCipher encryption.",
-                status_code=500,
-            )
+    db_state = detect_encryption_state(DB_PATH)
+    if db_state == DatabaseState.ENCRYPTED_PYTHON:
+        raise RuntimeError(
+            "Python-layer encrypted databases are unsupported at runtime. "
+            "Migrate to SQLCipher encryption."
+        )
 
+    return db_state == DatabaseState.ENCRYPTED_SQLCIPHER and not get_cached_password()
+
+
+def _load_latest_run() -> ReturnRun | None:
+    """Return the newest saved run, if one exists."""
     runs = list_return_runs()
-    run = None
-    if runs:
-        run_id = runs[0]["id"]
-        run_data = get_return_run(run_id)
-        if run_data:
-            run = _load_run_from_row(run_data)
+    if not runs:
+        return None
+    return _load_run_from_row(runs[0])
+
+
+@app.get("/", response_class=HTMLResponse)
+def home(request: Request) -> Response:
+    csrf = _get_csrf_token(request)
+    try:
+        locked = _database_locked()
+    except RuntimeError as exc:
+        return HTMLResponse(str(exc), status_code=500)
+
+    recent_runs: list[dict[str, Any]] = []
+    latest_run: ReturnRun | None = None
+    if not locked:
+        recent_runs = list_return_runs()
+        if recent_runs:
+            latest_run = _load_run_from_row(recent_runs[0])
+
+    latest_year = max(available_years, default=0)
+    resp = templates.TemplateResponse(
+        request,
+        "pages/home.html",
+        {
+            "locked": locked,
+            "latest_run": latest_run,
+            "recent_runs": recent_runs[:5],
+            "run_count": len(recent_runs),
+            "available_years": available_years,
+            "latest_state_count": len(_get_state_packs(latest_year)) if latest_year else 0,
+            "pack_count": len(list_rule_packs()),
+        },
+    )
+    resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
+    return resp
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard(request: Request) -> Response:
+    try:
+        if _database_locked():
+            return RedirectResponse(url="/unlock", status_code=303)
+    except RuntimeError as exc:
+        return HTMLResponse(str(exc), status_code=500)
 
     csrf = _get_csrf_token(request)
-    resp = templates.TemplateResponse(request, "pages/dashboard.html", {"run": run})
+    resp = templates.TemplateResponse(
+        request,
+        "pages/dashboard.html",
+        {"run": _load_latest_run(), "is_latest": True},
+    )
     resp.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return resp
 
@@ -751,7 +793,7 @@ async def calculate_submit(request: Request) -> Response:
         run_dict = json.loads(run.model_dump_json())
         save_return_run(run_dict)
 
-        return RedirectResponse(url="/", status_code=303)
+        return RedirectResponse(url="/dashboard", status_code=303)
     except ValueError as exc:
         all_packs = list_rule_packs()
         states_by_year = _available_states_by_year()
@@ -856,7 +898,21 @@ def view_run(request: Request, run_id: str) -> HTMLResponse:
         return HTMLResponse("Run not found", status_code=404)
 
     run = _load_run_from_row(run_data)
-    return templates.TemplateResponse(request, "pages/dashboard.html", {"run": run})
+    return templates.TemplateResponse(
+        request,
+        "pages/dashboard.html",
+        {"run": run, "is_latest": False},
+    )
+
+
+@app.get("/runs/{run_id}/audit", response_class=HTMLResponse)
+def view_run_audit(request: Request, run_id: str) -> HTMLResponse:
+    run_data = get_return_run(run_id)
+    if not run_data:
+        return HTMLResponse("Run not found", status_code=404)
+
+    run = _load_run_from_row(run_data)
+    return templates.TemplateResponse(request, "pages/audit_trace.html", {"run": run})
 
 
 # ─── What-If Comparison ──────────────────────────────────────
@@ -1082,7 +1138,7 @@ def unlock_submit(request: Request, password: str = Form(""), csrf_token: str = 
         init_db()
 
         # Redirect to dashboard with fresh CSRF token
-        resp = RedirectResponse(url="/", status_code=303)
+        resp = RedirectResponse(url="/dashboard", status_code=303)
         resp.set_cookie("csrf", secrets.token_urlsafe(32), httponly=True, samesite="strict")
         return resp
 

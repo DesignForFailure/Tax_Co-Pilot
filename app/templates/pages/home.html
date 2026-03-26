@@ -1,0 +1,185 @@
+{% extends "layouts/base.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+
+<section class="page-header">
+    <div>
+        <div class="eyebrow">Workspace Home</div>
+        <h1 class="page-title">Navigate the tax workflow from one clean starting point.</h1>
+        <p class="page-subtitle">
+            Use the dashboard for the latest return, jump straight into calculations, or move into saved runs,
+            audit review, imports, and rule-pack maintenance without hunting through the app.
+        </p>
+    </div>
+    <div class="action-row">
+        {% if locked %}
+        <a href="/unlock" class="btn">Unlock Database</a>
+        {% else %}
+        <a href="/dashboard" class="btn">Open Dashboard</a>
+        <a href="/calculate" class="btn btn-outline">New Calculation</a>
+        <a href="/runs" class="btn btn-outline">Browse Runs</a>
+        {% endif %}
+    </div>
+</section>
+
+<section class="hero">
+    <div class="stack-lg">
+        <div>
+            <div class="eyebrow">Local-first workspace</div>
+            <h2 class="card-title">Keep the core actions visible.</h2>
+            <p class="page-subtitle">
+                The app is organized around a simple loop: calculate a return, inspect the dashboard summary,
+                open the detailed audit trail when needed, and compare or export saved runs from the history view.
+            </p>
+        </div>
+        <div class="jump-nav">
+            {% if locked %}
+            <a href="/unlock" class="jump-link">Unlock</a>
+            {% else %}
+            <a href="/dashboard" class="jump-link">Dashboard</a>
+            <a href="/calculate" class="jump-link">Calculate</a>
+            <a href="/whatif" class="jump-link">What-If</a>
+            <a href="/runs" class="jump-link">Runs</a>
+            {% endif %}
+            <a href="/import-csv" class="jump-link">CSV Import</a>
+            <a href="/rule-packs" class="jump-link">Rule Packs</a>
+            <a href="/legal" class="jump-link">Legal</a>
+        </div>
+    </div>
+    <aside class="hero-panel stack-md">
+        <div>
+            <div class="eyebrow">Snapshot</div>
+            <h2 class="card-title" style="margin-bottom: 4px;">Current workspace state</h2>
+            <p class="text-dim text-sm">
+                {% if locked %}
+                The encrypted database is locked. Unlock it to view runs and continue working.
+                {% elif latest_run %}
+                Latest saved run is ready to inspect from the dashboard or full run pages.
+                {% else %}
+                No returns have been saved yet. Start with a new calculation to populate the dashboard.
+                {% endif %}
+            </p>
+        </div>
+        <div class="meta-list">
+            <div class="meta-card">
+                <div class="meta-label">Supported Tax Years</div>
+                <div class="meta-value">{{ available_years|length }}</div>
+            </div>
+            <div class="meta-card">
+                <div class="meta-label">State Packs (Latest Year)</div>
+                <div class="meta-value">{{ latest_state_count }}</div>
+            </div>
+            <div class="meta-card">
+                <div class="meta-label">Available Rule Packs</div>
+                <div class="meta-value">{{ pack_count }}</div>
+            </div>
+            <div class="meta-card">
+                <div class="meta-label">Saved Runs</div>
+                <div class="meta-value">{{ run_count }}</div>
+            </div>
+        </div>
+        {% if latest_run %}
+        <div class="stack-sm">
+            <span class="pill">Latest run</span>
+            <div class="text-sm">
+                <strong>{{ latest_run.tax_year }}</strong> · {{ latest_run.filing_status.upper() }} ·
+                {{ latest_run.created_at }}
+            </div>
+            <div class="text-sm text-dim">Rule pack: {{ latest_run.rule_pack_version }}</div>
+            <div class="text-sm {% if latest_run.output.refund_or_owed >= 0 %}positive{% else %}negative{% endif %}">
+                {% if latest_run.output.refund_or_owed >= 0 %}
+                Refund estimate: ${{ "{:,.0f}".format(latest_run.output.refund_or_owed) }}
+                {% else %}
+                Estimated owed: ${{ "{:,.0f}".format(latest_run.output.refund_or_owed|abs) }}
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </aside>
+</section>
+
+<section class="panel-grid-3">
+    <div class="card">
+        <div class="eyebrow">Primary</div>
+        <h2>Dashboard</h2>
+        <p class="text-dim">
+            Open the latest run summary, export outputs, view forms, and jump into the full audit trail.
+        </p>
+        <div class="action-row">
+            <a href="/dashboard" class="btn btn-sm">Open</a>
+        </div>
+    </div>
+    <div class="card">
+        <div class="eyebrow">Input</div>
+        <h2>Calculate</h2>
+        <p class="text-dim">
+            Enter taxpayer details and forms with section jump links so long pages stay easy to scan.
+        </p>
+        <div class="action-row">
+            <a href="/calculate" class="btn btn-sm">Start Return</a>
+            <a href="/whatif" class="btn btn-sm btn-outline">Compare MFJ/MFS</a>
+        </div>
+    </div>
+    <div class="card">
+        <div class="eyebrow">History</div>
+        <h2>Runs &amp; Exports</h2>
+        <p class="text-dim">
+            Browse saved runs, compare scenarios, annotate records, export backups, and manage imports.
+        </p>
+        <div class="action-row">
+            <a href="/runs" class="btn btn-sm">Saved Runs</a>
+            <a href="/import-csv" class="btn btn-sm btn-outline">Import CSV</a>
+        </div>
+    </div>
+</section>
+
+<section class="panel-grid-2">
+    <div class="card">
+        <div class="eyebrow">Documentation</div>
+        <h2>Repository Guides</h2>
+        <p class="text-dim">
+            The project documentation still lives in the repository checkout. The most useful references are
+            <code>README.md</code>, <code>docs/ENCRYPTION.md</code>, <code>docs/RULE_PACK_AUTHORING.md</code>,
+            and <code>docs/STATE_AUTHORING_GUIDE.md</code>.
+        </p>
+        <div class="action-row">
+            <a href="/rule-packs" class="btn btn-sm">Manage Rule Packs</a>
+            <a href="/legal" class="btn btn-sm btn-outline">Legal Notices</a>
+        </div>
+    </div>
+    <div class="card">
+        <div class="eyebrow">Recent Activity</div>
+        <h2>Latest Saved Runs</h2>
+        {% if recent_runs %}
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Created</th>
+                        <th>Year</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for run in recent_runs %}
+                    <tr>
+                        <td>{{ run.created_at }}</td>
+                        <td>{{ run.tax_year }}</td>
+                        <td>{{ run.filing_status|upper }}</td>
+                        <td class="align-right">
+                            <a href="/runs/{{ run.id }}" class="btn btn-sm">Open</a>
+                            <a href="/runs/{{ run.id }}/audit" class="btn btn-sm btn-outline">Audit</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-dim">No saved runs are available yet.</p>
+        {% endif %}
+    </div>
+</section>
+
+{% endblock %}

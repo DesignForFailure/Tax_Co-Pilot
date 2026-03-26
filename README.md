@@ -49,6 +49,7 @@ Most consumer tax software hides its logic, can't reproduce historical results, 
 
 - **Rules-as-Data** — Tax logic lives in versioned YAML rule packs, not application code. Past results never silently change.
 - **Full Audit Trace** — Every calculation produces rule ID, inputs, intermediates, rounding policy, and human-readable explanation.
+- **Adaptive Workspace UI** — Landing page navigation, latest-run dashboard, dedicated audit-trace review, and light/dark theme support keep long workflows easier to navigate.
 - **Local-First & Private** — Runs entirely on local hardware. Optional AES-256 encryption at rest via SQLCipher.
 - **Multi-Person & Multi-State** — Two-taxpayer filing support (MFJ/MFS) with multiple state jurisdiction modeling.
 - **What-If Engine** — Scenario comparison (e.g., MFJ vs MFS) with compliance-first optimization.
@@ -87,7 +88,7 @@ python -m pip install -r requirements-dev.txt
 # or: python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-Open **http://127.0.0.1:8000** in your browser.
+Open **http://127.0.0.1:8000** in your browser to reach the landing page and dashboard workspace.
 
 ### Test
 
@@ -156,7 +157,7 @@ Tax Co-Pilot is currently **alpha / MVP**.
 - Two-person filing (MFJ / MFS / Single / HoH / QSS)
 - 12 state packs (GA, CA, NY + 9 no-income-tax states)
 - What-if scenario comparison engine
-- Local web UI with full calculation trace
+- Local web UI with landing page, light/dark theme support, and full calculation trace
 - JSON and HTML audit export
 
 ### Versioning
@@ -243,9 +244,11 @@ Tax_Co-Pilot/
 │       ├── layouts/
 │       │   └── base.html
 │       └── pages/
+│           ├── audit_trace.html
 │           ├── calculate.html
 │           ├── dashboard.html
 │           ├── forms_view.html
+│           ├── home.html
 │           ├── import_csv.html
 │           ├── legal.html
 │           ├── rotate_key.html

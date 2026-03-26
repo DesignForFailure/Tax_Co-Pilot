@@ -1,6 +1,16 @@
 {% extends "layouts/base.html" %}
 {% block title %}Legal Notices{% endblock %}
 {% block content %}
+<section class="page-header">
+    <div>
+        <div class="eyebrow">Legal Notices</div>
+        <h1 class="page-title">Licensing, attribution, encryption notice, and disclaimers.</h1>
+        <p class="page-subtitle">
+            This page gathers the operational legal references for the local application so they remain available from the main navigation.
+        </p>
+    </div>
+</section>
+
 <div class="card">
     <h2>Legal Notices</h2>
 
@@ -85,67 +95,69 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.</div>
 
     <div class="mb-4">
         <h3>Additional Third-Party Libraries</h3>
-        <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-            <thead>
-                <tr style="text-align: left; color: var(--text-dim); border-bottom: 1px solid var(--border);">
-                    <th style="padding: 8px 12px;">Library</th>
-                    <th style="padding: 8px 12px;">License</th>
-                    <th style="padding: 8px 12px;">Copyright</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr style="border-bottom: 1px solid var(--border);">
-                    <td style="padding: 8px 12px;">FastAPI</td>
-                    <td style="padding: 8px 12px;">MIT</td>
-                    <td style="padding: 8px 12px;">&copy; 2018 Sebastian Ramirez</td>
-                </tr>
-                <tr style="border-bottom: 1px solid var(--border);">
-                    <td style="padding: 8px 12px;">Starlette</td>
-                    <td style="padding: 8px 12px;">BSD-3-Clause</td>
-                    <td style="padding: 8px 12px;">&copy; 2018 Encode OSS Ltd.</td>
-                </tr>
-                <tr style="border-bottom: 1px solid var(--border);">
-                    <td style="padding: 8px 12px;">Uvicorn</td>
-                    <td style="padding: 8px 12px;">BSD-3-Clause</td>
-                    <td style="padding: 8px 12px;">&copy; 2017 Encode OSS Ltd.</td>
-                </tr>
-                <tr style="border-bottom: 1px solid var(--border);">
-                    <td style="padding: 8px 12px;">Pydantic</td>
-                    <td style="padding: 8px 12px;">MIT</td>
-                    <td style="padding: 8px 12px;">&copy; 2017 Pydantic Services Inc.</td>
-                </tr>
-                <tr style="border-bottom: 1px solid var(--border);">
-                    <td style="padding: 8px 12px;">Jinja2</td>
-                    <td style="padding: 8px 12px;">BSD-3-Clause</td>
-                    <td style="padding: 8px 12px;">&copy; 2007 Pallets</td>
-                </tr>
-                <tr style="border-bottom: 1px solid var(--border);">
-                    <td style="padding: 8px 12px;">MarkupSafe</td>
-                    <td style="padding: 8px 12px;">BSD-3-Clause</td>
-                    <td style="padding: 8px 12px;">&copy; 2010 Pallets</td>
-                </tr>
-                <tr style="border-bottom: 1px solid var(--border);">
-                    <td style="padding: 8px 12px;">PyYAML</td>
-                    <td style="padding: 8px 12px;">MIT</td>
-                    <td style="padding: 8px 12px;">&copy; 2017 Ingy dot Net / &copy; 2006 Kirill Simonov</td>
-                </tr>
-                <tr style="border-bottom: 1px solid var(--border);">
-                    <td style="padding: 8px 12px;">python-multipart</td>
-                    <td style="padding: 8px 12px;">Apache-2.0</td>
-                    <td style="padding: 8px 12px;">&copy; 2012 Andrew Dunham</td>
-                </tr>
-                <tr style="border-bottom: 1px solid var(--border);">
-                    <td style="padding: 8px 12px;">pysqlcipher3</td>
-                    <td style="padding: 8px 12px;">zlib/libpng</td>
-                    <td style="padding: 8px 12px;">&copy; 2015 David Riggleman</td>
-                </tr>
-                <tr style="border-bottom: 1px solid var(--border);">
-                    <td style="padding: 8px 12px;">keyring</td>
-                    <td style="padding: 8px 12px;">MIT</td>
-                    <td style="padding: 8px 12px;">&copy; Jason R. Coombs</td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Library</th>
+                        <th>License</th>
+                        <th>Copyright</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>FastAPI</td>
+                        <td>MIT</td>
+                        <td>&copy; 2018 Sebastian Ramirez</td>
+                    </tr>
+                    <tr>
+                        <td>Starlette</td>
+                        <td>BSD-3-Clause</td>
+                        <td>&copy; 2018 Encode OSS Ltd.</td>
+                    </tr>
+                    <tr>
+                        <td>Uvicorn</td>
+                        <td>BSD-3-Clause</td>
+                        <td>&copy; 2017 Encode OSS Ltd.</td>
+                    </tr>
+                    <tr>
+                        <td>Pydantic</td>
+                        <td>MIT</td>
+                        <td>&copy; 2017 Pydantic Services Inc.</td>
+                    </tr>
+                    <tr>
+                        <td>Jinja2</td>
+                        <td>BSD-3-Clause</td>
+                        <td>&copy; 2007 Pallets</td>
+                    </tr>
+                    <tr>
+                        <td>MarkupSafe</td>
+                        <td>BSD-3-Clause</td>
+                        <td>&copy; 2010 Pallets</td>
+                    </tr>
+                    <tr>
+                        <td>PyYAML</td>
+                        <td>MIT</td>
+                        <td>&copy; 2017 Ingy dot Net / &copy; 2006 Kirill Simonov</td>
+                    </tr>
+                    <tr>
+                        <td>python-multipart</td>
+                        <td>Apache-2.0</td>
+                        <td>&copy; 2012 Andrew Dunham</td>
+                    </tr>
+                    <tr>
+                        <td>pysqlcipher3</td>
+                        <td>zlib/libpng</td>
+                        <td>&copy; 2015 David Riggleman</td>
+                    </tr>
+                    <tr>
+                        <td>keyring</td>
+                        <td>MIT</td>
+                        <td>&copy; Jason R. Coombs</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <hr style="border-color: var(--border); margin: 20px 0;">
