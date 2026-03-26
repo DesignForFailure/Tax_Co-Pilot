@@ -29,6 +29,7 @@ from contextlib import closing
 import pytest
 
 from app.services.database import (
+    DB_SCHEMA_VERSION,
     get_connection,
     init_db,
     save_return_run,
@@ -234,3 +235,11 @@ def test_backfill_tolerates_corrupted_json_blobs() -> None:
         ).fetchone()
     assert row is not None
     assert row["hash_version"] == 0
+
+
+def test_init_db_sets_independent_schema_generation() -> None:
+    """The SQLite schema generation should be tracked independently via user_version."""
+    with closing(get_connection()) as conn:
+        row = conn.execute("PRAGMA user_version").fetchone()
+    assert row is not None
+    assert row[0] == DB_SCHEMA_VERSION

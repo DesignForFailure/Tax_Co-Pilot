@@ -162,7 +162,7 @@ Tax Co-Pilot is currently **alpha / MVP**.
 
 ### Versioning
 
-This project follows [Semantic Versioning](https://semver.org/). During alpha, application releases use numeric `0.y.z` versions while lifecycle labels such as `Alpha` remain separate status markers. Rule pack manifests also use SemVer, while editor variant IDs such as `custom_v1` are workspace labels that sit alongside the manifest version. A stable compatibility promise begins at `1.0.0`.
+This project follows [Semantic Versioning](https://semver.org/) for application releases. During alpha, application releases use numeric `0.y.z` versions while lifecycle labels such as `Alpha` remain separate status markers. Rule pack manifests use their own independent SemVer line, while editor variant IDs such as `custom_v1` are workspace labels that sit alongside the manifest version. For backward compatibility, legacy custom packs with shorthand manifest versions such as `1` continue to load as `1.0.0` and are rewritten to canonical SemVer when edited, cloned, or re-imported. The SQLite schema uses its own integer generation via `PRAGMA user_version`, independent of both application and rule-pack versions. A stable application compatibility promise begins at `1.0.0`.
 
 ---
 

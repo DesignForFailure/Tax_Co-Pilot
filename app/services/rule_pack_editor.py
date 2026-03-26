@@ -32,7 +32,7 @@ from typing import Any
 
 import yaml
 
-from app.engine.rule_loader import RulePack, RulePackError, _read_yaml
+from app.engine.rule_loader import RulePack, RulePackError, _read_yaml, normalize_rule_pack_version
 
 _BASE_DIR = Path(__file__).resolve().parent.parent.parent / "rule_packs"
 
@@ -41,7 +41,7 @@ _JURISDICTION_RE = re.compile(r"^[a-zA-Z]{2,10}$")
 _VARIANT_RE = re.compile(r"^(standard|custom_v\d+)$")
 _RULE_ID_RE = re.compile(r"^[a-z]{2,10}\.\d{4}\.[a-z0-9_.]+$")
 _FEDERAL_JURISDICTIONS = {"federal", "fed"}
-_DEFAULT_CUSTOM_PACK_VERSION = "0.1.0"
+_DEFAULT_CUSTOM_PACK_VERSION = "1.0.0"
 
 
 def _validate_custom_name(name: str) -> None:
@@ -146,7 +146,7 @@ def _scan_year_dir(jurisdiction: str, year_dir: Path) -> list[PackInfo]:
                     year=year,
                     variant="standard",
                     is_custom=False,
-                    version=str(manifest.get("version", "")),
+                    version=normalize_rule_pack_version(manifest.get("version", "")),
                     rule_count=rule_count,
                 )
             )
@@ -176,7 +176,7 @@ def _scan_year_dir(jurisdiction: str, year_dir: Path) -> list[PackInfo]:
                     year=year,
                     variant=sub.name,
                     is_custom=True,
-                    version=str(m.get("version", "")),
+                    version=normalize_rule_pack_version(m.get("version", "")),
                     custom_name=str(m.get("custom_name", "")),
                     rule_count=rule_count,
                 )
@@ -300,6 +300,13 @@ def _atomic_write_yaml(path: Path, data: dict[str, Any]) -> None:
         raise
 
 
+def _canonicalize_manifest_version(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy of manifest data with a canonical semantic version string."""
+    normalized = dict(manifest)
+    normalized["version"] = normalize_rule_pack_version(normalized.get("version", ""))
+    return normalized
+
+
 def clone_pack(
     jurisdiction: str,
     year: int,
@@ -342,7 +349,7 @@ def clone_pack(
     if not source_manifest.exists():
         candidates = list(source_dir.glob("*manifest*.yaml"))
         source_manifest = candidates[0] if candidates else source_dir / "manifest.yaml"
-    manifest_data = _read_yaml(source_manifest)
+    manifest_data = _canonicalize_manifest_version(_read_yaml(source_manifest))
     manifest_data["custom"] = True
     manifest_data["custom_name"] = custom_name
     _atomic_write_yaml(target_dir / "manifest.yaml", manifest_data)
@@ -453,7 +460,8 @@ def save_rule(
         if not manifest_src.exists():
             candidates = list(pack_dir.glob("*_manifest*.yaml"))
             manifest_src = candidates[0] if candidates else manifest_src
-        shutil.copy2(manifest_src, tmp / "manifest.yaml")
+        manifest_data = _canonicalize_manifest_version(_read_yaml(manifest_src))
+        _atomic_write_yaml(tmp / "manifest.yaml", manifest_data)
         _atomic_write_yaml(tmp / "rules.yaml", rules_yaml)
         try:
             RulePack.load(tmp)
@@ -461,6 +469,11 @@ def save_rule(
             raise ValueError(f"Validation failed: {exc}") from exc
 
     # Validation passed — write for real
+    manifest_path = pack_dir / "manifest.yaml"
+    if not manifest_path.exists():
+        candidates = list(pack_dir.glob("*_manifest*.yaml"))
+        manifest_path = candidates[0] if candidates else manifest_path
+    _atomic_write_yaml(manifest_path, manifest_data)
     _atomic_write_yaml(rules_path, rules_yaml)
 
 
@@ -532,6 +545,7 @@ def import_yaml(
     target_dir.mkdir(parents=True, exist_ok=False)
 
     # Write files
+    manifest = _canonicalize_manifest_version(manifest)
     manifest["custom"] = True
     manifest["custom_name"] = custom_name
     _atomic_write_yaml(target_dir / "manifest.yaml", manifest)

@@ -54,6 +54,9 @@ _ALLOWED_EXPR_CHARS = set(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_+-*/(),. "
 )
 _ALLOWED_FUNCS = {"max", "min"}
+_LEGACY_NUMERIC_VERSION_RE = re.compile(
+    r"^(0|[1-9]\d*)(?:\.(0|[1-9]\d*))?$"
+)
 _SEMVER_RE = re.compile(
     r"^(0|[1-9]\d*)\."
     r"(0|[1-9]\d*)\."
@@ -68,6 +71,33 @@ _SEMVER_RE = re.compile(
 
 class RulePackError(ValueError):
     """Raised when a rule pack is invalid or cannot be loaded."""
+
+
+def normalize_rule_pack_version(version: Any) -> str:
+    """Normalize a rule-pack manifest version to canonical semantic version text.
+
+    Backward compatibility:
+    - Legacy custom packs created by older app versions stored shorthand numeric
+      versions such as ``1``. Those continue to load as ``1.0.0``.
+    - New packs should still write full semantic versions directly.
+    """
+    raw = str(version).strip()
+    if not raw:
+        raise RulePackError("manifest.yaml must include non-empty 'version'")
+
+    if _SEMVER_RE.fullmatch(raw):
+        return raw
+
+    legacy_match = _LEGACY_NUMERIC_VERSION_RE.fullmatch(raw)
+    if legacy_match:
+        major = legacy_match.group(1)
+        minor = legacy_match.group(2) or "0"
+        return f"{major}.{minor}.0"
+
+    raise RulePackError(
+        "manifest.yaml 'version' must be a Semantic Version such as "
+        "'1.0.0' or '1.0.0-alpha.1'"
+    )
 
 
 def _jurisdiction_prefix(jurisdiction: str) -> str:
@@ -358,17 +388,10 @@ class RulePack:
         manifest = _read_yaml(manifest_path)
         rules_yaml = _read_yaml(rules_path)
 
-        version = str(manifest.get("version", "")).strip()
+        version = normalize_rule_pack_version(manifest.get("version", ""))
         tax_year = int(manifest.get("tax_year", 0))
         jurisdiction = str(manifest.get("jurisdiction", "")).strip()
 
-        if not version:
-            raise RulePackError("manifest.yaml must include non-empty 'version'")
-        if not _SEMVER_RE.fullmatch(version):
-            raise RulePackError(
-                "manifest.yaml 'version' must be a Semantic Version such as "
-                "'1.0.0' or '1.0.0-alpha.1'"
-            )
         if tax_year <= 0:
             raise RulePackError("manifest.yaml must include a positive 'tax_year'")
         if not jurisdiction:

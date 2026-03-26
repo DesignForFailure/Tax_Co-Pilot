@@ -25,11 +25,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 - Version labeling is now consistent across the app and documentation: `app.__version__` is the canonical application version source, alpha/beta terminology remains a separate project-status label, and custom rule-pack variant IDs (`custom_vN`) are now presented separately from manifest semantic versions.
-- Rule pack cloning/import now preserves manifest semantic versions, while new empty custom variants start at `0.1.0` instead of using non-semver integer labels.
+- Rule pack cloning/import now preserves manifest semantic versions, new empty custom variants start at an independent rule-pack line (`1.0.0`), and SQLite now tracks its own schema generation separately via `PRAGMA user_version`.
 - UI/UX refresh across the shared layout and primary pages: added browser-aware light/dark theme support with a manual theme toggle, introduced clearer top-level navigation, added jump links on long data-entry pages, reduced spacing clutter on dashboard/runs/forms/import/legal pages, and folded the README ASCII wordmark into the dashboard presentation.
 - Rule pack manager/detail/import/editor pages and the encryption unlock/rotate screens now use the shared card/table/form layout system for clearer spacing, more consistent navigation, and better readability in both light and dark themes.
 
 ### Fixed
+- Compatibility: Legacy custom rule packs that still store shorthand numeric manifest versions such as `1` now continue to load, validate, and run; editor write paths canonicalize those manifests back to full SemVer like `1.0.0`.
 - Compliance: Added missing SPDX headers across repository configs, templates, YAML rule packs, GitHub automation files, and `README.txt`, and synchronized the README repository tree with the tracked `docs/superpowers/plans/2026-03-24-ui-ux-beta-hardening.md` file.
 - **UX/Safety: Locked workspace routes now fail closed to `/unlock`** — DB-backed dashboard/history/export/audit/import flows, plus calculation submit, now redirect to the unlock screen instead of surfacing misleading empty-state copy or raw encrypted-database errors; the calculate spouse jump link was also corrected to target the rendered section anchor.
 - **QA: Shipped state template now validates** — `rule_packs/state/_template/2024/` now uses a self-consistent `template.` rule namespace so repository-wide validation sweeps do not fail on the bundled starter pack.

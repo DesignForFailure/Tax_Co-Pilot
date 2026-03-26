@@ -429,7 +429,7 @@ loading and a year selector in the UI.
 WHAT TO BUILD:
 
 1. Create 2023 federal rule pack at `rule_packs/federal/2023/`:
-   - federal_2023_manifest.yaml (tax_year: 2023, version: "0.1.0")
+   - federal_2023_manifest.yaml (tax_year: 2023, version: "1.0.0")
    - federal_2023_rules.yaml with 2023 IRS constants:
      - Standard deduction: $13,850 single, $27,700 MFJ, $13,850 MFS,
        $20,800 HOH, $27,700 QSS.

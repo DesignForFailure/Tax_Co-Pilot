@@ -187,7 +187,7 @@ def test_validate_pack_invalid(tmp_packs: Path) -> None:
     assert "prefix" in errors[0].lower() or "WRONG" in errors[0]
 
 
-def test_validate_pack_rejects_non_semver_version(tmp_packs: Path) -> None:
+def test_validate_pack_accepts_legacy_numeric_version(tmp_packs: Path) -> None:
     bad_dir = tmp_packs / "federal" / "2024" / "custom_v98"
     bad_dir.mkdir()
     (bad_dir / "manifest.yaml").write_text(
@@ -196,6 +196,20 @@ def test_validate_pack_rejects_non_semver_version(tmp_packs: Path) -> None:
     (bad_dir / "rules.yaml").write_text(yaml.dump({"constants": {}, "rules": []}))
 
     errors = validate_pack("federal", 2024, "custom_v98", base_dir=tmp_packs)
+    assert errors == []
+    pack = RulePack.load(bad_dir)
+    assert pack.version == "1.0.0"
+
+
+def test_validate_pack_rejects_invalid_version_text(tmp_packs: Path) -> None:
+    bad_dir = tmp_packs / "federal" / "2024" / "custom_v97"
+    bad_dir.mkdir()
+    (bad_dir / "manifest.yaml").write_text(
+        yaml.dump({"version": "release-1", "tax_year": 2024, "jurisdiction": "federal"})
+    )
+    (bad_dir / "rules.yaml").write_text(yaml.dump({"constants": {}, "rules": []}))
+
+    errors = validate_pack("federal", 2024, "custom_v97", base_dir=tmp_packs)
     assert errors == [
         "manifest.yaml 'version' must be a Semantic Version such as '1.0.0' or '1.0.0-alpha.1'"
     ]
@@ -243,13 +257,33 @@ def test_clone_auto_increments_variant(tmp_packs: Path) -> None:
     assert (tmp_packs / "federal" / "2024" / "custom_v2").exists()
 
 
+def test_clone_pack_canonicalizes_legacy_numeric_version(tmp_packs: Path) -> None:
+    legacy_dir = tmp_packs / "federal" / "2025"
+    legacy_dir.mkdir(parents=True)
+    (legacy_dir / "manifest.yaml").write_text(
+        yaml.dump({"version": "1", "tax_year": 2025, "jurisdiction": "federal"}),
+        encoding="utf-8",
+    )
+    (legacy_dir / "rules.yaml").write_text(
+        yaml.dump({"constants": {}, "rules": []}),
+        encoding="utf-8",
+    )
+
+    info = clone_pack("federal", 2025, "standard", "legacy_clone", base_dir=tmp_packs)
+    assert info.version == "1.0.0"
+    cloned_manifest = yaml.safe_load(
+        (tmp_packs / "federal" / "2025" / info.variant / "manifest.yaml").read_text()
+    )
+    assert cloned_manifest["version"] == "1.0.0"
+
+
 def test_create_empty_pack(tmp_packs: Path) -> None:
     info = create_empty_pack("federal", 2024, "blank_pack", base_dir=tmp_packs)
     assert info.is_custom is True
-    assert info.version == "0.1.0"
+    assert info.version == "1.0.0"
     custom_dir = tmp_packs / "federal" / "2024" / info.variant
     m = yaml.safe_load((custom_dir / "manifest.yaml").read_text())
-    assert m["version"] == "0.1.0"
+    assert m["version"] == "1.0.0"
     assert m["jurisdiction"] == "federal"
     r = yaml.safe_load((custom_dir / "rules.yaml").read_text())
     assert r["rules"] == []
@@ -268,6 +302,56 @@ def test_save_rule_to_custom_pack(tmp_packs: Path) -> None:
     detail = load_pack_detail("federal", 2024, "custom_v1", base_dir=tmp_packs)
     ids = [r["id"] for r in detail["rules"]]
     assert "fed.2024.custom_rule" in ids
+
+
+def test_save_rule_canonicalizes_legacy_manifest_version(tmp_packs: Path) -> None:
+    custom_dir = tmp_packs / "federal" / "2024" / "custom_v1"
+    custom_dir.mkdir()
+    (custom_dir / "manifest.yaml").write_text(
+        yaml.dump(
+            {
+                "version": "1",
+                "tax_year": 2024,
+                "jurisdiction": "federal",
+                "custom": True,
+                "custom_name": "legacy",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (custom_dir / "rules.yaml").write_text(
+        yaml.dump(
+            {
+                "constants": {},
+                "rules": [
+                    {
+                        "id": "fed.2024.gross_income.wages",
+                        "description": "Legacy",
+                        "type": "sum",
+                        "inputs": {"items": {"ref": "input.w2.wages"}},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    save_rule(
+        "federal",
+        2024,
+        "custom_v1",
+        "fed.2024.gross_income.wages",
+        {
+            "id": "fed.2024.gross_income.wages",
+            "description": "Legacy updated",
+            "type": "sum",
+            "inputs": {"items": {"ref": "input.w2.wages"}},
+        },
+        base_dir=tmp_packs,
+    )
+
+    manifest = yaml.safe_load((custom_dir / "manifest.yaml").read_text())
+    assert manifest["version"] == "1.0.0"
 
 
 def test_save_rule_to_standard_pack_raises(tmp_packs: Path) -> None:
@@ -328,10 +412,24 @@ def test_import_yaml_valid(tmp_packs: Path) -> None:
     assert manifest["version"] == "1.2.3"
 
 
-def test_import_yaml_invalid_rejected(tmp_packs: Path) -> None:
+def test_import_yaml_legacy_numeric_version_is_canonicalized(tmp_packs: Path) -> None:
     manifest_bytes = yaml.dump(
         {"version": "1", "tax_year": 2024, "jurisdiction": "federal"}
     ).encode()
+    rules_bytes = yaml.dump({"constants": {}, "rules": []}).encode()
+
+    info = import_yaml(manifest_bytes, rules_bytes, custom_name="legacy", base_dir=tmp_packs)
+    assert info.version == "1.0.0"
+    manifest = yaml.safe_load(
+        (tmp_packs / "federal" / "2024" / info.variant / "manifest.yaml").read_text()
+    )
+    assert manifest["version"] == "1.0.0"
+
+
+def test_import_yaml_invalid_rejected(tmp_packs: Path) -> None:
+    manifest_bytes = yaml.dump(
+        {"version": "release-1", "tax_year": 2024, "jurisdiction": "federal"}
+    ).encode()
     rules_bytes = yaml.dump({"rules": [{"id": "WRONG", "type": "sum"}]}).encode()
-    with pytest.raises(ValueError, match="[Vv]alidat|prefix|Invalid"):
+    with pytest.raises(ValueError, match="[Vv]alidat|prefix|Invalid|Semantic Version"):
         import_yaml(manifest_bytes, rules_bytes, custom_name="bad", base_dir=tmp_packs)
