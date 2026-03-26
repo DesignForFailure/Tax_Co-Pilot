@@ -1,6 +1,8 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Database Encryption Guide
 
+> **[← Back to README](../README.md)** | **Encryption** · [Rule Pack Authoring](RULE_PACK_AUTHORING.md) · [State Authoring](STATE_AUTHORING_GUIDE.md) · [Export Control](EXPORT_CONTROL.md) · [Disclaimer](DISCLAIMER.md) · [Notice](NOTICE.md)
+
 Tax Co-Pilot supports optional encryption-at-rest for the SQLite database to protect your sensitive tax data.
 
 ## Overview

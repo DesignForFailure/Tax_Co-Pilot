@@ -1,6 +1,8 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # NOTICE — Third-Party Software Attribution
 
+> **[← Back to README](../README.md)** | [Encryption](ENCRYPTION.md) · [Rule Pack Authoring](RULE_PACK_AUTHORING.md) · [State Authoring](STATE_AUTHORING_GUIDE.md) · [Export Control](EXPORT_CONTROL.md) · [Disclaimer](DISCLAIMER.md) · **Notice**
+
 **Tax_Co-Pilot**
 Copyright (C) 2026 Tax Co-Pilot Contributors
 

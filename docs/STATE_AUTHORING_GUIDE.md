@@ -2,6 +2,8 @@
 
 # State Rule Pack Authoring Guide
 
+> **[← Back to README](../README.md)** | [Encryption](ENCRYPTION.md) · [Rule Pack Authoring](RULE_PACK_AUTHORING.md) · **State Authoring** · [Export Control](EXPORT_CONTROL.md) · [Disclaimer](DISCLAIMER.md) · [Notice](NOTICE.md)
+
 A practical guide for adding a new state to Tax Co-Pilot's rules-as-data engine.
 
 ---

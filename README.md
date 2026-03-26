@@ -2,7 +2,13 @@
 
 <div align="center">
 
-# Tax Co-Pilot
+```
+ ___________              _____            ______ _ __      __
+/_  __/ __  \__  __      / ___/___        / __ (_) / ___  / /_
+ / / / /_/ / / / /___  / /   / __ \___  / /_/ / / / __ \/ __/
+/ / / __  / /_/ /___/ / /___/ /_/ /___/ / ____/ / / /_/ / /_
+/_/ /_/ /_/\__,_/      \____/\____/     /_/   /_/_/\____/\__/
+```
 
 **Local-first, privacy-preserving personal tax software**
 
@@ -149,16 +155,30 @@ This project follows [Semantic Versioning](https://semver.org/). During alpha, r
 
 ## Documentation
 
-| Document | Description |
-|---|---|
-| [ENCRYPTION.md](docs/ENCRYPTION.md) | Encryption setup and configuration guide |
-| [RULE_PACK_AUTHORING.md](docs/RULE_PACK_AUTHORING.md) | How to write and extend rule packs |
-| [STATE_AUTHORING_GUIDE.md](docs/STATE_AUTHORING_GUIDE.md) | Adding new state tax jurisdiction support |
-| [EXPORT_CONTROL.md](docs/EXPORT_CONTROL.md) | Cryptographic export control notice |
-| [ROADMAP.md](ROADMAP.md) | Project roadmap and milestones |
-| [CHANGELOG.md](CHANGELOG.md) | Release notes and change history |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Contributor guide |
-| [SECURITY.md](SECURITY.md) | Security policy and vulnerability reporting |
+### Guides
+
+| | Document | Description |
+|---|---|---|
+| :lock: | [Encryption Guide](docs/ENCRYPTION.md) | Setup, configuration, and password management for AES-256 database encryption |
+| :book: | [Rule Pack Authoring](docs/RULE_PACK_AUTHORING.md) | How to write rule packs — rule types, expressions, constants, and worked examples |
+| :us: | [State Authoring Guide](docs/STATE_AUTHORING_GUIDE.md) | Adding a new state tax jurisdiction from template to tests |
+
+### Project
+
+| | Document | Description |
+|---|---|---|
+| :dart: | [Roadmap](ROADMAP.md) | Milestones, planned features, and implementation prompts |
+| :scroll: | [Changelog](CHANGELOG.md) | Release notes and change history |
+| :handshake: | [Contributing](CONTRIBUTING.md) | Development setup, quality checks, and PR expectations |
+| :shield: | [Security Policy](SECURITY.md) | Vulnerability reporting and disclosure process |
+
+### Legal
+
+| | Document | Description |
+|---|---|---|
+| :page_facing_up: | [Notice (Third-Party)](docs/NOTICE.md) | Full attribution for all third-party dependencies |
+| :globe_with_meridians: | [Export Control](docs/EXPORT_CONTROL.md) | Cryptographic export control notice (EAR/TSU) |
+| :warning: | [Disclaimer](docs/DISCLAIMER.md) | Warranty disclaimer and user responsibilities |
 
 ---
 

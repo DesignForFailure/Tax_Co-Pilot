@@ -1,6 +1,8 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Disclaimer — No Warranty & User Responsibility
 
+> **[← Back to README](../README.md)** | [Encryption](ENCRYPTION.md) · [Rule Pack Authoring](RULE_PACK_AUTHORING.md) · [State Authoring](STATE_AUTHORING_GUIDE.md) · [Export Control](EXPORT_CONTROL.md) · **Disclaimer** · [Notice](NOTICE.md)
+
 ## Not Tax Advice
 
 Tax_Co-Pilot is an engineering tool for tax **modeling** and **calculation**. It

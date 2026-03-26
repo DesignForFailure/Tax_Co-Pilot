@@ -1,6 +1,8 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Contributing to Tax_Co-Pilot
 
+> **[← Back to README](README.md)** | [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · **Contributing** · [Security](SECURITY.md)
+
 Thanks for helping improve Tax_Co-Pilot. This project emphasizes deterministic behavior, transparency, and reproducibility.
 
 This project is licensed under the **GNU AGPL v3**. By contributing, you agree that your contributions will be licensed under the same terms. All new source files should include the AGPL v3 license header.

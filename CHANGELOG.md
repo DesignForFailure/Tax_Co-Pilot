@@ -1,6 +1,8 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Changelog
 
+> **[← Back to README](README.md)** | [Roadmap](ROADMAP.md) · **Changelog** · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),

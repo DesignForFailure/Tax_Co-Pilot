@@ -1,6 +1,8 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Security Policy
 
+> **[← Back to README](README.md)** | [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · **Security**
+
 ## Reporting a vulnerability
 
 If you believe you have found a security vulnerability, please **do not** open a public issue.

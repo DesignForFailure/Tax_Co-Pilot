@@ -2,6 +2,8 @@
 
 # Rule Pack Authoring Guide
 
+> **[← Back to README](../README.md)** | [Encryption](ENCRYPTION.md) · **Rule Pack Authoring** · [State Authoring](STATE_AUTHORING_GUIDE.md) · [Export Control](EXPORT_CONTROL.md) · [Disclaimer](DISCLAIMER.md) · [Notice](NOTICE.md)
+
 A practical reference for writing new Tax Co-Pilot rule packs from scratch.
 
 ---

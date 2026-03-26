@@ -1,6 +1,8 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Roadmap
 
+> **[← Back to README](README.md)** | **Roadmap** · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
+
 This roadmap reflects the near-term plan for evolving Tax_Co-Pilot from MVP/alpha toward a broader and more stable release.
 
 ## Current Stage
