@@ -1,57 +1,85 @@
 {% extends "layouts/base.html" %}
-
 {% block title %}Unlock Database{% endblock %}
-
 {% block content %}
-<div style="max-width: 520px; margin: 40px auto;">
-    <div class="card">
-        <div style="text-align: center; margin-bottom: 24px;">
-            <div class="eyebrow" style="margin-bottom: 10px;">Encrypted Database</div>
-            <h2 style="margin-bottom: 8px;">Database Password Required</h2>
-            <p class="text-dim text-sm">Enter your encryption password to access tax data</p>
-        </div>
 
-        {% if error %}
-        <div class="notice notice-error" style="margin-bottom: 16px;">
-            {{ error }}
-        </div>
-        {% endif %}
-
-        <form method="POST" action="/unlock">
-            <input type="hidden" name="csrf_token" value="{{ csrf }}">
-
-            <div style="margin-bottom: 16px;">
-                <label for="password">Password</label>
-                <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    required
-                    autofocus
-                    placeholder="Enter your database password"
-                    style="font-size: 16px;"
-                >
-            </div>
-
-            <button type="submit" class="btn" style="width: 100%; padding: 12px; font-size: 15px;">
-                Unlock Database
-            </button>
-        </form>
-
-        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
-            <p class="text-dim text-sm" style="text-align: center;">
-                If you've forgotten your password, there is no recovery mechanism.
-                Your encrypted data will be permanently inaccessible.
+<div class="content-narrow">
+    <section class="page-header">
+        <div>
+            <div class="eyebrow">Encrypted Database</div>
+            <h1 class="page-title">Unlock the workspace to access saved tax data.</h1>
+            <p class="page-subtitle">
+                The application detected an encrypted SQLCipher database. Enter the password to open saved runs,
+                exports, audit traces, and other DB-backed workflow pages.
             </p>
         </div>
-    </div>
+        <div class="action-row">
+            <a href="/" class="btn btn-outline">Back Home</a>
+        </div>
+    </section>
 
-    <div style="text-align: center; margin-top: 16px;">
-        <p class="text-dim text-sm">
-            Encryption protects your sensitive tax data at rest.
-            <br>
-            Password is stored securely in your system keyring.
-        </p>
+    {% if error %}
+    <div class="notice notice-error">
+        <h2 class="heading-danger">Unlock Error</h2>
+        <p class="text-dim text-sm">{{ error }}</p>
     </div>
+    {% endif %}
+
+    <section class="hero">
+        <div class="stack-lg">
+            <div>
+                <div class="eyebrow">What Unlock Restores</div>
+                <h2 class="card-title">Saved runs, exports, annotations, and audit history.</h2>
+                <p class="page-subtitle">
+                    Until the database is unlocked, DB-backed routes are blocked to avoid leaking raw encryption
+                    errors or showing misleading empty-state messaging.
+                </p>
+            </div>
+            <div class="panel-grid-2">
+                <div class="meta-card">
+                    <div class="meta-label">Storage</div>
+                    <div class="meta-value">SQLCipher</div>
+                </div>
+                <div class="meta-card">
+                    <div class="meta-label">Password Cache</div>
+                    <div class="meta-value">Session</div>
+                </div>
+            </div>
+            <div class="card card-warning">
+                <h2>Recovery Warning</h2>
+                <p class="text-dim text-sm">
+                    There is no password recovery flow. If the password is lost, the encrypted data is permanently
+                    inaccessible unless you already have a usable backup and its matching key.
+                </p>
+            </div>
+        </div>
+
+        <aside class="hero-panel stack-md">
+            <div>
+                <div class="eyebrow">Unlock</div>
+                <h2 class="card-title">Enter the database password.</h2>
+            </div>
+            <form method="POST" action="/unlock" class="stack-md">
+                <input type="hidden" name="csrf_token" value="{{ csrf }}">
+
+                <div>
+                    <label for="password">Password</label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        required
+                        autofocus
+                        placeholder="Enter your database password"
+                    >
+                </div>
+
+                <button type="submit" class="btn full-width">Unlock Database</button>
+            </form>
+            <p class="text-dim text-sm">
+                The password may be stored in your local system keyring after a successful unlock for future sessions.
+            </p>
+        </aside>
+    </section>
 </div>
+
 {% endblock %}

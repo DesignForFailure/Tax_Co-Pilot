@@ -25,6 +25,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 - UI/UX refresh across the shared layout and primary pages: added browser-aware light/dark theme support with a manual theme toggle, introduced clearer top-level navigation, added jump links on long data-entry pages, reduced spacing clutter on dashboard/runs/forms/import/legal pages, and folded the README ASCII wordmark into the dashboard presentation.
+- Rule pack manager/detail/import/editor pages and the encryption unlock/rotate screens now use the shared card/table/form layout system for clearer spacing, more consistent navigation, and better readability in both light and dark themes.
 
 ### Fixed
 - **UX/Safety: Locked workspace routes now fail closed to `/unlock`** — DB-backed dashboard/history/export/audit/import flows, plus calculation submit, now redirect to the unlock screen instead of surfacing misleading empty-state copy or raw encrypted-database errors; the calculate spouse jump link was also corrected to target the rendered section anchor.

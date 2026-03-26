@@ -306,6 +306,12 @@
             margin-bottom: 8px;
             color: var(--text-dim);
         }
+        .card-title {
+            font-size: 1.4rem;
+            line-height: 1.15;
+            margin-bottom: 10px;
+            color: var(--text);
+        }
         .card p + p { margin-top: 10px; }
         .section-anchor { scroll-margin-top: 110px; }
         .section-header {
@@ -320,6 +326,10 @@
         .stack-sm > * + * { margin-top: 10px; }
         .stack-md > * + * { margin-top: 14px; }
         .stack-lg > * + * { margin-top: 24px; }
+        .content-narrow {
+            width: min(840px, 100%);
+            margin: 0 auto;
+        }
         .action-row {
             display: flex;
             flex-wrap: wrap;
@@ -382,10 +392,15 @@
             margin-top: 8px;
             font-variant-numeric: tabular-nums;
         }
+        .summary-item .value.value-compact { font-size: 1.08rem; }
+        .summary-item .value.value-code { font-size: 0.98rem; }
         .positive { color: var(--green); }
         .negative { color: var(--red); }
         .text-dim { color: var(--text-dim); }
         .text-sm { font-size: 0.92rem; }
+        .text-center { text-align: center; }
+        .heading-danger { color: var(--red); }
+        .heading-success { color: var(--green); }
         .mb-4 { margin-bottom: 16px; }
         .pill {
             display: inline-flex;
@@ -398,6 +413,16 @@
             color: var(--text-dim);
             font-size: 0.82rem;
             font-weight: 700;
+        }
+        .pill-accent {
+            border-color: rgba(15, 138, 123, 0.18);
+            background: var(--accent-soft);
+            color: var(--accent-dim);
+        }
+        .pill-warning {
+            border-color: rgba(184, 116, 24, 0.24);
+            background: rgba(184, 116, 24, 0.12);
+            color: var(--orange);
         }
         .jump-nav {
             display: flex;
@@ -458,6 +483,28 @@
             grid-template-columns: 1fr 1fr 1fr;
             gap: 14px;
             margin-bottom: 14px;
+        }
+        .form-grid-4 {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(120px, 0.7fr) minmax(0, 1.1fr) auto;
+            gap: 12px;
+            align-items: end;
+            margin-bottom: 12px;
+        }
+        .inline-form {
+            display: inline-flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            margin: 0;
+        }
+        .input-compact {
+            max-width: 240px;
+        }
+        .field-hint {
+            margin-top: 6px;
+            color: var(--text-dim);
+            font-size: 0.82rem;
         }
         .btn {
             display: inline-flex;
@@ -539,6 +586,22 @@
         }
         .notice-error { border-left: 4px solid var(--red); }
         .notice-success { border-left: 4px solid var(--green); }
+        .card-accent {
+            border-color: rgba(15, 138, 123, 0.18);
+            background: var(--accent-soft);
+        }
+        .card-warning {
+            border-color: rgba(184, 116, 24, 0.26);
+            background: rgba(184, 116, 24, 0.08);
+        }
+        .card-danger {
+            border-color: rgba(180, 71, 71, 0.28);
+            background: rgba(180, 71, 71, 0.08);
+        }
+        .card-success {
+            border-color: rgba(37, 122, 82, 0.28);
+            background: rgba(37, 122, 82, 0.08);
+        }
 
         .table-wrap {
             overflow-x: auto;
@@ -566,6 +629,12 @@
         }
         .data-table tr:last-child td { border-bottom: none; }
         .align-right { text-align: right; }
+        .table-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 8px;
+        }
 
         .disclosure {
             border: 1px solid var(--border);
@@ -617,6 +686,15 @@
             border-top: 1px solid var(--border);
             margin: 20px 0;
         }
+        .list-compact {
+            padding-left: 20px;
+        }
+        .list-compact li + li {
+            margin-top: 8px;
+        }
+        .full-width {
+            width: 100%;
+        }
 
         .site-footer {
             border-top: 1px solid var(--border);
@@ -642,7 +720,8 @@
                 align-items: flex-start;
             }
             .form-row,
-            .form-row-3 {
+            .form-row-3,
+            .form-grid-4 {
                 grid-template-columns: 1fr;
             }
             .card,
