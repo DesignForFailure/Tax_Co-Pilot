@@ -40,3 +40,4 @@ exports/audit/
 .DS_Store
 .idea/
 .vscode/
+AppRun_Bash_Error_Logs/
