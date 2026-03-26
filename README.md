@@ -62,6 +62,13 @@ Most consumer tax software hides its logic, can't reproduce historical results, 
 
 - Python 3.11+
 - pip
+- System build dependencies (required to compile `pysqlcipher3`):
+
+  | Distro | Command |
+  |--------|---------|
+  | **Fedora / RHEL** | `sudo dnf install gcc python3-devel sqlcipher-devel` |
+  | **Debian / Ubuntu** | `sudo apt-get install build-essential python3-dev libsqlcipher-dev` |
+  | **macOS (Homebrew)** | `brew install sqlcipher` |
 
 ### Install
 

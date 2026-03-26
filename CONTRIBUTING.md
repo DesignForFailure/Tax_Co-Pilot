@@ -9,8 +9,12 @@ This project is licensed under the **GNU AGPL v3**. By contributing, you agree t
 
 ## Local development setup
 
-1. **Install Python**
+1. **Install Python and system build dependencies**
    - Use Python 3.11+ (3.12 is also supported).
+   - Install system libraries needed to compile `pysqlcipher3`:
+     - **Fedora / RHEL:** `sudo dnf install gcc python3-devel sqlcipher-devel`
+     - **Debian / Ubuntu:** `sudo apt-get install build-essential python3-dev libsqlcipher-dev`
+     - **macOS (Homebrew):** `brew install sqlcipher`
 2. **Create and activate a virtual environment**
    - `python -m venv .venv`
    - `source .venv/bin/activate` (Linux/macOS) or `.venv\\Scripts\\activate` (Windows)
