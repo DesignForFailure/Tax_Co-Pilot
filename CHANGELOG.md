@@ -27,6 +27,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - UI/UX refresh across the shared layout and primary pages: added browser-aware light/dark theme support with a manual theme toggle, introduced clearer top-level navigation, added jump links on long data-entry pages, reduced spacing clutter on dashboard/runs/forms/import/legal pages, and folded the README ASCII wordmark into the dashboard presentation.
 
 ### Fixed
+- **UX/Safety: Locked workspace routes now fail closed to `/unlock`** — DB-backed dashboard/history/export/audit/import flows, plus calculation submit, now redirect to the unlock screen instead of surfacing misleading empty-state copy or raw encrypted-database errors; the calculate spouse jump link was also corrected to target the rendered section anchor.
 - **QA: Shipped state template now validates** — `rule_packs/state/_template/2024/` now uses a self-consistent `template.` rule namespace so repository-wide validation sweeps do not fail on the bundled starter pack.
 - **UI: Rule Pack Manager create form no longer hides supported states** — `GET /rule-packs` now derives jurisdiction options from the actual discovered packs instead of a stale hardcoded `CA/NY/GA` list.
 - **Compliance: Removed contradictory duplicate SPDX headers** — cleaned duplicate AGPL/GPL header lines from touched Python modules and tests.

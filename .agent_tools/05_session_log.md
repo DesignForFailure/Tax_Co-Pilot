@@ -40,3 +40,4 @@
 - [2026-03-26] .agent_tools/05_session_log.md: Appended session record for feature/ui-workspace-refresh branch creation, validation rerun, and commit packaging of the UI/UX workspace refresh.
 - [2026-03-26] .agent_tools/05_session_log.md: Appended session record for pushing feature/ui-workspace-refresh and publishing the GitHub pull request.
 - [2026-03-26] .agent_tools/05_session_log.md: Reviewed the UI workspace refresh and recorded regressions around locked-route handling, misleading locked-state counts, and a broken calculate-page jump anchor.
+- [2026-03-26] main.py, app/templates/pages/home.html, app/templates/pages/calculate.html, tests/test_route_coverage.py, CHANGELOG.md: Fixed locked-database redirects across dashboard/history/export/import and calculate-submit flows, corrected locked home-page messaging and the calculate spouse jump anchor, and added regression coverage.
