@@ -39,3 +39,4 @@
 - [2026-03-26] main.py, app/templates/{layouts, pages}/*, tests/{test_route_coverage.py,test_error_paths.py}, README.md, CHANGELOG.md: Added landing and audit-trace routes/pages, split latest-run dashboard to /dashboard, introduced adaptive light/dark navigation/layout refresh with dashboard audit preview and README wordmark styling, updated docs/tree, and aligned route/UI regression tests.
 - [2026-03-26] .agent_tools/05_session_log.md: Appended session record for feature/ui-workspace-refresh branch creation, validation rerun, and commit packaging of the UI/UX workspace refresh.
 - [2026-03-26] .agent_tools/05_session_log.md: Appended session record for pushing feature/ui-workspace-refresh and publishing the GitHub pull request.
+- [2026-03-26] .agent_tools/05_session_log.md: Reviewed the UI workspace refresh and recorded regressions around locked-route handling, misleading locked-state counts, and a broken calculate-page jump anchor.
