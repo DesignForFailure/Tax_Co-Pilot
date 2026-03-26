@@ -1,128 +1,164 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
-# Tax_Co-Pilot
 
-Tax_Co-Pilot is a **local-first, privacy-preserving personal tax software system** designed for auditability, reproducibility, and compliance.
+<div align="center">
 
-This project is **not tax advice software**. It is an engineering-focused system for **modeling tax rules, storing tax-relevant data, and deterministically calculating outcomes** using transparent, verifiable logic.
+# Tax Co-Pilot
 
-The core goals are:
-- Correctness
-- Auditability
-- Reproducibility
-- Privacy
-- Safe, compliant tax optimization through scenario analysis
+**Local-first, privacy-preserving personal tax software**
 
----
+[![CI](https://github.com/DesignForFailure/Tax_Co-Pilot/actions/workflows/ci.yml/badge.svg)](https://github.com/DesignForFailure/Tax_Co-Pilot/actions/workflows/ci.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB.svg)](https://python.org)
+[![Status: Alpha](https://img.shields.io/badge/Status-Alpha-orange.svg)](#project-status)
 
-## Why This Exists
+An engineering-focused system for modeling tax rules, storing tax-relevant data, and deterministically calculating outcomes using transparent, verifiable logic.
 
-Most consumer tax software:
-- Hides calculation logic
-- Cannot reproduce historical results once rules change
-- Blends inputs, assumptions, and outputs without traceability
-- Is cloud-based and opaque
+**This is not tax advice software.**
 
-Tax_Co-Pilot takes the opposite approach.
+[Getting Started](#getting-started) · [Architecture](#architecture) · [Documentation](#documentation) · [Contributing](CONTRIBUTING.md)
 
-This project treats taxes as a **ledger + rules + calculations problem**, where:
-- Inputs are explicit and immutable
-- Rules are versioned data, not hidden code
-- Outputs are fully traceable to their sources
-- Every number can be explained
+</div>
 
 ---
 
-## High-Level Design Principles
+## Why Tax Co-Pilot?
 
-### 1. Local-First & Privacy
-- Runs entirely on local hardware
-- No cloud dependency
-- Data stored in local SQLite with **optional encryption at rest** (AES-256 via SQLCipher)
-- Password-protected database with secure key derivation (PBKDF2)
-- Explicit export and backup flows
-- See [docs/ENCRYPTION.md](docs/ENCRYPTION.md) for encryption setup guide
+Most consumer tax software hides its logic, can't reproduce historical results, and stores your data in the cloud. Tax Co-Pilot takes the opposite approach:
 
-### 2. Rules-as-Data
-- Federal and state tax logic lives in **versioned rule packs**
-- Rules are pinned to a tax year
-- Past results never silently change
-- Rule updates produce new versions with changelogs
-
-### 3. Auditability by Design
-Every calculated value includes:
-- Rule ID and rule pack version
-- Input references
-- Intermediate calculations
-- Rounding policy
-- Human-readable explanation
-
-Each tax run produces an immutable **Calculation Artifact** containing:
-- Input snapshot
-- Rule pack snapshot
-- Outputs
-- Full calculation trace
-
-### 4. Multi-Person, Multi-State, Military-Aware
-- Supports two taxpayers (MFJ / MFS)
-- Models differing state obligations per person
-- Supports military-relevant factors (e.g., PCS moves, residency modeling)
-- Focuses on representation and workflow, not legal advice
-
-### 5. Compliance-First Optimization
-- Includes a scenario (“what-if”) engine
-- Suggests only lawful, documented elections and choices
-- Requires eligibility confirmation and supporting notes
-- Supports conservative → exploratory analysis modes
-- Never suggests concealment, mischaracterization, or unsupported deductions
+| | Traditional Tax Software | Tax Co-Pilot |
+|---|---|---|
+| **Calculation logic** | Hidden / proprietary | Open, versioned YAML rule packs |
+| **Reproducibility** | Results change silently | Immutable runs with full audit trace |
+| **Data storage** | Cloud-based, opaque | Local SQLite, optional AES-256 encryption |
+| **Traceability** | Inputs and outputs blended | Every number traceable to its source |
 
 ---
 
-## Project Scope (MVP)
+## Key Features
 
-The initial MVP focuses on proving the architecture:
+- **Rules-as-Data** — Tax logic lives in versioned YAML rule packs, not application code. Past results never silently change.
+- **Full Audit Trace** — Every calculation produces rule ID, inputs, intermediates, rounding policy, and human-readable explanation.
+- **Local-First & Private** — Runs entirely on local hardware. Optional AES-256 encryption at rest via SQLCipher.
+- **Multi-Person & Multi-State** — Two-taxpayer filing support (MFJ/MFS) with multiple state jurisdiction modeling.
+- **What-If Engine** — Scenario comparison (e.g., MFJ vs MFS) with compliance-first optimization.
+- **Integrity Verification** — SHA-256 hash chain over immutable run artifacts with tamper detection.
 
-- Multiple tax years (currently 2023 and 2024 rule packs)
-- Simplified federal 1040-style calculation
-- W-2 and basic 1099 income
-- Withholding and estimated payments
-- Two-person filing support
-- Multiple state packs with expanding coverage
-- Local web UI
-- Full calculation trace
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.11+
+- pip
+
+### Install
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+
+# Optional: dev tooling (ruff, mypy, pip-audit)
+python -m pip install -r requirements-dev.txt
+```
+
+### Run
+
+```bash
+./run.sh
+# or: python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Open **http://127.0.0.1:8000** in your browser.
+
+### Test
+
+```bash
+pytest -q
+```
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│  Browser (Server-rendered HTML / Jinja2)        │
+└────────────────────┬────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────┐
+│  main.py — FastAPI routes, forms, CSRF, export  │
+└──┬──────────────────────────────┬───────────────┘
+   │                              │
+┌──▼──────────────┐   ┌──────────▼──────────────┐
+│  app/engine/    │   │  app/services/          │
+│  Calculator     │   │  Database (SQLite/WAL)  │
+│  RuleLoader     │   │  Encryption (SQLCipher) │
+│  WhatIfEngine   │   │  CSV Import / Export    │
+└──┬──────────────┘   └─────────────────────────┘
+   │
+┌──▼──────────────────────────────────────────────┐
+│  rule_packs/ — Versioned YAML (federal + state) │
+└─────────────────────────────────────────────────┘
+```
+
+### Layer Separation
+
+| Layer | Path | Responsibility |
+|---|---|---|
+| **Engine** | `app/engine/` | Tax computation only. No persistence, no I/O. Decimal math throughout. |
+| **Services** | `app/services/` | Persistence, encryption, adapters. No tax/business logic. |
+| **Models** | `app/models/` | Pydantic domain models (FilingStatus, W2Data, ReturnRun, TraceNode, etc.) |
+| **Web** | `main.py` | FastAPI routes, form parsing, CSRF, security headers. |
+| **Rule Packs** | `rule_packs/` | Versioned YAML rule definitions and manifests per jurisdiction/year. |
+
+### Tech Stack
+
+| Component | Technology |
+|---|---|
+| Language | Python 3.11+ |
+| Backend | FastAPI + Uvicorn |
+| Database | SQLite (WAL mode) + optional SQLCipher (AES-256) |
+| UI | Server-rendered Jinja2 templates |
+| Numeric Type | `Decimal` (never `float`) |
+| Rule Packs | Versioned YAML |
+| CI | GitHub Actions (ruff, mypy, pytest, pip-audit) |
 
 ---
 
 ## Project Status
 
-Tax_Co-Pilot is currently **MVP / alpha**.  
-Expect rapid iteration while the rules model, APIs, and data contracts are being validated.
+Tax Co-Pilot is currently **alpha / MVP**.
 
-## Versioning Approach
+### Current Scope
 
-This project follows **Semantic Versioning (SemVer)**.
+- Tax years 2023 and 2024 with federal 1040-style calculations
+- W-2, 1099-INT, 1099-DIV, 1099-B income support
+- Withholding and estimated payments
+- Two-person filing (MFJ / MFS / Single / HoH / QSS)
+- 12 state packs (GA, CA, NY + 9 no-income-tax states)
+- What-if scenario comparison engine
+- Local web UI with full calculation trace
+- JSON and HTML audit export
 
-- During alpha, releases will use the `0.y.z` series (and may include `-alpha` tags).
-- Breaking changes are expected between minor alpha releases.
-- A stable compatibility promise begins at `1.0.0`.
+### Versioning
 
-## Support Policy (Alpha)
+This project follows [Semantic Versioning](https://semver.org/). During alpha, releases use `0.y.z`. Breaking changes are expected. A stable compatibility promise begins at `1.0.0`.
 
-- **Release stage:** Alpha / MVP
-- **Compatibility:** No backward-compatibility guarantees yet
-- **Breaking changes:** Expected and may occur without long deprecation windows
-- **Production use:** Not recommended for production tax filing workflows yet
+---
 
-## Tech Stack
+## Documentation
 
-- **Language:** Python 3.11+
-- **Backend:** FastAPI
-- **ASGI Server:** Uvicorn
-- **Database:** SQLite (with optional AES-256 encryption via SQLCipher)
-- **Encryption:** SQLCipher (runtime); PBKDF2-HMAC-SHA256 key derivation
-- **UI:** Server-rendered HTML templates (Jinja2)
-- **Numeric Type:** Decimal
-- **Rule Packs:** YAML (versioned)
-- **CI:** GitHub Actions (ruff, mypy, pytest, pip-audit)
+| Document | Description |
+|---|---|
+| [ENCRYPTION.md](docs/ENCRYPTION.md) | Encryption setup and configuration guide |
+| [RULE_PACK_AUTHORING.md](docs/RULE_PACK_AUTHORING.md) | How to write and extend rule packs |
+| [STATE_AUTHORING_GUIDE.md](docs/STATE_AUTHORING_GUIDE.md) | Adding new state tax jurisdiction support |
+| [EXPORT_CONTROL.md](docs/EXPORT_CONTROL.md) | Cryptographic export control notice |
+| [ROADMAP.md](ROADMAP.md) | Project roadmap and milestones |
+| [CHANGELOG.md](CHANGELOG.md) | Release notes and change history |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contributor guide |
+| [SECURITY.md](SECURITY.md) | Security policy and vulnerability reporting |
 
 ---
 
@@ -292,6 +328,7 @@ Tax_Co-Pilot/
 │   ├── test_golden.py
 │   ├── test_golden2.py
 │   ├── test_golden_m1.py
+│   ├── test_hash_versioning.py
 │   ├── test_itemized_credits.py
 │   ├── test_milestone6_routes.py
 │   ├── test_multi_year.py
@@ -318,72 +355,35 @@ Tax_Co-Pilot/
 
 ---
 
-## Install
-
-```bash
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-# Optional: dev tooling
-python -m pip install -r requirements-dev.txt
-```
-
-## Run (Canonical)
-
-Use the project launcher script:
-
-```bash
-./run.sh
-```
-
-The script starts Uvicorn with the ASGI import target `main:app`.
-
-Expected local URL:
-
-- <http://127.0.0.1:8000>
-
-## Run (Direct Uvicorn Alternative)
-
-```bash
-python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
-```
-
-## Test
-
-```bash
-pytest -q
-```
-
----
-
 ## Legal & Acknowledgments
 
-Tax_Co-Pilot is licensed under the **GNU Affero General Public License v3.0 or later** (AGPL-3.0-or-later). See [LICENSE](LICENSE) for the full text.
+Tax Co-Pilot is licensed under the **GNU Affero General Public License v3.0 or later** (AGPL-3.0-or-later). See [LICENSE](LICENSE) for the full text.
 
 ### Encryption Engine
 
-Database encryption at rest is powered by **[SQLCipher](https://www.zetetic.net/sqlcipher/)** (AES-256), Copyright © 2008-2024 Zetetic LLC, licensed under the **BSD-3-Clause** license. SQLCipher is built on [SQLite](https://www.sqlite.org/), which is in the public domain.
+Database encryption at rest is powered by **[SQLCipher](https://www.zetetic.net/sqlcipher/)** (AES-256), Copyright 2008-2024 Zetetic LLC, licensed under BSD-3-Clause. SQLCipher is built on [SQLite](https://www.sqlite.org/) (public domain).
 
-The Python **[cryptography](https://github.com/pyca/cryptography)** library is used for legacy/compatibility encryption tooling and is licensed under **Apache-2.0 OR BSD-3-Clause**. It includes **[OpenSSL](https://www.openssl.org/)** (Apache-2.0).
+The **[cryptography](https://github.com/pyca/cryptography)** library is used for legacy/compatibility encryption tooling (Apache-2.0 OR BSD-3-Clause), including **[OpenSSL](https://www.openssl.org/)** (Apache-2.0).
 
-### Key Frameworks
+### Key Dependencies
 
-| Library          | License      | Use                      |
-|------------------|--------------|--------------------------|
-| FastAPI          | MIT          | Web framework            |
-| Uvicorn          | BSD-3-Clause | ASGI server              |
-| Pydantic         | MIT          | Data validation          |
-| Jinja2           | BSD-3-Clause | Template engine          |
-| PyYAML           | MIT          | YAML rule pack parsing   |
-| python-multipart | Apache-2.0   | Form data parsing        |
-| pysqlcipher3     | zlib/libpng  | SQLCipher Python binding |
-| keyring          | MIT          | OS credential storage    |
+| Library | License | Use |
+|---|---|---|
+| FastAPI | MIT | Web framework |
+| Uvicorn | BSD-3-Clause | ASGI server |
+| Pydantic | MIT | Data validation |
+| Jinja2 | BSD-3-Clause | Template engine |
+| PyYAML | MIT | YAML rule pack parsing |
+| python-multipart | Apache-2.0 | Form data parsing |
+| pysqlcipher3 | zlib/libpng | SQLCipher Python binding |
+| keyring | MIT | OS credential storage |
 
-All third-party licenses are permissive and compatible with AGPL-3.0. Full attribution details are in [docs/NOTICE.md](docs/NOTICE.md).
+All third-party licenses are permissive and compatible with AGPL-3.0. Full attribution in [docs/NOTICE.md](docs/NOTICE.md).
 
-### Encryption & Export Control
+### Export Control
 
-This software contains cryptographic functionality (AES-256 via SQLCipher, PBKDF2-HMAC-SHA256 key derivation). As publicly available open-source software, it is distributed under the TSU exception (EAR §740.13(e)). See [docs/EXPORT_CONTROL.md](docs/EXPORT_CONTROL.md) for details.
+This software contains cryptographic functionality (AES-256 via SQLCipher, PBKDF2-HMAC-SHA256). Distributed under the TSU exception (EAR 740.13(e)). See [docs/EXPORT_CONTROL.md](docs/EXPORT_CONTROL.md).
 
 ### Disclaimer
 
-**This software is provided "as is", without warranty of any kind.** Tax_Co-Pilot is not tax advice software. All data is stored locally on your device. You are solely responsible for your data, backups, and encryption passwords. See the [AGPL-3.0 license](LICENSE) sections 15-16 for the full warranty disclaimer and liability limitation.
+**This software is provided "as is", without warranty of any kind.** Tax Co-Pilot is not tax advice software. All data is stored locally on your device. You are solely responsible for your data, backups, and encryption passwords. See the [AGPL-3.0 license](LICENSE) sections 15-16 for the full warranty disclaimer.
