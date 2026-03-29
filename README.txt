@@ -1,3 +1,5 @@
+SPDX-License-Identifier: AGPL-3.0-or-later
+
 Tax_Co-Pilot: Install, Setup, and Run Guide
 ==========================================
 

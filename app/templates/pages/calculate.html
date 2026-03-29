@@ -1,3 +1,4 @@
+{# SPDX-License-Identifier: AGPL-3.0-or-later #}
 {% extends "layouts/base.html" %}
 {% block title %}Calculate{% endblock %}
 {% block content %}
@@ -84,7 +85,7 @@
                 <select name="pack_variant">
                     <option value="standard" selected>Standard</option>
                     {% for pv in pack_variants if pv.jurisdiction == 'federal' and pv.is_custom %}
-                    <option value="{{ pv.variant }}">Custom {{ pv.version }} — {{ pv.custom_name or pv.variant }}</option>
+                    <option value="{{ pv.variant }}">{{ pv.custom_name or pv.variant }} ({{ pv.variant }}, v{{ pv.version }})</option>
                     {% endfor %}
                 </select>
             </div>

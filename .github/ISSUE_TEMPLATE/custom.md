@@ -7,6 +7,8 @@ assignees: ''
 
 ---
 
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+
 **Describe the vulnerability**
 A clear and concise description of what the vulnerability is.
 

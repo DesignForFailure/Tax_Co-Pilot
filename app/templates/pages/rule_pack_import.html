@@ -1,3 +1,4 @@
+{# SPDX-License-Identifier: AGPL-3.0-or-later #}
 {% extends "layouts/base.html" %}
 {% block title %}Import Rule Pack{% endblock %}
 {% block content %}
@@ -32,7 +33,7 @@
             <div>
                 <label for="manifest_file">Manifest YAML</label>
                 <input type="file" id="manifest_file" name="manifest_file" accept=".yaml,.yml" required>
-                <p class="field-hint">Include jurisdiction, `tax_year`, and `version` in the manifest.</p>
+                <p class="field-hint">Include jurisdiction, `tax_year`, and a semantic `version` such as `1.0.0` in the manifest. Legacy shorthand like `1` is accepted for older packs and normalized on save.</p>
             </div>
 
             <div>

@@ -1,3 +1,4 @@
+{# SPDX-License-Identifier: AGPL-3.0-or-later #}
 {% extends "layouts/base.html" %}
 {% block title %}{{ pack.jurisdiction | upper }} {{ pack.year }} — {{ pack.variant }}{% endblock %}
 {% block content %}
@@ -33,7 +34,7 @@
         </div>
     </div>
     <div class="summary-item">
-        <div class="label">Version</div>
+        <div class="label">SemVer Version</div>
         <div class="value value-compact">{{ pack.version }}</div>
     </div>
     <div class="summary-item">

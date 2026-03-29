@@ -55,6 +55,8 @@ jurisdiction: "GA"
 | `tax_year`     | The tax year these rules apply to                |
 | `jurisdiction` | Two-letter state code, matching the directory name |
 
+Use the full `MAJOR.MINOR.PATCH` form for new manifests. Legacy shorthand numeric versions from older custom packs are tolerated for backward compatibility only.
+
 ## 4. Required Rule IDs
 
 The engine extracts state results by **convention**. Each state pack must define rules with these IDs (replace `{st}` with the lowercase state code):

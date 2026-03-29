@@ -53,6 +53,7 @@ from app.services.encryption import (
 )
 
 DB_PATH = Path("data/tax_copilot.db")
+DB_SCHEMA_VERSION = 1
 
 # Global password cache (set by main.py startup or unlock route)
 _cached_password: str | None = None
@@ -286,6 +287,10 @@ def init_db() -> None:
             )
             # Auto-detect version for existing rows that already have a hash.
             _backfill_hash_versions(conn)
+        schema_row = conn.execute("PRAGMA user_version").fetchone()
+        current_schema_version = int(schema_row[0]) if schema_row else 0
+        if current_schema_version < DB_SCHEMA_VERSION:
+            conn.execute(f"PRAGMA user_version = {DB_SCHEMA_VERSION}")
 
 
 def _backfill_hash_versions(conn: sqlite3.Connection) -> None:

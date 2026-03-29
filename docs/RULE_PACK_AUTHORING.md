@@ -68,6 +68,8 @@ jurisdiction: "GA"
 | `tax_year`     | int    | The tax year these rules apply to (must be > 0)           |
 | `jurisdiction` | string | Jurisdiction identifier: `"federal"` or a two-letter state code |
 
+For new or edited packs, always write the full `MAJOR.MINOR.PATCH` form. The loader still accepts legacy shorthand numeric versions such as `1` or `1.2` from older custom packs and normalizes them to `1.0.0` or `1.2.0` when those packs are rewritten.
+
 The `jurisdiction` value controls the required **prefix** for all rule IDs in the pack. The mapping is:
 
 | `jurisdiction` value                   | Required rule ID prefix |

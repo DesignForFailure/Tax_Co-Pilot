@@ -6,6 +6,8 @@ labels: "state-expansion"
 assignees: ""
 ---
 
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+
 ## State Information
 
 - **State:** (e.g., CA, NY, IL)
