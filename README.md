@@ -265,6 +265,7 @@ Tax_Co-Pilot/
 │   ├── ENCRYPTION.md
 │   ├── EXPORT_CONTROL.md
 │   ├── NOTICE.md
+│   ├── ROADMAP_ARCHIVE_v1.md
 │   ├── RULE_PACK_AUTHORING.md
 │   ├── STATE_AUTHORING_GUIDE.md
 │   └── superpowers/
@@ -279,7 +280,8 @@ Tax_Co-Pilot/
 │       │   ├── 2026-03-22-data-mgmt-dx.md
 │       │   ├── 2026-03-22-hardening-qa.md
 │       │   ├── 2026-03-22-rule-pack-editor.md
-│       │   └── 2026-03-24-ui-ux-beta-hardening.md
+│       │   ├── 2026-03-24-ui-ux-beta-hardening.md
+│       │   └── 2026-03-29-phase1-structural-hardening.md
 │       └── specs/
 │           ├── 2026-03-15-federal-completeness-design.md
 │           ├── 2026-03-16-state-expansion-design.md
