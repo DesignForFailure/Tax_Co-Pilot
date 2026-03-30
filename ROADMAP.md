@@ -29,13 +29,20 @@ These milestones reduce future overhead by fixing core infrastructure before add
 - Lines 117–236: App setup, middleware, global caches, cache helpers
 - Lines 239–294: `_parse_money()` currency parser
 - Lines 297–396: CSRF, DB lock checks, startup, run loading helpers
-- Lines 399–445: Navigation routes (`/`, `/dashboard`, `/legal`)
-- Lines 448–836: Core calculation routes (`/calculate` GET/POST) + all form-parsing helpers (lines 480–761)
-- Lines 838–930: Run management routes (`/runs`, `/runs/{id}`, `/runs/{id}/audit`)
-- Lines 933–1128: Run export/forms/delete routes
-- Lines 1131–1200: Legal + encryption unlock routes
-- Lines 1203–1359: Annotation, export-all, import-returns, backup/restore routes
-- Lines 1362–1434: Key rotation + audit verify routes
+- Lines 399–445: Home + Dashboard routes (`/`, `/dashboard`)
+- Lines 448–468: Calculate form GET route
+- Lines 470–761: Form-parsing helpers (constants, money parsing, indexed field collection, W-2/1099 parsers, taxpayer builder, full input assembler, rule editor form parser)
+- Lines 767–836: Calculate POST route
+- Lines 838–944: Run management routes (`/runs`, `/runs/compare`, `/runs/{id}`, `/runs/{id}/audit`)
+- Lines 950–989: What-if routes (`/whatif` GET/POST)
+- Lines 995–1025: CSV import routes (`/import-csv` GET/POST)
+- Lines 1031–1113: Run export routes (JSON, HTML, forms view, forms export)
+- Lines 1119–1128: Run deletion (`/runs/{id}/delete`)
+- Lines 1131–1134: Legal notices (`/legal`)
+- Lines 1137–1200: Encryption unlock (`/unlock` GET/POST)
+- Lines 1203–1218: Run annotation (`/runs/{id}/annotate`)
+- Lines 1221–1359: Bulk export/import + backup/restore (`/export-all`, `/import-returns`, `/backup`, `/restore`)
+- Lines 1362–1434: Key rotation + audit verify (`/rotate-key`, `/audit/verify`)
 - Lines 1437–1739: Rule pack editor routes (16 handlers)
 - Lines 1742–1745: ValueError exception handler
 
@@ -45,7 +52,8 @@ These milestones reduce future overhead by fixing core infrastructure before add
 app/
 ├── routes/
 │   ├── __init__.py          # Package init
-│   ├── calculate.py         # GET/POST /calculate, GET /dashboard, GET /whatif, POST /whatif
+│   ├── calculate.py         # GET /, GET /dashboard, GET/POST /calculate, GET/POST /whatif
+│   ├── navigation.py        # GET /legal (static pages with no service dependencies)
 │   ├── runs.py              # GET /runs, GET /runs/{id}, GET /runs/{id}/audit,
 │   │                        # GET /runs/{id}/forms, POST /runs/{id}/delete,
 │   │                        # POST /runs/{id}/annotate, GET /runs/compare
@@ -103,8 +111,8 @@ main.py                      # App factory, lifespan, middleware, router include
 **What to build:**
 
 1. **Create `app/log.py`** — centralized logger configuration:
-   - Configure root logger with JSON-structured output (timestamp, level, module, message, extra fields).
-   - Default level: `INFO` in production, `DEBUG` when `TAX_COPILOT_DEBUG=true`.
+   - Configure a named `tax_copilot` logger with structured plaintext output (`timestamp level module message`).
+   - Default level: `INFO` in production, `DEBUG` when `TAX_COPILOT_LOG_LEVEL=DEBUG`.
    - Console handler (stderr) for all levels.
    - Optional rotating file handler at `data/tax_copilot.log` (10 MB max, 3 backups).
    - Environment variable `TAX_COPILOT_LOG_LEVEL` to override.
@@ -568,6 +576,9 @@ Phase 3 (after applicable dependencies):
   M18 (SE tax)               — independent, can start after M12
   M19 (EITC)                 — depends on M16 + M18
 
-Phase 4 (after M19):
-  M20, M21, M22, M23         — independent of each other
+Phase 4 (after Phase 1; M20 depends on M16):
+  M20 (education credits)    — depends on M16 (matrix_lookup for phaseout tables)
+  M21 (dependent care)       — independent, can start after M12
+  M22 (NIIT)                 — independent, can start after M12 (simple formula rule)
+  M23 (state credits)        — independent, can start after M12
 ```

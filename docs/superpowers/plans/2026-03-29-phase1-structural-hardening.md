@@ -16,6 +16,7 @@ Create the following empty files:
 ```
 app/routes/__init__.py
 app/routes/calculate.py
+app/routes/navigation.py
 app/routes/runs.py
 app/routes/import_export.py
 app/routes/encryption.py
@@ -53,6 +54,12 @@ Imports needed in this module:
 - Domain models: `W2Data`, `Form1099INTData`, `Form1099DIVData`, `Form1099BData`, `Taxpayer`, `TaxpayerRole`, `TaxReturnInput`, `FilingStatus`, `AdjustmentsData`, `ItemizedDeductionData`
 
 Make all function names **public** (drop leading underscore) since they're now a module API. Update all call sites.
+
+**Critical dependency:** `_parse_tax_input_from_form()` at line 714 directly references the module-level `available_years` global to validate `tax_year`. After extraction, this function must either:
+- Accept `available_years` as a parameter (preferred — keeps `form_parsing` free of cross-module state), or
+- Import `available_years` from `pack_cache.py` (creates a coupling between form parsing and cache)
+
+Choose the parameter approach: change the signature to `parse_tax_input_from_form(fd: FormData, available_years: Sequence[int]) -> TaxReturnInput` and pass the value from the calling route.
 
 ### Step 3: Extract `route_helpers/csrf.py`
 
@@ -121,19 +128,25 @@ def handler(request: Request) -> Response:
     ...
 ```
 
-**`app/routes/calculate.py`** — router prefix: none (paths: `/`, `/dashboard`, `/calculate`, `/whatif`, `/legal`)
+**`app/routes/calculate.py`** — router prefix: none (paths: `/`, `/dashboard`, `/calculate`, `/whatif`)
 
 Handlers to move:
 - `home()` (lines 399–429) — `GET /`
 - `dashboard()` (lines 432–445) — `GET /dashboard`
-- `calculate_form()` (lines 448–478) — `GET /calculate`
-- `calculate_submit()` (lines 767–835) — `POST /calculate`
-- `whatif_form()` + `whatif_submit()` — `GET /whatif`, `POST /whatif`
-- `legal_notices()` (lines 1131–1134) — `GET /legal`
+- `calculate_form()` (lines 448–468) — `GET /calculate`
+- `calculate_submit()` (lines 767–836) — `POST /calculate`
+- `whatif_form()` (lines 950–958) + `whatif_submit()` (lines 961–989) — `GET /whatif`, `POST /whatif`
 
 Dependencies: `pack_cache` (get_federal_pack, get_state_packs, available_years, available_states_by_year), `form_parsing` (parse_tax_input_from_form, form_str), `db_state` (locked_database_response, load_run_from_row, load_latest_run, database_locked), `csrf` (get_csrf_token, verify_csrf), `CalculationEngine`, `WhatIfEngine`, `save_return_run`, `list_return_runs`, `list_rule_packs`.
 
 Template access: Store `templates` and `BASE_DIR` on `app.state` during lifespan, access via `request.app.state.templates`.
+
+**`app/routes/navigation.py`** — router prefix: none (paths: `/legal`)
+
+Handlers to move:
+- `legal_notices()` (lines 1131–1134) — `GET /legal`
+
+Dependencies: templates only. This is a static page with no service dependencies.
 
 **`app/routes/runs.py`** — router prefix: none
 
@@ -194,7 +207,7 @@ After extraction, `main.py` should contain only:
 4. `app = FastAPI(lifespan=_lifespan)`
 5. `TrustedHostMiddleware`
 6. `security_headers` middleware
-7. `app.include_router()` calls for all 5 route modules
+7. `app.include_router()` calls for all 6 route modules
 8. ValueError exception handler
 
 Target: under 100 lines.
@@ -204,8 +217,11 @@ Target: under 100 lines.
 Export all routers for clean importing:
 ```python
 from app.routes.calculate import router as calculate_router
+from app.routes.navigation import router as navigation_router
 from app.routes.runs import router as runs_router
-# ... etc
+from app.routes.import_export import router as import_export_router
+from app.routes.encryption import router as encryption_router
+from app.routes.rule_packs import router as rule_packs_router
 ```
 
 ### Step 9: Run quality gates
@@ -255,14 +271,20 @@ import os
 from pathlib import Path
 
 def configure(*, log_dir: Path | None = None) -> None:
-    """Configure application-wide logging."""
+    """Configure application-wide logging.
+
+    Uses a structured plaintext format: ``timestamp level module message``.
+    All modules should use ``logging.getLogger("tax_copilot.<module>")``.
+    """
     level_name = os.environ.get("TAX_COPILOT_LOG_LEVEL", "INFO").upper()
     level = getattr(logging, level_name, logging.INFO)
 
     root = logging.getLogger("tax_copilot")
+    if root.handlers:
+        return  # Already configured (guard against double-init in tests)
     root.setLevel(level)
 
-    # Console handler (stderr)
+    # Console handler (stderr) — structured plaintext
     fmt = logging.Formatter(
         "%(asctime)s %(levelname)-8s %(name)s %(message)s",
         datefmt="%Y-%m-%dT%H:%M:%S",
@@ -271,7 +293,7 @@ def configure(*, log_dir: Path | None = None) -> None:
     console.setFormatter(fmt)
     root.addHandler(console)
 
-    # Optional file handler
+    # Optional rotating file handler
     if log_dir is not None:
         log_dir.mkdir(parents=True, exist_ok=True)
         fh = logging.handlers.RotatingFileHandler(
@@ -282,6 +304,8 @@ def configure(*, log_dir: Path | None = None) -> None:
         fh.setFormatter(fmt)
         root.addHandler(fh)
 ```
+
+**Note:** The format is structured plaintext, not JSON. This keeps the log human-readable for a local-first desktop app. If JSON logging is needed later (e.g., for log aggregation), swap the `Formatter` for `python-json-logger` or similar — the logger hierarchy stays the same.
 
 ### Step 2: Wire into startup
 
@@ -432,11 +456,8 @@ app/static/
 
 **`app/static/js/theme.js`:**
 - Source: `base.html` lines 8–18 (early theme init) + lines 784–827 (toggle handler)
-- The early init script must run before body paint. Place the `<script src="/static/js/theme.js">` in `<head>` with `blocking="render"` or use the pattern:
-  ```html
-  <script src="/static/js/theme.js"></script>
-  ```
-  and in `theme.js`, the first lines execute immediately (set `data-theme` on `<html>` from localStorage). The toggle handler uses `DOMContentLoaded`.
+- The early init script must run before body paint. Place a synchronous `<script src="/static/js/theme.js"></script>` in `<head>` (no `defer` or `async` attributes) so the browser blocks rendering until the script executes.
+- In `theme.js`, the first lines execute immediately (read `localStorage` and set `data-theme` on `<html>` to prevent flash of wrong theme). The toggle handler wraps in `DOMContentLoaded`.
 
 **`app/static/js/submit-guard.js`:**
 - Source: `base.html` lines 829–836 (form submit button disable)
@@ -685,7 +706,7 @@ Add pagination controls below the table:
 ```html
 {% if total_pages > 1 %}
 <nav class="pagination" aria-label="Run list pages">
-    <span class="text-dim">Showing {{ (page - 1) * 25 + 1 }}–{{ min(page * 25, total_count) }} of {{ total_count }} runs</span>
+    <span class="text-dim">Showing {{ (page - 1) * 25 + 1 }}–{{ [page * 25, total_count] | min }} of {{ total_count }} runs</span>
     <div class="pagination-controls">
         {% if page > 1 %}
             <a href="/runs?page={{ page - 1 }}" class="btn btn-sm btn-outline">← Previous</a>
@@ -748,9 +769,20 @@ def test_runs_route_negative_page():
 
 ### Step 8: Update callers
 
-Search for all calls to `list_return_runs()` across the codebase and update:
-- Callers that destructure the old `list[dict]` return must now handle `tuple[list[dict], int]`.
-- Test files that call `list_return_runs()` directly must be updated.
+The return type changes from `list[dict]` to `tuple[list[dict], int]`. Every call site must be updated. Known callers (as of 2026-03-29):
+
+**Application code (in `main.py`, post-M12 in route modules):**
+- `_load_latest_run()` (line 393) — `runs = list_return_runs()` → `runs, _ = list_return_runs(page=1, page_size=1)`; only needs the newest run
+- `home()` (line 410) — `recent_runs = list_return_runs()` → use `count_return_runs()` for count, `list_return_runs(page=1, page_size=5)` for the 5 recent runs shown on home
+- `past_runs()` (line 844) — already covered in Step 3 above
+- `export_all_runs()` (line 1227) — already covered in Step 5 above
+
+**Test files:**
+- `tests/test_route_coverage.py` lines 80, 344, 361, 387, 400 — all do `runs = list_return_runs()` or `{run["id"] for run in list_return_runs()}`; update to `runs, _ = list_return_runs()` or `runs, _ = list_return_runs(); {run["id"] for run in runs}`
+- `tests/test_milestone6_routes.py` lines 64, 307 — `runs = list_return_runs()` → `runs, _ = list_return_runs()`
+- `tests/test_multi_year.py` line 284 — same pattern
+- `tests/test_forms.py` lines 474, 491 — same pattern
+- `tests/test_data_mgmt.py` lines 40, 90 — same pattern
 
 ### Step 9: Run quality gates
 
