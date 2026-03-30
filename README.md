@@ -106,19 +106,23 @@ pytest -q
 └────────────────────┬────────────────────────────┘
                      │
 ┌────────────────────▼────────────────────────────┐
-│  main.py — FastAPI routes, forms, CSRF, export  │
-└──┬──────────────────────────────┬───────────────┘
-   │                              │
-┌──▼──────────────┐   ┌──────────▼──────────────┐
-│  app/engine/    │   │  app/services/          │
-│  Calculator     │   │  Database (SQLite/WAL)  │
-│  RuleLoader     │   │  Encryption (SQLCipher) │
-│  WhatIfEngine   │   │  CSV Import / Export    │
-└──┬──────────────┘   └─────────────────────────┘
-   │
-┌──▼──────────────────────────────────────────────┐
-│  rule_packs/ — Versioned YAML (federal + state) │
-└─────────────────────────────────────────────────┘
+│  main.py — app factory, lifespan, middleware    │
+└──────────────┬─────────────────┬────────────────┘
+               │                 │
+┌──────────────▼─────────────┐ ┌─▼─────────────────────────┐
+│  app/routes/               │ │  app/route_helpers/       │
+│  Request handlers          │ │  CSRF / form / DB state   │
+└──────────────┬─────────────┘ └─┬─────────────────────────┘
+               │                 │
+┌──────────────▼─────────────┐ ┌─▼─────────────────────────┐
+│  app/engine/              │ │  app/services/            │
+│  Calculator / RuleLoader  │ │  Database / Encryption    │
+│  WhatIfEngine             │ │  CSV / Audit / Pack CRUD  │
+└──────────────┬─────────────┘ └───────────────────────────┘
+               │
+┌──────────────▼────────────────────────────────────────────┐
+│  rule_packs/ — Versioned YAML (federal + state)          │
+└───────────────────────────────────────────────────────────┘
 ```
 
 ### Layer Separation
@@ -128,7 +132,9 @@ pytest -q
 | **Engine** | `app/engine/` | Tax computation only. No persistence, no I/O. Decimal math throughout. |
 | **Services** | `app/services/` | Persistence, encryption, adapters. No tax/business logic. |
 | **Models** | `app/models/` | Pydantic domain models (FilingStatus, W2Data, ReturnRun, TraceNode, etc.) |
-| **Web** | `main.py` | FastAPI routes, form parsing, CSRF, security headers. |
+| **Route Helpers** | `app/route_helpers/` | Shared CSRF, form parsing, DB state, and rule-pack cache helpers for the web layer. |
+| **Web** | `app/routes/` | FastAPI route handlers and response orchestration. |
+| **App Wiring** | `main.py` | FastAPI app factory, lifespan, middleware, and router registration. |
 | **Rule Packs** | `rule_packs/` | Versioned YAML rule definitions and manifests per jurisdiction/year. |
 
 ### Tech Stack
@@ -232,6 +238,20 @@ Tax_Co-Pilot/
 │   │   ├── __init__.py
 │   │   ├── domain.py
 │   │   └── forms.py
+│   ├── route_helpers/
+│   │   ├── __init__.py
+│   │   ├── csrf.py
+│   │   ├── db_state.py
+│   │   ├── form_parsing.py
+│   │   └── pack_cache.py
+│   ├── routes/
+│   │   ├── __init__.py
+│   │   ├── calculate.py
+│   │   ├── encryption.py
+│   │   ├── import_export.py
+│   │   ├── navigation.py
+│   │   ├── rule_packs.py
+│   │   └── runs.py
 │   ├── services/
 │   │   ├── __init__.py
 │   │   ├── audit_export.py
@@ -368,6 +388,7 @@ Tax_Co-Pilot/
 │   ├── test_golden_m1.py
 │   ├── test_hash_versioning.py
 │   ├── test_itemized_credits.py
+│   ├── test_milestone12_structure.py
 │   ├── test_milestone6_routes.py
 │   ├── test_multi_year.py
 │   ├── test_parse_money.py

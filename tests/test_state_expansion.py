@@ -15,7 +15,7 @@ from app.models.domain import (
     TaxReturnInput,
     W2Data,
 )
-from main import _available_states_by_year
+from app.route_helpers.pack_cache import available_states_by_year
 
 BASE = Path(__file__).resolve().parent.parent
 FED = RulePack.load(BASE / "rule_packs" / "federal" / "2024")
@@ -200,7 +200,7 @@ def test_multi_state_w2s_produce_both_outputs() -> None:
 
 def test_available_states_are_year_specific() -> None:
     """UI state choices should match the selected tax year's loaded packs."""
-    states_by_year = _available_states_by_year()
+    states_by_year = available_states_by_year()
     assert states_by_year[2023] == ["GA"]
     assert "CA" not in states_by_year[2023]
     assert "CA" in states_by_year[2024]
@@ -269,9 +269,9 @@ def test_ga_all_filing_statuses(filing_status: FilingStatus) -> None:
 
 def test_state_pack_discovery() -> None:
     """_get_state_packs finds all 12 state packs."""
-    from main import _get_state_packs
+    from app.route_helpers.pack_cache import get_state_packs
 
-    packs = _get_state_packs(2024)
+    packs = get_state_packs(2024)
     assert "GA" in packs
     assert packs["GA"].jurisdiction == "GA"
     assert "CA" in packs
@@ -284,8 +284,8 @@ def test_state_pack_discovery() -> None:
 
 def test_state_pack_discovery_skips_template() -> None:
     """_get_state_packs skips _template directory."""
-    from main import _get_state_packs
+    from app.route_helpers.pack_cache import get_state_packs
 
-    packs = _get_state_packs(2024)
+    packs = get_state_packs(2024)
     assert "_TEMPLATE" not in packs
     assert "_template" not in packs
