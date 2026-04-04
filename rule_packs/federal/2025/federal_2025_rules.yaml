@@ -1,0 +1,729 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Tax_Co-Pilot - Local-first personal tax software system
+# Copyright (C) 2026  Tax_Co-Pilot Contributors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# =============================================================================
+# Source authority:
+#   - IRS Revenue Procedure 2024-40 (inflation adjustments for TY 2025)
+#   - One Big Beautiful Bill Act (P.L. 119-21), signed July 4, 2025
+#     * Standard deduction increase: Sec. 110001
+#     * SALT cap increase to $40,000: Sec. 110004
+#     * CTC increase to $2,200: Sec. 110101
+#   - IRS Revenue Procedure 2024-25 (HSA limits for 2025)
+#   - IRS Publication 17 (2025)
+# =============================================================================
+
+constants:
+  # Source: OBBBA Sec. 110001 + Rev. Proc. 2024-40
+  standard_deduction:
+    single: "15750"
+    mfj: "31500"
+    mfs: "15750"
+    hoh: "23625"
+    qss: "31500"
+
+  # Social Security taxability thresholds (unchanged since 1993)
+  ss_taxability:
+    base_threshold:
+      single: "25000"
+      mfj: "32000"
+      mfs: "0"
+      hoh: "25000"
+      qss: "32000"
+    upper_threshold:
+      single: "34000"
+      mfj: "44000"
+      mfs: "0"
+      hoh: "34000"
+      qss: "44000"
+
+  adjustment_limits:
+    student_loan_interest_max: "2500"
+    educator_expenses_max: "300"
+    ira_limit: "7000"
+    # Source: Rev. Proc. 2024-25 (self-only / family HDHP coverage)
+    hsa_limit:
+      single: "4300"
+      mfj: "8550"
+      mfs: "4300"
+      hoh: "4300"
+      qss: "8550"
+
+  # Source: OBBBA Sec. 110004
+  # Base cap: $40,000 ($20,000 MFS) for 2025-2029
+  # Phaseout: 30% of (MAGI - threshold), floor $10,000
+  itemized_limits:
+    salt_cap:
+      single: "40000"
+      mfj: "40000"
+      mfs: "20000"
+      hoh: "40000"
+      qss: "40000"
+    salt_cap_floor:
+      single: "10000"
+      mfj: "10000"
+      mfs: "5000"
+      hoh: "10000"
+      qss: "10000"
+    salt_phaseout_threshold:
+      single: "500000"
+      mfj: "500000"
+      mfs: "250000"
+      hoh: "500000"
+      qss: "500000"
+
+  # Source: OBBBA Sec. 110101
+  ctc_phaseout_threshold:
+    single: "200000"
+    mfj: "400000"
+    mfs: "200000"
+    hoh: "200000"
+    qss: "400000"
+
+rules:
+  # =========================================================================
+  # GROSS INCOME
+  # =========================================================================
+
+  - id: "fed.2025.gross_income.wages"
+    description: "Total W-2 wages (Box 1)"
+    form_line: "1040 Line 1a"
+    type: "sum"
+    inputs:
+      items: { ref: "input.w2.wages" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.gross_income.interest"
+    description: "Total taxable interest (1099-INT)"
+    form_line: "1040 Line 2b"
+    type: "sum"
+    inputs:
+      items: { ref: "input.1099int.amount" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.gross_income.dividends"
+    description: "Total ordinary dividends (1099-DIV Box 1a)"
+    form_line: "1040 Line 3b"
+    type: "sum"
+    inputs:
+      items: { ref: "input.1099div.ordinary" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.gross_income.capital_gains"
+    description: "Net capital gains (1099-B proceeds - basis)"
+    form_line: "Schedule D"
+    type: "sum"
+    inputs:
+      items: { ref: "input.1099b.net_gain" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.gross_income.self_employment"
+    description: "Total self-employment income (1099-NEC Box 1)"
+    form_line: "Schedule 1 Line 3"
+    type: "sum"
+    inputs:
+      items: { ref: "input.1099nec.compensation" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.gross_income.capital_gains_limited"
+    description: "Net capital gains after loss limitation (-$3,000 max loss)"
+    form_line: "1040 Line 7"
+    type: "formula"
+    expression: "max(gains, neg_limit)"
+    inputs:
+      gains: { ref: "fed.2025.gross_income.capital_gains" }
+      neg_limit: { literal: "-3000" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.gross_income.other"
+    description: "Other income (Line 8 catch-all)"
+    form_line: "Schedule 1 Line 8"
+    type: "formula"
+    expression: "other"
+    inputs:
+      other: { ref: "input.other_income" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  # =========================================================================
+  # SOCIAL SECURITY TAXABILITY
+  # =========================================================================
+
+  - id: "fed.2025.gross_income.ss_half_benefits"
+    description: "50% of total Social Security benefits"
+    form_line: "SS Worksheet Line 2"
+    type: "formula"
+    expression: "benefits * half"
+    inputs:
+      benefits: { ref: "input.ssa.total_benefits" }
+      half: { literal: "0.5" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.gross_income.ss_base_threshold"
+    description: "SS taxability base threshold by filing status"
+    form_line: "SS Worksheet"
+    type: "lookup"
+    table: "constants.ss_taxability.base_threshold"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2025.gross_income.ss_upper_threshold"
+    description: "SS taxability upper threshold by filing status"
+    form_line: "SS Worksheet"
+    type: "lookup"
+    table: "constants.ss_taxability.upper_threshold"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2025.gross_income.ss_max_taxable"
+    description: "85% of total SS benefits (maximum taxable amount)"
+    form_line: "SS Worksheet Line 4"
+    type: "formula"
+    expression: "benefits * rate"
+    inputs:
+      benefits: { ref: "input.ssa.total_benefits" }
+      rate: { literal: "0.85" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.gross_income.ss_provisional"
+    description: "Provisional income for SS taxability (non-SS income + 50% benefits)"
+    form_line: "SS Worksheet Line 6"
+    type: "formula"
+    expression: "wages + interest + dividends + gains + se + other + half_ss"
+    inputs:
+      wages: { ref: "fed.2025.gross_income.wages" }
+      interest: { ref: "fed.2025.gross_income.interest" }
+      dividends: { ref: "fed.2025.gross_income.dividends" }
+      gains: { ref: "fed.2025.gross_income.capital_gains_limited" }
+      se: { ref: "fed.2025.gross_income.self_employment" }
+      other: { ref: "fed.2025.gross_income.other" }
+      half_ss: { ref: "fed.2025.gross_income.ss_half_benefits" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.gross_income.ss_lower_calc"
+    description: "SS taxability lower-tier amount (50% of provisional above base)"
+    form_line: "SS Worksheet Line 10"
+    type: "formula"
+    expression: "max(min((prov - base) * rate, (upper - base) * rate), zero)"
+    inputs:
+      prov: { ref: "fed.2025.gross_income.ss_provisional" }
+      base: { ref: "fed.2025.gross_income.ss_base_threshold" }
+      upper: { ref: "fed.2025.gross_income.ss_upper_threshold" }
+      rate: { literal: "0.50" }
+      zero: { literal: "0" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.gross_income.ss_upper_calc"
+    description: "SS taxability upper-tier amount (85% of provisional above upper threshold)"
+    form_line: "SS Worksheet Line 14"
+    type: "formula"
+    expression: "max((prov - upper) * rate, zero)"
+    inputs:
+      prov: { ref: "fed.2025.gross_income.ss_provisional" }
+      upper: { ref: "fed.2025.gross_income.ss_upper_threshold" }
+      rate: { literal: "0.85" }
+      zero: { literal: "0" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.gross_income.social_security"
+    description: "Taxable Social Security benefits"
+    form_line: "1040 Line 6b"
+    type: "formula"
+    expression: "min(max_taxable, lower + upper)"
+    inputs:
+      max_taxable: { ref: "fed.2025.gross_income.ss_max_taxable" }
+      lower: { ref: "fed.2025.gross_income.ss_lower_calc" }
+      upper: { ref: "fed.2025.gross_income.ss_upper_calc" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.gross_income.total"
+    description: "Total income (all sources)"
+    form_line: "1040 Line 9"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "fed.2025.gross_income.wages" }
+        - { ref: "fed.2025.gross_income.interest" }
+        - { ref: "fed.2025.gross_income.dividends" }
+        - { ref: "fed.2025.gross_income.capital_gains_limited" }
+        - { ref: "fed.2025.gross_income.self_employment" }
+        - { ref: "fed.2025.gross_income.social_security" }
+        - { ref: "fed.2025.gross_income.other" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  # =========================================================================
+  # ADJUSTMENTS (ABOVE-THE-LINE)
+  # =========================================================================
+
+  - id: "fed.2025.adjustments.hsa_limit"
+    description: "HSA contribution limit by filing status"
+    form_line: "Form 8889"
+    type: "lookup"
+    table: "constants.adjustment_limits.hsa_limit"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2025.adjustments.student_loan"
+    description: "Student loan interest deduction (capped at $2,500)"
+    form_line: "Schedule 1 Line 21"
+    type: "formula"
+    expression: "min(input, cap)"
+    inputs:
+      input: { ref: "input.adjustments.student_loan_interest" }
+      cap: { literal: "2500" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.adjustments.educator"
+    description: "Educator expenses deduction (capped at $300)"
+    form_line: "Schedule 1 Line 11"
+    type: "formula"
+    expression: "min(input, cap)"
+    inputs:
+      input: { ref: "input.adjustments.educator_expenses" }
+      cap: { literal: "300" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.adjustments.hsa"
+    description: "HSA deduction (capped by filing status)"
+    form_line: "Schedule 1 Line 13"
+    type: "formula"
+    expression: "min(input, limit)"
+    inputs:
+      input: { ref: "input.adjustments.hsa_contributions" }
+      limit: { ref: "fed.2025.adjustments.hsa_limit" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.adjustments.ira"
+    description: "IRA deduction (capped at $7,000)"
+    form_line: "Schedule 1 Line 20"
+    type: "formula"
+    expression: "min(input, cap)"
+    inputs:
+      input: { ref: "input.adjustments.ira_contributions" }
+      cap: { literal: "7000" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.adjustments.se_tax"
+    description: "Self-employment tax deduction (user provides deductible half)"
+    form_line: "Schedule 1 Line 15"
+    type: "formula"
+    expression: "input"
+    inputs:
+      input: { ref: "input.adjustments.self_employment_tax_deduction" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.adjustments.total"
+    description: "Total above-the-line adjustments"
+    form_line: "Schedule 1 Line 26"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "fed.2025.adjustments.student_loan" }
+        - { ref: "fed.2025.adjustments.educator" }
+        - { ref: "fed.2025.adjustments.hsa" }
+        - { ref: "fed.2025.adjustments.ira" }
+        - { ref: "fed.2025.adjustments.se_tax" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  # =========================================================================
+  # AGI
+  # =========================================================================
+
+  - id: "fed.2025.agi.total"
+    description: "Adjusted gross income (gross income minus adjustments)"
+    form_line: "1040 Line 11"
+    type: "formula"
+    expression: "max(gross - adj, zero)"
+    inputs:
+      gross: { ref: "fed.2025.gross_income.total" }
+      adj: { ref: "fed.2025.adjustments.total" }
+      zero: { literal: "0" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  # =========================================================================
+  # STANDARD DEDUCTION
+  # =========================================================================
+
+  - id: "fed.2025.standard_deduction"
+    description: "Standard deduction for 2025 (OBBBA-enhanced)"
+    form_line: "1040 Line 13"
+    type: "lookup"
+    table: "constants.standard_deduction"
+    key: { ref: "input.filing_status" }
+
+  # =========================================================================
+  # ITEMIZED DEDUCTIONS
+  # =========================================================================
+
+  # --- SALT (with OBBBA phaseout) ---
+
+  - id: "fed.2025.itemized.salt_base_cap"
+    description: "SALT deduction base cap by filing status (OBBBA: $40,000/$20,000)"
+    form_line: "Schedule A"
+    type: "lookup"
+    table: "constants.itemized_limits.salt_cap"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2025.itemized.salt_cap_floor"
+    description: "SALT deduction floor by filing status ($10,000/$5,000)"
+    form_line: "Schedule A"
+    type: "lookup"
+    table: "constants.itemized_limits.salt_cap_floor"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2025.itemized.salt_phaseout_threshold"
+    description: "SALT phaseout MAGI threshold by filing status (OBBBA: $500,000/$250,000)"
+    form_line: "Schedule A"
+    type: "lookup"
+    table: "constants.itemized_limits.salt_phaseout_threshold"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2025.itemized.salt_phaseout_reduction"
+    description: "SALT cap reduction: 30% of (AGI - phaseout threshold), min 0"
+    form_line: "Schedule A"
+    type: "formula"
+    expression: "max((agi - threshold) * rate, zero)"
+    inputs:
+      agi: { ref: "fed.2025.agi.total" }
+      threshold: { ref: "fed.2025.itemized.salt_phaseout_threshold" }
+      rate: { literal: "0.30" }
+      zero: { literal: "0" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.itemized.salt_effective_cap"
+    description: "SALT effective cap after phaseout (floored at $10,000/$5,000)"
+    form_line: "Schedule A"
+    type: "formula"
+    expression: "max(base_cap - reduction, floor)"
+    inputs:
+      base_cap: { ref: "fed.2025.itemized.salt_base_cap" }
+      reduction: { ref: "fed.2025.itemized.salt_phaseout_reduction" }
+      floor: { ref: "fed.2025.itemized.salt_cap_floor" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.itemized.salt_total"
+    description: "State/local taxes + property taxes, capped at effective SALT limit"
+    form_line: "Schedule A Line 7"
+    type: "formula"
+    expression: "min(state_taxes + property_taxes, cap)"
+    inputs:
+      state_taxes: { ref: "input.itemized.state_local_taxes" }
+      property_taxes: { ref: "input.itemized.real_estate_taxes" }
+      cap: { ref: "fed.2025.itemized.salt_effective_cap" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  # --- Medical ---
+
+  - id: "fed.2025.itemized.medical_floor"
+    description: "7.5% of AGI floor for medical deduction"
+    form_line: "Schedule A Line 3"
+    type: "formula"
+    expression: "agi * rate"
+    inputs:
+      agi: { ref: "fed.2025.agi.total" }
+      rate: { literal: "0.075" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.itemized.medical"
+    description: "Medical deduction (expenses above 7.5% AGI floor)"
+    form_line: "Schedule A Line 4"
+    type: "formula"
+    expression: "max(expenses - floor, zero)"
+    inputs:
+      expenses: { ref: "input.itemized.medical_expenses" }
+      floor: { ref: "fed.2025.itemized.medical_floor" }
+      zero: { literal: "0" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  # --- Mortgage interest ---
+
+  - id: "fed.2025.itemized.mortgage_interest"
+    description: "Home mortgage interest deduction"
+    form_line: "Schedule A Line 10"
+    type: "formula"
+    expression: "input"
+    inputs:
+      input: { ref: "input.itemized.mortgage_interest" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  # --- Charitable ---
+
+  - id: "fed.2025.itemized.charitable_agi_cap"
+    description: "60% of AGI cap for cash charitable contributions"
+    form_line: "Schedule A"
+    type: "formula"
+    expression: "agi * rate"
+    inputs:
+      agi: { ref: "fed.2025.agi.total" }
+      rate: { literal: "0.60" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.itemized.charitable"
+    description: "Charitable contributions (cash capped at 60% AGI + noncash)"
+    form_line: "Schedule A Line 14"
+    type: "formula"
+    expression: "min(cash, agi_cap) + noncash"
+    inputs:
+      cash: { ref: "input.itemized.charitable_cash" }
+      noncash: { ref: "input.itemized.charitable_noncash" }
+      agi_cap: { ref: "fed.2025.itemized.charitable_agi_cap" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  # --- Total itemized ---
+
+  - id: "fed.2025.itemized.total"
+    description: "Total itemized deductions (Schedule A Line 17)"
+    form_line: "Schedule A Line 17"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "fed.2025.itemized.medical" }
+        - { ref: "fed.2025.itemized.salt_total" }
+        - { ref: "fed.2025.itemized.mortgage_interest" }
+        - { ref: "fed.2025.itemized.charitable" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  # =========================================================================
+  # APPLIED DEDUCTION
+  # =========================================================================
+
+  - id: "fed.2025.deductions.applied"
+    description: "Greater of standard or itemized deduction"
+    form_line: "1040 Line 12"
+    type: "formula"
+    expression: "max(standard, itemized)"
+    inputs:
+      standard: { ref: "fed.2025.standard_deduction" }
+      itemized: { ref: "fed.2025.itemized.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  # =========================================================================
+  # TAXABLE INCOME
+  # =========================================================================
+
+  - id: "fed.2025.taxable_income"
+    description: "Taxable income = max(AGI - applied deduction, 0)"
+    form_line: "1040 Line 15"
+    type: "formula"
+    expression: "max(agi - deduction, 0)"
+    inputs:
+      agi: { ref: "fed.2025.agi.total" }
+      deduction: { ref: "fed.2025.deductions.applied" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  # =========================================================================
+  # TAX COMPUTATION
+  # Source: Rev. Proc. 2024-40, Tables 1-4
+  # =========================================================================
+
+  - id: "fed.2025.tax.brackets"
+    description: "Federal income tax using 2025 bracket tables"
+    form_line: "1040 Line 16"
+    type: "bracket_table"
+    input: { ref: "fed.2025.taxable_income" }
+    key: { ref: "input.filing_status" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+    tables:
+      single:
+        - { lower: "0", upper: "11925", rate: "0.10" }
+        - { lower: "11925", upper: "48475", rate: "0.12" }
+        - { lower: "48475", upper: "103350", rate: "0.22" }
+        - { lower: "103350", upper: "197300", rate: "0.24" }
+        - { lower: "197300", upper: "250525", rate: "0.32" }
+        - { lower: "250525", upper: "626350", rate: "0.35" }
+        - { lower: "626350", upper: null, rate: "0.37" }
+      mfj:
+        - { lower: "0", upper: "23850", rate: "0.10" }
+        - { lower: "23850", upper: "96950", rate: "0.12" }
+        - { lower: "96950", upper: "206700", rate: "0.22" }
+        - { lower: "206700", upper: "394600", rate: "0.24" }
+        - { lower: "394600", upper: "501050", rate: "0.32" }
+        - { lower: "501050", upper: "751600", rate: "0.35" }
+        - { lower: "751600", upper: null, rate: "0.37" }
+      mfs:
+        - { lower: "0", upper: "11925", rate: "0.10" }
+        - { lower: "11925", upper: "48475", rate: "0.12" }
+        - { lower: "48475", upper: "103350", rate: "0.22" }
+        - { lower: "103350", upper: "197300", rate: "0.24" }
+        - { lower: "197300", upper: "250525", rate: "0.32" }
+        - { lower: "250525", upper: "375800", rate: "0.35" }
+        - { lower: "375800", upper: null, rate: "0.37" }
+      hoh:
+        - { lower: "0", upper: "17000", rate: "0.10" }
+        - { lower: "17000", upper: "64850", rate: "0.12" }
+        - { lower: "64850", upper: "103350", rate: "0.22" }
+        - { lower: "103350", upper: "197300", rate: "0.24" }
+        - { lower: "197300", upper: "250500", rate: "0.32" }
+        - { lower: "250500", upper: "626350", rate: "0.35" }
+        - { lower: "626350", upper: null, rate: "0.37" }
+      qss:
+        - { lower: "0", upper: "23850", rate: "0.10" }
+        - { lower: "23850", upper: "96950", rate: "0.12" }
+        - { lower: "96950", upper: "206700", rate: "0.22" }
+        - { lower: "206700", upper: "394600", rate: "0.24" }
+        - { lower: "394600", upper: "501050", rate: "0.32" }
+        - { lower: "501050", upper: "751600", rate: "0.35" }
+        - { lower: "751600", upper: null, rate: "0.37" }
+
+  # =========================================================================
+  # CREDITS
+  # =========================================================================
+
+  - id: "fed.2025.credits.ctc.base"
+    description: "Child tax credit base amount ($2,200 per qualifying child, OBBBA)"
+    form_line: "1040 Line 19"
+    type: "formula"
+    expression: "children * credit"
+    inputs:
+      children: { ref: "input.qualifying_children" }
+      credit: { literal: "2200" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.ctc.threshold"
+    description: "CTC phaseout AGI threshold by filing status"
+    form_line: "CTC Worksheet"
+    type: "lookup"
+    table: "constants.ctc_phaseout_threshold"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2025.credits.ctc.phaseout"
+    description: "CTC phaseout reduction ($50 per $1,000 of AGI over threshold)"
+    form_line: "CTC Worksheet"
+    type: "formula"
+    expression: "max((agi - threshold) * rate, zero)"
+    inputs:
+      agi: { ref: "fed.2025.agi.total" }
+      threshold: { ref: "fed.2025.credits.ctc.threshold" }
+      rate: { literal: "0.05" }
+      zero: { literal: "0" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.ctc.final"
+    description: "Child tax credit after phaseout"
+    form_line: "1040 Line 19"
+    type: "formula"
+    expression: "max(base - phaseout, zero)"
+    inputs:
+      base: { ref: "fed.2025.credits.ctc.base" }
+      phaseout: { ref: "fed.2025.credits.ctc.phaseout" }
+      zero: { literal: "0" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.total"
+    description: "Total nonrefundable credits"
+    form_line: "1040 Line 21"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "fed.2025.credits.ctc.final" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  # =========================================================================
+  # TAX AFTER CREDITS
+  # =========================================================================
+
+  - id: "fed.2025.tax.after_credits"
+    description: "Federal tax after credits (cannot go below zero)"
+    form_line: "1040 Line 22"
+    type: "formula"
+    expression: "max(tax - credits, zero)"
+    inputs:
+      tax: { ref: "fed.2025.tax.brackets" }
+      credits: { ref: "fed.2025.credits.total" }
+      zero: { literal: "0" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  # =========================================================================
+  # PAYMENTS
+  # =========================================================================
+
+  - id: "fed.2025.total_withholding"
+    description: "Total federal withholding"
+    form_line: "1040 Line 25d"
+    type: "sum"
+    inputs:
+      items: { ref: "input.withholding.federal" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.estimated_payments"
+    description: "Estimated tax payments made during the year"
+    form_line: "1040 Line 26"
+    type: "sum"
+    inputs:
+      items: { ref: "input.estimated_payments" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.total_payments"
+    description: "Total payments (withholding + estimated)"
+    form_line: "1040 Line 33"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "fed.2025.total_withholding" }
+        - { ref: "fed.2025.estimated_payments" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  # =========================================================================
+  # REFUND / AMOUNT OWED
+  # =========================================================================
+
+  - id: "fed.2025.refund_or_owed"
+    description: "Refund (positive) or amount owed (negative)"
+    form_line: "1040 Line 34/37"
+    type: "formula"
+    expression: "payments - tax"
+    inputs:
+      payments: { ref: "fed.2025.total_payments" }
+      tax: { ref: "fed.2025.tax.after_credits" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
