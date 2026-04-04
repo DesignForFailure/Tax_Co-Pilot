@@ -1,0 +1,100 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Tax_Co-Pilot - Local-first personal tax software system
+# Copyright (C) 2026  Tax_Co-Pilot Contributors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# =============================================================================
+# Source authority:
+#   - Georgia Department of Revenue, dor.georgia.gov
+#     * Flat rate: 5.19% for TY 2025
+#     * Standard deduction: $12,000 (S/HOH/MFS/QSS), $24,000 (MFJ)
+#   - Georgia HB 1015 (2024): Eliminated personal exemptions for self/spouse,
+#     replaced with increased standard deduction. Dependent exemption $4,000.
+#   - Georgia HB 1437 (2022): Flat rate schedule (5.49 → 5.39 → 5.19 → ...)
+#   - GA DOR Important Tax Updates page (verified Feb 2026):
+#     "The Georgia income tax rate remains at a flat rate of 5.19%"
+#
+# NOTE: Georgia has NOT adopted OBBBA federal changes as of this writing.
+#       GA AGI starts from federal AGI (pre-OBBBA conformity date).
+#       Monitor dor.georgia.gov for conformity updates.
+#
+# NOTE: Dependent exemption ($4,000/dependent) is not modeled here.
+#       The 2024 file also did not model dependent exemptions.
+#       This can be added in a future milestone if needed.
+# =============================================================================
+
+constants:
+  # Source: GA DOR "Standard Deductions Increases" page + Form 500-ES (2025)
+  # Personal exemptions for self/spouse eliminated per HB 1015 (eff. TY 2024)
+  standard_deduction:
+    single: "12000"
+    mfj: "24000"
+    mfs: "12000"
+    hoh: "12000"
+    qss: "12000"
+
+rules:
+  - id: "ga.2025.agi"
+    description: "Georgia AGI (MVP: starts from federal AGI)"
+    type: "formula"
+    expression: "federal_agi"
+    inputs:
+      federal_agi: { ref: "fed.2025.agi.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "ga.2025.standard_deduction"
+    description: "Georgia standard deduction"
+    type: "lookup"
+    table: "constants.standard_deduction"
+    key: { ref: "input.filing_status" }
+
+  - id: "ga.2025.taxable_income"
+    description: "Georgia taxable income = max(AGI - standard deduction, 0)"
+    type: "formula"
+    expression: "max(agi - deduction, 0)"
+    inputs:
+      agi: { ref: "ga.2025.agi" }
+      deduction: { ref: "ga.2025.standard_deduction" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ga.2025.tax"
+    description: "Georgia income tax (2025 flat rate 5.19%)"
+    type: "formula"
+    expression: "taxable_income * rate"
+    inputs:
+      taxable_income: { ref: "ga.2025.taxable_income" }
+      rate: { literal: "0.0519" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ga.2025.withholding"
+    description: "Total Georgia tax withheld"
+    type: "sum"
+    inputs:
+      items: { ref: "input.withholding.state.GA" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "ga.2025.refund_or_owed"
+    description: "Georgia refund (positive) or amount owed (negative)"
+    type: "formula"
+    expression: "withholding - tax"
+    inputs:
+      withholding: { ref: "ga.2025.withholding" }
+      tax: { ref: "ga.2025.tax" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
