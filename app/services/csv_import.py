@@ -45,7 +45,8 @@ def _money(
 ) -> Decimal:
     """Parse CSV money-like fields safely.
 
-    Mirrors app.main._parse_money constraints so CSV imports behave the same way.
+    Mirrors app.route_helpers.form_parsing.parse_money so CSV imports
+    behave the same way as browser form submissions.
     """
     raw = (s or "").strip()
     if not raw:

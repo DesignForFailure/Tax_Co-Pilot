@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — all original milestones (1–11) complete.
+**Status:** Late Alpha — milestones 1–12 complete; Phase 1 continues with M13–M15.
 **SemVer line:** `0.1.x`
-**Test suite:** 307 passing, 4 skipped, 0 failures.
+**Test suite:** 308 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -21,6 +21,8 @@ This roadmap covers the next phase of development: structural hardening, correct
 These milestones reduce future overhead by fixing core infrastructure before adding features.
 
 ### M12: Break Up `main.py` Monolith
+
+**Status:** Complete on 2026-03-29. `main.py` now handles only app wiring, middleware, and lifespan; route logic lives in `app/routes/` and shared web helpers live in `app/route_helpers/`.
 
 **Goal:** Split the 1,744-line `main.py` into focused route modules with shared utilities, so that future changes touch small, cohesive files instead of one sprawling monolith.
 
@@ -97,7 +99,7 @@ main.py                      # App factory, lifespan, middleware, router include
 **Acceptance criteria:**
 - `main.py` is under 100 lines.
 - Every existing route responds identically (same paths, same status codes, same templates).
-- `ruff check . && mypy . && pytest` — all 307 tests pass, zero new lint or type errors.
+- `ruff check . && mypy . && pytest` — all 308 tests pass, zero new lint or type errors.
 - No circular imports.
 
 ---

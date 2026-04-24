@@ -11,6 +11,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Added
+- **Roadmap v2 Milestone 12 (complete):** Split the `main.py` monolith into `app/routes/` and `app/route_helpers/`, keeping `main.py` as a 93-line app-wiring module and adding `tests/test_milestone12_structure.py` to guard the new boundary.
 - UI workspace refresh: added a dedicated landing page (`GET /`), moved the latest-run summary to `GET /dashboard`, and added `GET /runs/{run_id}/audit` for a full audit-trace page with collapsed rule-evaluation rows.
 - **Milestone 12 — Rule Pack Editor (complete):** GUI-based rule pack management system. Create, edit, clone, import, and export YAML rule packs via web UI. Standard packs are read-only; custom variants stored in `custom_vN/` subdirectories. Type-adaptive rule editor for sum, formula, lookup, and bracket_table rules with inline bracket table editing. Calculate form integration with variant selector dropdown. Full validation via `RulePack.load()` on every save. CSRF-protected POST routes. Path traversal protection on all route parameters.
 - `app/services/rule_pack_editor.py`: CRUD service for rule packs (list, load, clone, create, save, delete, validate, import, export).
@@ -24,6 +25,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - **Hardening, QA & Auditability pass (complete):** Fixed SQL injection in SQLCipher PRAGMA, `tax_year` validation, unary negation in rule expressions, `hybrid_factory` consistency, URL-encoded error redirects, upload size limits with SQLite integrity validation, input sanitization (tags/notes caps, filename sanitization, export fallback). Added tamper-evident hash chain (`integrity_hash`, `previous_hash`) with `GET /audit/verify`. Key rotation via `POST /rotate-key` with `PRAGMA rekey`. Password cache clearing on shutdown. Explicit cipher parameters. CSRF token rotation after authentication. Made `pip-audit` blocking in CI.
 
 ### Changed
+- Web architecture now separates route handlers (`app/routes/`) from shared route utilities (`app/route_helpers/`); tests that previously imported `main.py` internals now target the extracted helper modules directly.
 - Version labeling is now consistent across the app and documentation: `app.__version__` is the canonical application version source, alpha/beta terminology remains a separate project-status label, and custom rule-pack variant IDs (`custom_vN`) are now presented separately from manifest semantic versions.
 - Rule pack cloning/import now preserves manifest semantic versions, new empty custom variants start at an independent rule-pack line (`1.0.0`), and SQLite now tracks its own schema generation separately via `PRAGMA user_version`.
 - UI/UX refresh across the shared layout and primary pages: added browser-aware light/dark theme support with a manual theme toggle, introduced clearer top-level navigation, added jump links on long data-entry pages, reduced spacing clutter on dashboard/runs/forms/import/legal pages, and folded the README ASCII wordmark into the dashboard presentation.

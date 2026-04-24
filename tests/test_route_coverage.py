@@ -23,6 +23,7 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
+import app.route_helpers.db_state as db_state_module
 from app.services.database import init_db, list_return_runs
 from main import app
 
@@ -54,13 +55,12 @@ def _client() -> TestClient:
 @pytest.fixture
 def _locked_database(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     import app.services.database as db_module
-    import main as main_module
     from app.services.encryption import DatabaseState
 
-    monkeypatch.setattr(main_module.encryption_config, "enabled", True)
+    monkeypatch.setattr(db_state_module.encryption_config, "enabled", True)
     monkeypatch.setattr(db_module.config, "enabled", True)
     monkeypatch.setattr(
-        main_module,
+        db_state_module,
         "detect_encryption_state",
         lambda _path: DatabaseState.ENCRYPTED_SQLCIPHER,
     )
@@ -337,8 +337,8 @@ def test_audit_verify_runs_have_hashes() -> None:
 
 def test_calculate_preserves_withholding_only_1099_rows() -> None:
     """Withholding-only 1099 rows must contribute to saved inputs and totals."""
+    from app.route_helpers.db_state import load_run_from_row
     from app.services.database import get_return_run
-    from main import _load_run_from_row
 
     c = _client()
     before_ids = {str(run["id"]) for run in list_return_runs()}
@@ -364,7 +364,7 @@ def test_calculate_preserves_withholding_only_1099_rows() -> None:
     run_id = new_ids.pop()
     row = get_return_run(run_id)
     assert row is not None
-    run = _load_run_from_row(row)
+    run = load_run_from_row(row)
     assert len(run.input_snapshot.taxpayers[0].form_1099_ints) == 1
     assert run.output.total_withholding == 150
 
