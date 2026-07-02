@@ -41,7 +41,8 @@ def _post_calculate(**overrides: Any) -> Response:
         "p_w2_0_federal_withheld": "100",
     }
     form.update(overrides)
-    return client.post("/calculate", data=form, follow_redirects=False)
+    response: Response = client.post("/calculate", data=form, follow_redirects=False)
+    return response
 
 
 def test_calculate_submit_rejects_blank_primary_first_name() -> None:
