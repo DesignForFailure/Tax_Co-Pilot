@@ -12,6 +12,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
+from app.log import get_logger
 from app.route_helpers.csrf import get_csrf_token, verify_csrf
 from app.route_helpers.db_state import locked_database_response
 from app.services.database import (
@@ -32,6 +33,8 @@ from app.services.encryption import (
 )
 
 router = APIRouter(tags=["encryption"])
+
+logger = get_logger(__name__)
 
 
 def _templates(request: Request) -> Jinja2Templates:
@@ -89,20 +92,24 @@ def unlock_submit(
         set_password_in_keyring(password)
         init_db()
 
+        logger.info("Database unlock succeeded")
         response = RedirectResponse(url="/dashboard", status_code=303)
         response.set_cookie("csrf", secrets.token_urlsafe(32), httponly=True, samesite="strict")
         return response
     except PasswordValidationError as exc:
+        logger.warning("Database unlock rejected: %s", exc)
         return RedirectResponse(
             url=f"/unlock?error={urllib.parse.quote_plus(str(exc)[:100])}",
             status_code=303,
         )
     except ValueError:
+        logger.warning("Database unlock failed: incorrect password or corrupted database")
         return RedirectResponse(
             url=f"/unlock?error={urllib.parse.quote_plus('Incorrect password or corrupted database')}",
             status_code=303,
         )
     except Exception as exc:
+        logger.exception("Database unlock failed")
         return RedirectResponse(
             url=f"/unlock?error={urllib.parse.quote_plus(f'Unlock failed: {str(exc)[:50]}')}",
             status_code=303,
@@ -171,6 +178,7 @@ async def rotate_key_submit(request: Request) -> RedirectResponse:
             status_code=303,
         )
     except Exception as exc:
+        logger.exception("Key rotation request failed")
         return RedirectResponse(
             url=f"/rotate-key?error={urllib.parse.quote_plus(str(exc)[:100])}",
             status_code=303,

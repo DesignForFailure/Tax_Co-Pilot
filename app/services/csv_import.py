@@ -33,7 +33,10 @@ from decimal import Decimal, InvalidOperation
 
 from pydantic import BaseModel
 
+from app.log import get_logger
 from app.models.domain import Form1099BData, Form1099DIVData, Form1099INTData, W2Data
+
+logger = get_logger(__name__)
 
 # Column names each record type must provide. Without this check, a file
 # with mismatched headers (wrong type selected, Excel-renamed columns)
@@ -182,6 +185,7 @@ def import_csv(csv_text: str, record_type: str) -> tuple[list[BaseModel], list[s
             else:
                 raise ValueError(f"Unsupported record_type: {record_type}")
         except Exception as e:
+            logger.debug("CSV import: line %d rejected: %s", idx, e)
             errors.append(f"Line {idx}: {e}")
 
     return records, errors

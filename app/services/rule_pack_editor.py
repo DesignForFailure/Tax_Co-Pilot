@@ -34,6 +34,9 @@ from typing import Any
 import yaml
 
 from app.engine.rule_loader import RulePack, RulePackError, _read_yaml, normalize_rule_pack_version
+from app.log import get_logger
+
+logger = get_logger(__name__)
 
 _BASE_DIR = Path(__file__).resolve().parent.parent.parent / "rule_packs"
 
@@ -140,7 +143,7 @@ def _scan_year_dir(jurisdiction: str, year_dir: Path) -> list[PackInfo]:
                     rd = _read_yaml(rules_path)
                     rule_count = len(rd.get("rules", []) or [])
                 except Exception:
-                    pass
+                    logger.debug("Failed to count rules in %s", rules_path, exc_info=True)
             packs.append(
                 PackInfo(
                     jurisdiction=jurisdiction,
@@ -152,7 +155,7 @@ def _scan_year_dir(jurisdiction: str, year_dir: Path) -> list[PackInfo]:
                 )
             )
         except Exception:
-            pass
+            logger.warning("Skipping unreadable pack manifest in %s", year_dir, exc_info=True)
 
     # Custom packs (custom_v* subdirectories)
     for sub in sorted(year_dir.iterdir()):
@@ -170,7 +173,7 @@ def _scan_year_dir(jurisdiction: str, year_dir: Path) -> list[PackInfo]:
                     rd = _read_yaml(r_path)
                     rule_count = len(rd.get("rules", []) or [])
                 except Exception:
-                    pass
+                    logger.debug("Failed to count rules in %s", r_path, exc_info=True)
             packs.append(
                 PackInfo(
                     jurisdiction=jurisdiction,
@@ -183,7 +186,7 @@ def _scan_year_dir(jurisdiction: str, year_dir: Path) -> list[PackInfo]:
                 )
             )
         except Exception:
-            pass
+            logger.warning("Skipping unreadable custom pack in %s", sub, exc_info=True)
     return packs
 
 
@@ -249,6 +252,7 @@ def validate_pack(
         RulePack.load(pack_dir)
         return []
     except (RulePackError, Exception) as exc:
+        logger.debug("Pack validation failed for %s: %s", pack_dir, exc)
         return [str(exc)]
 
 
@@ -301,6 +305,7 @@ def _atomic_write_yaml(path: Path, data: dict[str, Any]) -> None:
         # Path.rename raises FileExistsError on Windows when the target exists.
         os.replace(tmp_path, path)
     except Exception:
+        logger.error("Atomic YAML write failed for %s", path, exc_info=True)
         tmp_path.unlink(missing_ok=True)
         raise
 
@@ -367,7 +372,7 @@ def clone_pack(
             rd = _read_yaml(r_path)
             rule_count = len(rd.get("rules", []) or [])
         except Exception:
-            pass
+            logger.debug("Failed to count rules in %s", r_path, exc_info=True)
 
     return PackInfo(
         jurisdiction=jurisdiction,
@@ -476,6 +481,7 @@ def save_rule(
         try:
             RulePack.load(tmp)
         except Exception as exc:
+            logger.warning("Rule save rejected: pack validation failed: %s", exc)
             raise ValueError(f"Validation failed: {exc}") from exc
 
     # Validation passed — write for real
@@ -523,6 +529,7 @@ def delete_rule(
         try:
             RulePack.load(tmp)
         except Exception as exc:
+            logger.warning("Rule deletion rejected: pack validation failed: %s", exc)
             raise ValueError(f"Validation failed: {exc}") from exc
 
     _atomic_write_yaml(rules_path, rules_yaml)
@@ -588,6 +595,7 @@ def import_yaml(
     try:
         pack = RulePack.load(target_dir)
     except Exception as exc:
+        logger.warning("Pack import rejected: validation failed: %s", exc)
         shutil.rmtree(target_dir, ignore_errors=True)
         raise ValueError(f"Validation failed: {exc}") from exc
 
@@ -596,7 +604,7 @@ def import_yaml(
         rd = yaml.safe_load(rules_bytes)
         rule_count = len(rd.get("rules", []) or []) if isinstance(rd, dict) else 0
     except Exception:
-        pass
+        logger.debug("Failed to count rules in imported pack", exc_info=True)
 
     return PackInfo(
         jurisdiction=jurisdiction,

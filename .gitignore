@@ -30,6 +30,10 @@ data/*.db
 data/*.sqlite
 data/*.sqlite3
 
+# Local log files (TAX_COPILOT_LOG_FILE)
+data/*.log
+data/*.log.*
+
 # Generated audit exports
 data/audit_exports/
 exports/audit/

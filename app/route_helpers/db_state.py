@@ -8,8 +8,11 @@ from typing import Any
 
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from app import __version__
 from app.config import config as encryption_config
+from app.log import configure, get_logger
 from app.models.domain import ReturnRun
+from app.route_helpers.pack_cache import available_years
 from app.services.database import (
     DB_PATH,
     get_cached_password,
@@ -18,6 +21,8 @@ from app.services.database import (
     set_cached_password,
 )
 from app.services.encryption import DatabaseState, detect_encryption_state, get_password
+
+logger = get_logger(__name__)
 
 
 def load_run_from_row(run_data: dict[str, Any]) -> ReturnRun:
@@ -31,16 +36,36 @@ def load_run_from_row(run_data: dict[str, Any]) -> ReturnRun:
 
 
 def startup() -> None:
-    """Initialize the database on application startup."""
-    if encryption_config.enabled:
-        db_state = detect_encryption_state(DB_PATH)
+    """Initialize logging and the database on application startup."""
+    # Logging must be live before any DB or encryption operation runs.
+    configure()
+    db_state = detect_encryption_state(DB_PATH)
+    logger.info(
+        "Tax Copilot %s starting (encryption_enabled=%s, db_state=%s, available_years=%s)",
+        __version__,
+        encryption_config.enabled,
+        db_state.value,
+        available_years,
+    )
 
+    if encryption_config.enabled:
         if db_state == DatabaseState.ENCRYPTED_SQLCIPHER:
             password = get_password(source=encryption_config.password_source)
             if password:
+                logger.info(
+                    "Startup unlock: password resolved (source=%s)",
+                    encryption_config.password_source,
+                )
                 set_cached_password(password)
                 init_db()
+            else:
+                logger.warning(
+                    "Startup unlock deferred: no password available (source=%s); "
+                    "web unlock required",
+                    encryption_config.password_source,
+                )
         elif db_state == DatabaseState.ENCRYPTED_PYTHON:
+            logger.error("Startup aborted: Python-layer encrypted database detected")
             raise RuntimeError(
                 "Python-layer encrypted databases are unsupported at runtime. "
                 "Migrate to SQLCipher encryption."
