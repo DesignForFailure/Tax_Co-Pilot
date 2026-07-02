@@ -24,7 +24,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app.route_helpers.db_state as db_state_module
-from app.services.database import init_db, list_return_runs
+from app.services.database import init_db, list_all_return_runs
 from main import app
 
 CSRF = "test-csrf-token"
@@ -77,7 +77,7 @@ def _locked_database(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 def _create_run() -> str:
     c = _client()
     c.post("/calculate", data=_BASE_FORM, follow_redirects=False)
-    runs = list_return_runs()
+    runs = list_all_return_runs()
     assert runs
     return str(runs[0]["id"])
 
@@ -343,7 +343,7 @@ def test_calculate_preserves_withholding_only_1099_rows() -> None:
     from app.services.database import get_return_run
 
     c = _client()
-    before_ids = {str(run["id"]) for run in list_return_runs()}
+    before_ids = {str(run["id"]) for run in list_all_return_runs()}
     resp = c.post(
         "/calculate",
         data={
@@ -360,7 +360,7 @@ def test_calculate_preserves_withholding_only_1099_rows() -> None:
     )
     assert resp.status_code == 303
 
-    after_ids = {str(run["id"]) for run in list_return_runs()}
+    after_ids = {str(run["id"]) for run in list_all_return_runs()}
     new_ids = after_ids - before_ids
     assert len(new_ids) == 1
     run_id = new_ids.pop()
@@ -386,7 +386,7 @@ def test_audit_verify_detects_state_output_tampering() -> None:
     from app.services.database import get_connection
 
     c = _client()
-    before_ids = {str(run["id"]) for run in list_return_runs()}
+    before_ids = {str(run["id"]) for run in list_all_return_runs()}
     resp = c.post(
         "/calculate",
         data={
@@ -399,7 +399,7 @@ def test_audit_verify_detects_state_output_tampering() -> None:
     )
     assert resp.status_code == 303
 
-    after_ids = {str(run["id"]) for run in list_return_runs()}
+    after_ids = {str(run["id"]) for run in list_all_return_runs()}
     new_ids = after_ids - before_ids
     assert len(new_ids) == 1
     run_id = new_ids.pop()

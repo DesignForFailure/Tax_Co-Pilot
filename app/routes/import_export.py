@@ -42,7 +42,7 @@ from app.services.database import (
     get_connection,
     get_return_run,
     init_db,
-    list_return_runs,
+    list_all_return_runs,
     save_return_run,
 )
 from app.services.form_mapper import map_return_run
@@ -166,7 +166,7 @@ def export_all_runs() -> Response:
         return locked_response
 
     hydrated: list[dict[str, Any]] = []
-    for row in list_return_runs():
+    for row in list_all_return_runs():
         try:
             hydrated.append(json.loads(load_run_from_row(row).model_dump_json()))
         except Exception:

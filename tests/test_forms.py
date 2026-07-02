@@ -27,7 +27,7 @@ from app.models.domain import (
     W2Data,
 )
 from app.models.forms import Form1040Lines, FormPacket, Schedule1Lines
-from app.services.database import init_db, list_return_runs
+from app.services.database import init_db, list_all_return_runs
 from app.services.form_mapper import map_return_run
 from main import app
 
@@ -471,7 +471,7 @@ def test_calculate_with_adjustments(_ensure_db: None) -> None:
     r = client.post("/calculate", data=form, follow_redirects=False)
     assert r.status_code == 303
 
-    runs = list_return_runs()
+    runs = list_all_return_runs()
     assert runs
 
 
@@ -488,7 +488,7 @@ def _create_run(client: TestClient) -> str:
     }
     r = client.post("/calculate", data=form, follow_redirects=False)
     assert r.status_code == 303
-    runs = list_return_runs()
+    runs = list_all_return_runs()
     return str(runs[0]["id"])
 
 

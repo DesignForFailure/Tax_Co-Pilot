@@ -395,11 +395,54 @@ def save_return_run(run_data: dict) -> None:
     )
 
 
-def list_return_runs(tax_year: int | None = None) -> list[dict]:
-    """List saved runs, newest first."""
+def count_return_runs(tax_year: int | None = None) -> int:
+    """Count saved runs without loading any rows."""
+    with closing(get_connection()) as conn:
+        if tax_year is not None:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM return_runs WHERE tax_year = ?", (tax_year,)
+            ).fetchone()
+        else:
+            row = conn.execute("SELECT COUNT(*) FROM return_runs").fetchone()
+        return int(row[0]) if row else 0
+
+
+def list_return_runs(
+    tax_year: int | None = None,
+    *,
+    page: int = 1,
+    page_size: int = 25,
+) -> tuple[list[dict], int]:
+    """Return (runs, total_count) for one page of saved runs, newest first.
+
+    Out-of-range paging inputs are clamped rather than rejected: page and
+    page_size below 1 become 1, and a page past the last simply returns an
+    empty list with the accurate total.
+    """
+    page = max(1, page)
+    page_size = max(1, page_size)
+    total = count_return_runs(tax_year)
     with closing(get_connection()) as conn:
         # rowid tiebreak keeps "newest first" deterministic when two runs
         # share a created_at second (matches the chain-linking queries).
+        if tax_year is not None:
+            rows = conn.execute(
+                "SELECT * FROM return_runs WHERE tax_year = ? "
+                "ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?",
+                (tax_year, page_size, (page - 1) * page_size),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM return_runs ORDER BY created_at DESC, rowid DESC "
+                "LIMIT ? OFFSET ?",
+                (page_size, (page - 1) * page_size),
+            ).fetchall()
+        return [dict(r) for r in rows], total
+
+
+def list_all_return_runs(tax_year: int | None = None) -> list[dict]:
+    """List every saved run, newest first (bulk export and test helpers)."""
+    with closing(get_connection()) as conn:
         if tax_year is not None:
             rows = conn.execute(
                 "SELECT * FROM return_runs WHERE tax_year = ? "
