@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 from contextlib import closing
 from pathlib import Path
@@ -52,7 +53,8 @@ from app.services.encryption import (
     hybrid_factory,
 )
 
-DB_PATH = Path("data/tax_copilot.db")
+# Overridable so tests (and packagers) can point at an isolated database file.
+DB_PATH = Path(os.environ.get("TAX_COPILOT_DB_PATH", "data/tax_copilot.db"))
 DB_SCHEMA_VERSION = 1
 
 # Global password cache (set by main.py startup or unlock route)
