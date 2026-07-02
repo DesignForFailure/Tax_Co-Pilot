@@ -15,24 +15,52 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-constants: {}
+# NH taxed interest and dividends at 3% for TY 2024 (RSA 77; repealed for
+# taxable periods beginning after 12/31/2024). Exemption: $2,400 individual,
+# $4,800 joint. Additional $1,200 exemptions (65+/blind/disabled) are not
+# modeled (no age/blind inputs exist yet).
+constants:
+  id_exemption:
+    single: "2400"
+    mfj: "4800"
+    mfs: "2400"
+    hoh: "2400"
+    qss: "4800"
 
 rules:
   - id: "nh.2024.agi"
-    description: "New Hampshire — no state income tax"
+    description: "New Hampshire I&D gross income (interest + dividends)"
     type: "formula"
-    expression: "zero"
+    expression: "interest + dividends"
     inputs:
-      zero: { literal: "0" }
+      interest: { ref: "input.1099int.amount" }
+      dividends: { ref: "input.1099div.ordinary" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "nh.2024.personal_exemption"
+    description: "New Hampshire I&D exemption ($2,400 / $4,800 joint)"
+    type: "lookup"
+    table: "constants.id_exemption"
+    key: { ref: "input.filing_status" }
+
+  - id: "nh.2024.taxable_income"
+    description: "New Hampshire taxable I&D income"
+    type: "formula"
+    expression: "max(agi - exemption, 0)"
+    inputs:
+      agi: { ref: "nh.2024.agi" }
+      exemption: { ref: "nh.2024.personal_exemption" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
   - id: "nh.2024.tax"
-    description: "New Hampshire state income tax (none)"
+    description: "New Hampshire Interest & Dividends tax (3% for TY 2024; repealed 1/1/2025)"
     type: "formula"
-    expression: "zero"
+    expression: "taxable * rate"
     inputs:
-      zero: { literal: "0" }
+      taxable: { ref: "nh.2024.taxable_income" }
+      rate: { literal: "0.03" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 

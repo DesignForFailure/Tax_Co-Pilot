@@ -383,13 +383,18 @@ def save_return_run(run_data: dict) -> None:
 def list_return_runs(tax_year: int | None = None) -> list[dict]:
     """List saved runs, newest first."""
     with closing(get_connection()) as conn:
+        # rowid tiebreak keeps "newest first" deterministic when two runs
+        # share a created_at second (matches the chain-linking queries).
         if tax_year is not None:
             rows = conn.execute(
-                "SELECT * FROM return_runs WHERE tax_year = ? ORDER BY created_at DESC",
+                "SELECT * FROM return_runs WHERE tax_year = ? "
+                "ORDER BY created_at DESC, rowid DESC",
                 (tax_year,),
             ).fetchall()
         else:
-            rows = conn.execute("SELECT * FROM return_runs ORDER BY created_at DESC").fetchall()
+            rows = conn.execute(
+                "SELECT * FROM return_runs ORDER BY created_at DESC, rowid DESC"
+            ).fetchall()
         return [dict(r) for r in rows]
 
 

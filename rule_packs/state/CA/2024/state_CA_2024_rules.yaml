@@ -58,55 +58,56 @@ rules:
     rounding_precision: 2
     tables:
       single:
-        - { lower: "0", upper: "10412", rate: "0.01" }
-        - { lower: "10412", upper: "24684", rate: "0.02" }
-        - { lower: "24684", upper: "38959", rate: "0.04" }
-        - { lower: "38959", upper: "54081", rate: "0.06" }
-        - { lower: "54081", upper: "68350", rate: "0.08" }
-        - { lower: "68350", upper: "349137", rate: "0.093" }
-        - { lower: "349137", upper: "418961", rate: "0.103" }
-        - { lower: "418961", upper: "698271", rate: "0.113" }
-        - { lower: "698271", upper: null, rate: "0.123" }
+        - { lower: "0", upper: "10756", rate: "0.01" }
+        - { lower: "10756", upper: "25499", rate: "0.02" }
+        - { lower: "25499", upper: "40245", rate: "0.04" }
+        - { lower: "40245", upper: "55866", rate: "0.06" }
+        - { lower: "55866", upper: "70606", rate: "0.08" }
+        - { lower: "70606", upper: "360659", rate: "0.093" }
+        - { lower: "360659", upper: "432787", rate: "0.103" }
+        - { lower: "432787", upper: "721314", rate: "0.113" }
+        - { lower: "721314", upper: null, rate: "0.123" }
       mfj:
-        - { lower: "0", upper: "20824", rate: "0.01" }
-        - { lower: "20824", upper: "49368", rate: "0.02" }
-        - { lower: "49368", upper: "77918", rate: "0.04" }
-        - { lower: "77918", upper: "108162", rate: "0.06" }
-        - { lower: "108162", upper: "136700", rate: "0.08" }
-        - { lower: "136700", upper: "698274", rate: "0.093" }
-        - { lower: "698274", upper: "837922", rate: "0.103" }
-        - { lower: "837922", upper: "1396542", rate: "0.113" }
-        - { lower: "1396542", upper: null, rate: "0.123" }
+        - { lower: "0", upper: "21512", rate: "0.01" }
+        - { lower: "21512", upper: "50998", rate: "0.02" }
+        - { lower: "50998", upper: "80490", rate: "0.04" }
+        - { lower: "80490", upper: "111732", rate: "0.06" }
+        - { lower: "111732", upper: "141212", rate: "0.08" }
+        - { lower: "141212", upper: "721318", rate: "0.093" }
+        - { lower: "721318", upper: "865574", rate: "0.103" }
+        - { lower: "865574", upper: "1442628", rate: "0.113" }
+        - { lower: "1442628", upper: null, rate: "0.123" }
       mfs:
-        - { lower: "0", upper: "10412", rate: "0.01" }
-        - { lower: "10412", upper: "24684", rate: "0.02" }
-        - { lower: "24684", upper: "38959", rate: "0.04" }
-        - { lower: "38959", upper: "54081", rate: "0.06" }
-        - { lower: "54081", upper: "68350", rate: "0.08" }
-        - { lower: "68350", upper: "349137", rate: "0.093" }
-        - { lower: "349137", upper: "418961", rate: "0.103" }
-        - { lower: "418961", upper: "698271", rate: "0.113" }
-        - { lower: "698271", upper: null, rate: "0.123" }
+        - { lower: "0", upper: "10756", rate: "0.01" }
+        - { lower: "10756", upper: "25499", rate: "0.02" }
+        - { lower: "25499", upper: "40245", rate: "0.04" }
+        - { lower: "40245", upper: "55866", rate: "0.06" }
+        - { lower: "55866", upper: "70606", rate: "0.08" }
+        - { lower: "70606", upper: "360659", rate: "0.093" }
+        - { lower: "360659", upper: "432787", rate: "0.103" }
+        - { lower: "432787", upper: "721314", rate: "0.113" }
+        - { lower: "721314", upper: null, rate: "0.123" }
+      # FTB Schedule Z: HoH has its own schedule.
       hoh:
-        - { lower: "0", upper: "10412", rate: "0.01" }
-        - { lower: "10412", upper: "24684", rate: "0.02" }
-        - { lower: "24684", upper: "38959", rate: "0.04" }
-        - { lower: "38959", upper: "54081", rate: "0.06" }
-        - { lower: "54081", upper: "68350", rate: "0.08" }
-        - { lower: "68350", upper: "349137", rate: "0.093" }
-        - { lower: "349137", upper: "418961", rate: "0.103" }
-        - { lower: "418961", upper: "698271", rate: "0.113" }
-        - { lower: "698271", upper: null, rate: "0.123" }
+        - { lower: "0", upper: "21527", rate: "0.01" }
+        - { lower: "21527", upper: "51000", rate: "0.02" }
+        - { lower: "51000", upper: "65744", rate: "0.04" }
+        - { lower: "65744", upper: "81364", rate: "0.06" }
+        - { lower: "81364", upper: "96107", rate: "0.08" }
+        - { lower: "96107", upper: "490493", rate: "0.093" }
+        - { lower: "490493", upper: "588593", rate: "0.103" }
+        - { lower: "588593", upper: "980987", rate: "0.113" }
+        - { lower: "980987", upper: null, rate: "0.123" }
       qss:
-        - { lower: "0", upper: "20824", rate: "0.01" }
-        - { lower: "20824", upper: "49368", rate: "0.02" }
-        - { lower: "49368", upper: "77918", rate: "0.04" }
-        - { lower: "77918", upper: "108162", rate: "0.06" }
-        - { lower: "108162", upper: "136700", rate: "0.08" }
-        - { lower: "136700", upper: "698274", rate: "0.093" }
-        - { lower: "698274", upper: "837922", rate: "0.103" }
-        - { lower: "837922", upper: "1396542", rate: "0.113" }
-        - { lower: "1396542", upper: null, rate: "0.123" }
+        - { lower: "0", upper: "21512", rate: "0.01" }
+        - { lower: "21512", upper: "50998", rate: "0.02" }
+        - { lower: "50998", upper: "80490", rate: "0.04" }
+        - { lower: "80490", upper: "111732", rate: "0.06" }
+        - { lower: "111732", upper: "141212", rate: "0.08" }
+        - { lower: "141212", upper: "721318", rate: "0.093" }
+        - { lower: "721318", upper: "865574", rate: "0.103" }
+        - { lower: "865574", upper: "1442628", rate: "0.113" }
+        - { lower: "1442628", upper: null, rate: "0.123" }
 
   - id: "ca.2024.tax.mhs"
     description: "Mental health services surtax (1% on taxable income over $1M)"

@@ -15,19 +15,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+# Source authority (TY 2024):
+#   - GA SB 56 (2023): standard deduction $24,000 MFJ / $12,000 all other
+#     statuses effective TY 2024; personal exemptions for self/spouse
+#     repealed (2024 IT-511 "What's New").
+#   - GA HB 1015 (2024): flat rate accelerated to 5.39% retroactive to
+#     1/1/2024.
+#   - GA HB 1021 (2024): dependent exemption raised to $4,000 (not modeled
+#     here; consistent with the 2025 pack).
 constants:
   standard_deduction:
-    single: "5400"
-    mfj: "7100"
-    mfs: "3550"
-    hoh: "5400"
-    qss: "7100"
-  personal_exemption:
-    single: "2700"
-    mfj: "7400"
-    mfs: "2700"
-    hoh: "2700"
-    qss: "7400"
+    single: "12000"
+    mfj: "24000"
+    mfs: "12000"
+    hoh: "12000"
+    qss: "12000"
 
 rules:
   - id: "ga.2024.agi"
@@ -45,20 +47,13 @@ rules:
     table: "constants.standard_deduction"
     key: { ref: "input.filing_status" }
 
-  - id: "ga.2024.personal_exemption"
-    description: "Georgia personal exemption"
-    type: "lookup"
-    table: "constants.personal_exemption"
-    key: { ref: "input.filing_status" }
-
   - id: "ga.2024.taxable_income"
-    description: "Georgia taxable income = max(AGI - standard deduction - personal exemption, 0)"
+    description: "Georgia taxable income = max(AGI - standard deduction, 0); personal exemptions repealed by SB 56 effective TY 2024"
     type: "formula"
-    expression: "max(agi - deduction - exemption, 0)"
+    expression: "max(agi - deduction, 0)"
     inputs:
       agi: { ref: "ga.2024.agi" }
       deduction: { ref: "ga.2024.standard_deduction" }
-      exemption: { ref: "ga.2024.personal_exemption" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
