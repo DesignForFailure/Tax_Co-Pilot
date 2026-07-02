@@ -35,11 +35,10 @@ from __future__ import annotations
 import hashlib
 import os
 import re
-import secrets
 import sqlite3
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from datetime import UTC
+from contextlib import closing
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -88,6 +87,15 @@ def _hex_encode_key(password: str) -> str:
 
     SQLCipher accepts hex-encoded keys via: PRAGMA key = "x'<hex>'"
     This avoids SQL injection from passwords containing quotes.
+
+    KNOWN LIMITATION: SQLCipher interprets an x'...' literal of exactly
+    64 hex chars as a RAW 32-byte key (96 chars as raw key + salt),
+    skipping PBKDF2 entirely. A password whose UTF-8 encoding is exactly
+    32 or 48 bytes therefore gets no key stretching. Changing this
+    encoding now would lock existing users out of their databases, so it
+    is documented in docs/ENCRYPTION.md instead; a keyed migration would
+    be required to fix it. All lengths remain deterministic and
+    self-consistent within this app.
     """
     return password.encode("utf-8").hex()
 
@@ -187,21 +195,21 @@ def detect_encryption_state(db_path: Path) -> DatabaseState:
     if not db_path.exists():
         return DatabaseState.NONE
 
-    # Try opening as unencrypted SQLite
+    # Try opening as unencrypted SQLite. The failure branch is the EXPECTED
+    # path for encrypted databases, so the connection must be closed there
+    # too or every state probe leaks a file handle.
     try:
-        conn = sqlite3.connect(str(db_path), timeout=1.0)
-        # Try to read from sqlite_master (will fail if encrypted)
-        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' LIMIT 1")
-        _ = cursor.fetchall()  # Check if we can read (will fail if encrypted)
-        conn.close()
+        with closing(sqlite3.connect(str(db_path), timeout=1.0)) as conn:
+            # Try to read from sqlite_master (will fail if encrypted)
+            cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' LIMIT 1")
+            _ = cursor.fetchall()  # Check if we can read (will fail if encrypted)
 
-        # Check for Python encryption metadata table
-        conn = sqlite3.connect(str(db_path), timeout=1.0)
-        cursor = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='_encryption_metadata'"
-        )
-        has_metadata = cursor.fetchone() is not None
-        conn.close()
+            # Check for Python encryption metadata table
+            cursor = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' "
+                "AND name='_encryption_metadata'"
+            )
+            has_metadata = cursor.fetchone() is not None
 
         if has_metadata:
             return DatabaseState.ENCRYPTED_PYTHON
@@ -385,6 +393,7 @@ class SQLCipherProvider(EncryptionProvider):
         # Create parent directory if needed
         db_path.parent.mkdir(parents=True, exist_ok=True)
 
+        conn = None
         try:
             # Connect to database
             conn = sqlcipher.connect(str(db_path), timeout=timeout, isolation_level=None)
@@ -397,7 +406,12 @@ class SQLCipherProvider(EncryptionProvider):
             conn.execute(f"PRAGMA kdf_iter = {self.kdf_iterations}")
 
             # Pin cipher parameters for cross-version compatibility.
-            # Order matters: key → kdf_iter → cipher params → first read.
+            # NOTE: cipher_compatibility = 4 resets all cipher settings to the
+            # SQLCipher v4 defaults, INCLUDING kdf_iter (256,000). Every
+            # existing database was created under these defaults, so the
+            # kdf_iter PRAGMA above is effectively inert; reordering it after
+            # this line would change the KDF and lock users out of their
+            # databases. See docs/ENCRYPTION.md.
             conn.execute("PRAGMA cipher_page_size = 4096")
             conn.execute("PRAGMA cipher_compatibility = 4")
 
@@ -414,6 +428,11 @@ class SQLCipherProvider(EncryptionProvider):
             return conn  # type: ignore
 
         except Exception as e:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
             raise ValueError(
                 f"Failed to open encrypted database. "
                 f"Password may be incorrect or database corrupted: {e}"
@@ -659,6 +678,13 @@ def _migrate_to_sqlcipher(
         db_path.rename(backup_path)
         encrypted_path.rename(db_path)
 
+        # The app runs SQLite in WAL mode; sidecars belonging to the old
+        # PLAINTEXT database must not survive next to the encrypted file
+        # (they contain plaintext pages and confuse SQLCipher on open).
+        for suffix in ("-wal", "-shm"):
+            sidecar = Path(str(db_path) + suffix)
+            sidecar.unlink(missing_ok=True)
+
     except Exception as e:
         # Cleanup on failure
         if encrypted_path.exists():
@@ -666,123 +692,3 @@ def _migrate_to_sqlcipher(
         raise RuntimeError(f"SQLCipher migration failed: {e}") from e
 
 
-def _migrate_to_python_encryption(
-    db_path: Path, password: str, kdf_iterations: int, backup_suffix: str
-) -> None:
-    """Migrate to Python-layer encryption.
-
-    Creates new database with encryption metadata, copies all data with
-    field-level encryption for JSON columns.
-
-    Args:
-        db_path: Path to unencrypted database
-        password: Encryption password
-        kdf_iterations: PBKDF2 iterations
-        backup_suffix: Suffix for backup file
-    """
-    import base64
-    from datetime import datetime
-
-    from cryptography.fernet import Fernet
-    from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-
-    encrypted_path = db_path.with_suffix(".db.encrypted.tmp")
-    backup_path = db_path.with_suffix(backup_suffix)
-
-    try:
-        # Generate salt for key derivation
-        salt = secrets.token_bytes(16)
-
-        # Derive encryption key
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(), length=32, salt=salt, iterations=kdf_iterations
-        )
-        key = kdf.derive(password.encode("utf-8"))
-        fernet = Fernet(base64.urlsafe_b64encode(key))
-
-        # Open source database
-        source_conn = sqlite3.connect(str(db_path), timeout=10.0)
-        source_conn.row_factory = sqlite3.Row
-
-        # Create encrypted database
-        dest_conn = sqlite3.connect(str(encrypted_path), timeout=10.0, isolation_level=None)
-
-        # Create encryption metadata table
-        dest_conn.execute(
-            """CREATE TABLE _encryption_metadata (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                encryption_provider TEXT NOT NULL,
-                salt BLOB NOT NULL,
-                iterations INTEGER NOT NULL,
-                encrypted_at TEXT NOT NULL,
-                key_version INTEGER NOT NULL DEFAULT 1
-            )"""
-        )
-        dest_conn.execute(
-            """INSERT INTO _encryption_metadata (id, encryption_provider, salt, iterations, encrypted_at, key_version)
-               VALUES (1, 'python', ?, ?, ?, 1)""",
-            (salt, kdf_iterations, datetime.now(UTC).isoformat()),
-        )
-
-        # Copy schema (all tables except _encryption_metadata)
-        for row in source_conn.execute(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name != '_encryption_metadata'"
-        ):
-            if row[0]:
-                dest_conn.execute(row[0])
-
-        # Copy data with encryption for JSON columns
-        tables = [
-            _validate_table_name(row[0])
-            for row in source_conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
-        ]
-
-        for table in tables:
-            # Get column names
-            columns_info = source_conn.execute(f"PRAGMA table_info({table})").fetchall()
-            columns = [col[1] for col in columns_info]
-
-            # Identify JSON columns (assume columns ending in _json)
-            json_columns = {col for col in columns if col.endswith("_json")}
-
-            # Copy rows
-            source_rows = source_conn.execute(f"SELECT * FROM {table}").fetchall()
-            for row in source_rows:
-                row_dict = dict(row)
-                # Encrypt JSON columns
-                for col in json_columns:
-                    if row_dict[col] is not None:
-                        plaintext = row_dict[col].encode("utf-8")
-                        encrypted = fernet.encrypt(plaintext)
-                        row_dict[col] = encrypted.decode("utf-8")
-
-                # Insert into dest
-                placeholders = ", ".join(["?"] * len(columns))
-                col_names = ", ".join(columns)
-                values = [row_dict[col] for col in columns]
-                dest_conn.execute(
-                    f"INSERT INTO {table} ({col_names}) VALUES ({placeholders})", values
-                )
-
-        source_conn.close()
-        dest_conn.close()
-
-        # Verify encrypted database can be opened
-        provider = PythonEncryptionProvider(kdf_iterations)
-        verify_conn = provider.create_connection(encrypted_path, password, timeout=10.0)
-        verify_conn.close()
-
-        # Atomic swap
-        if backup_path.exists():
-            backup_path.unlink()
-        db_path.rename(backup_path)
-        encrypted_path.rename(db_path)
-
-    except Exception as e:
-        # Cleanup on failure
-        if encrypted_path.exists():
-            encrypted_path.unlink()
-        raise RuntimeError(f"Python encryption migration failed: {e}") from e

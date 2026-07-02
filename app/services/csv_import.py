@@ -35,6 +35,19 @@ from pydantic import BaseModel
 
 from app.models.domain import Form1099BData, Form1099DIVData, Form1099INTData, W2Data
 
+# Column names each record type must provide. Without this check, a file
+# with mismatched headers (wrong type selected, Excel-renamed columns)
+# imports rows of silent $0 amounts instead of failing.
+_REQUIRED_HEADERS: dict[str, set[str]] = {
+    "W2": {"employer_name", "wages"},
+    "1099-B": {"description", "proceeds", "cost_basis"},
+    "1099B": {"description", "proceeds", "cost_basis"},
+    "1099-INT": {"payer_name", "interest_income"},
+    "1099INT": {"payer_name", "interest_income"},
+    "1099-DIV": {"payer_name", "ordinary_dividends"},
+    "1099DIV": {"payer_name", "ordinary_dividends"},
+}
+
 
 def _money(
     s: str,
@@ -93,8 +106,20 @@ def import_csv(csv_text: str, record_type: str) -> tuple[list[BaseModel], list[s
     errors: list[str] = []
     records: list[BaseModel] = []
 
+    required = _REQUIRED_HEADERS.get(record_type)
+    if required is None:
+        return records, [f"Unsupported record_type: {record_type}"]
+
     # Strip UTF-8 BOM (Excel default CSV export on Windows)
     reader = csv.DictReader(io.StringIO((csv_text or "").lstrip("\ufeff")))
+    headers = {(h or "").strip() for h in (reader.fieldnames or [])}
+    missing = sorted(required - headers)
+    if missing:
+        return records, [
+            f"Missing required column(s) for {record_type}: {', '.join(missing)}. "
+            f"Found columns: {', '.join(sorted(headers)) or '(none)'}"
+        ]
+
     for idx, row in enumerate(reader, start=2):  # header is line 1
         try:
             if record_type == "W2":
