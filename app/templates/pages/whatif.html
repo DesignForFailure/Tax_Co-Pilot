@@ -107,6 +107,12 @@
             <button type="button" class="btn btn-sm btn-outline" data-add-row="p_1099b">+ Add 1099-B</button>
         </div>
         <div id="p_1099b_container" class="dynamic-section"></div>
+        <div class="section-header">
+            <h3>1099-NEC (Self-Employment)</h3>
+            <button type="button" class="btn btn-sm btn-outline" data-add-row="p_1099nec">+ Add 1099-NEC</button>
+        </div>
+        <div id="p_1099nec_container" class="dynamic-section"></div>
+
     </div>
 
     <div class="card section-anchor" id="whatif-spouse">
@@ -139,6 +145,12 @@
             <button type="button" class="btn btn-sm btn-outline" data-add-row="s_1099b">+ Add 1099-B</button>
         </div>
         <div id="s_1099b_container" class="dynamic-section"></div>
+        <div class="section-header">
+            <h3>1099-NEC (Self-Employment)</h3>
+            <button type="button" class="btn btn-sm btn-outline" data-add-row="s_1099nec">+ Add 1099-NEC</button>
+        </div>
+        <div id="s_1099nec_container" class="dynamic-section"></div>
+
     </div>
 
     <div class="card section-anchor" id="whatif-other-income">
@@ -160,7 +172,7 @@
             <div><label>IRA Contributions</label><input type="text" name="adj_ira" placeholder="0"></div>
         </div>
         <div class="form-row">
-            <div><label>SE Tax Deduction</label><input type="text" name="adj_se_tax" placeholder="0"></div>
+            <div><label>SE Tax Deduction</label><input type="text" name="adj_se_tax" placeholder="0"><p class="field-hint">Auto-calculated from 1099-NEC income when present; this manual value applies only without NEC income.</p></div>
         </div>
     </div>
 

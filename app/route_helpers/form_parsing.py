@@ -16,6 +16,7 @@ from app.models.domain import (
     Form1099BData,
     Form1099DIVData,
     Form1099INTData,
+    Form1099NECData,
     ItemizedDeductionData,
     Taxpayer,
     TaxpayerRole,
@@ -279,6 +280,26 @@ def parse_1099bs(fd: FormData, prefix: str) -> list[Form1099BData]:
     return items
 
 
+def parse_1099necs(fd: FormData, prefix: str) -> list[Form1099NECData]:
+    """Parse 1099-NEC rows from indexed form fields."""
+    items: list[Form1099NECData] = []
+    for idx in collect_indices(fd, prefix):
+        base = f"{prefix}_{idx}"
+        compensation = form_money(fd, f"{base}_compensation")
+        payer = form_str(fd, f"{base}_payer")
+        federal_withheld = form_money(fd, f"{base}_federal_withheld")
+        if compensation == 0 and federal_withheld == 0 and not payer:
+            continue
+        items.append(
+            Form1099NECData(
+                payer_name=payer,
+                nonemployee_compensation=compensation,
+                federal_withheld=federal_withheld,
+            )
+        )
+    return items
+
+
 def parse_taxpayer(fd: FormData, prefix: str, role: TaxpayerRole) -> Taxpayer:
     """Build a taxpayer from indexed form fields under the given prefix."""
     first_name = form_str(fd, f"{prefix}_first")
@@ -298,6 +319,7 @@ def parse_taxpayer(fd: FormData, prefix: str, role: TaxpayerRole) -> Taxpayer:
         form_1099_ints=parse_1099ints(fd, f"{prefix}_1099int"),
         form_1099_divs=parse_1099divs(fd, f"{prefix}_1099div"),
         form_1099_bs=parse_1099bs(fd, f"{prefix}_1099b"),
+        form_1099_necs=parse_1099necs(fd, f"{prefix}_1099nec"),
     )
 
 
@@ -310,6 +332,7 @@ def taxpayer_has_form_data(taxpayer: Taxpayer) -> bool:
         or taxpayer.form_1099_ints
         or taxpayer.form_1099_divs
         or taxpayer.form_1099_bs
+        or taxpayer.form_1099_necs
     )
 
 

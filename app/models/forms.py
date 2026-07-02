@@ -41,6 +41,8 @@ class Form1040Lines(BaseModel):
     line_19: Decimal = Decimal("0")   # Child tax credit
     line_21: Decimal = Decimal("0")   # Total credits
     line_22: Decimal = Decimal("0")   # Tax after credits
+    line_23: Decimal = Decimal("0")   # Other taxes (incl. self-employment tax)
+    line_24: Decimal = Decimal("0")   # Total tax
 
     # Payments
     line_25d: Decimal = Decimal("0")  # Federal income tax withheld

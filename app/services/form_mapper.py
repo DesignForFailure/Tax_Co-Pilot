@@ -41,6 +41,8 @@ _FORM_LINE_MAP: dict[str, tuple[str, str]] = {
     "1040 Line 19": ("form_1040", "line_19"),
     "1040 Line 21": ("form_1040", "line_21"),
     "1040 Line 22": ("form_1040", "line_22"),
+    "1040 Line 23": ("form_1040", "line_23"),
+    "1040 Line 24": ("form_1040", "line_24"),
     "Schedule A Line 4": ("schedule_a", "line_4"),
     "Schedule A Line 7": ("schedule_a", "line_7"),
     "Schedule A Line 10": ("schedule_a", "line_10"),
@@ -95,9 +97,13 @@ def map_return_run(run: ReturnRun) -> FormPacket:
     )
 
     # Refund (Line 34) vs Amount Owed (Line 37)
-    # Use post-credit tax whenever credits are present. This includes scenarios
-    # where credits reduce line_22 to zero.
-    tax_amount = form_1040.line_22 if form_1040.line_21 > 0 else form_1040.line_16
+    # Line 24 (total tax incl. SE tax) wins when present; otherwise use
+    # post-credit tax whenever credits are present, including scenarios where
+    # credits reduce line_22 to zero.
+    if form_1040.line_24 > 0:
+        tax_amount = form_1040.line_24
+    else:
+        tax_amount = form_1040.line_22 if form_1040.line_21 > 0 else form_1040.line_16
     if form_1040.line_33 > tax_amount:
         form_1040.line_34 = form_1040.line_33 - tax_amount
         form_1040.line_37 = Decimal("0")

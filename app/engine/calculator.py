@@ -139,6 +139,7 @@ class CalculationEngine:
                 f"fed.{yr}.tax.total_before_credits",
                 self.resolved.get(f"fed.{yr}.tax.brackets", Decimal("0")),
             ),
+            self_employment_tax=self.resolved.get(f"fed.{yr}.se.total", Decimal("0")),
         )
 
         state_outputs = self._run_states()

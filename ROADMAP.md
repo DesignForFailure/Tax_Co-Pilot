@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–17 complete; Phase 3 continues with M18, then M19.
+**Status:** Late Alpha — milestones 1–18 complete; Phase 3 concludes with M19 (EITC), whose dependencies (M16, M18) are now both in place.
 **SemVer line:** `0.3.x` (promoted on Phase 2 completion, per the release trajectory below).
-**Test suite:** 434 passing, 4 skipped, 0 failures.
+**Test suite:** 449 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -422,6 +422,8 @@ These milestones fix known calculation inaccuracies.
 ---
 
 ### M18: Self-Employment Tax Auto-Calculation
+
+**Status:** Complete on 2026-07-02. The 2023/2024/2025 federal packs (v1.3.0) implement Schedule SE: the 92.35% factor, the $400 net-earnings floor, the SS portion capped at the year's wage base reduced by W-2 wages, and the uncapped Medicare portion. The employer-half deduction flows into AGI automatically (manual field remains the fallback when no NEC income exists), the refund settles against `fed.YYYY.tax.total_liability` (1040 Line 24), `ReturnOutput.self_employment_tax` is exposed, and the calculate/what-if pages gained 1099-NEC entry rows. 15 golden vectors in `tests/test_se_tax.py`. (The 0.9% Additional Medicare Tax remains unmodeled — tracked alongside NIIT in M22-era work.)
 
 **Goal:** Automatically compute self-employment tax and the above-the-line SE tax deduction from 1099-NEC income, instead of requiring manual input.
 

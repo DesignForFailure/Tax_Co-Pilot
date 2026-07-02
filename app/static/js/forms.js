@@ -5,8 +5,8 @@
    refresh only activate when the page has the matching elements. */
 (function () {
     var counters = {
-        p_w2: 1, p_1099int: 0, p_1099div: 0, p_1099b: 0,
-        s_w2: 0, s_1099int: 0, s_1099div: 0, s_1099b: 0
+        p_w2: 1, p_1099int: 0, p_1099div: 0, p_1099b: 0, p_1099nec: 0,
+        s_w2: 0, s_1099int: 0, s_1099div: 0, s_1099b: 0, s_1099nec: 0
     };
 
     function getTemplate(section, idx) {
@@ -42,6 +42,15 @@
                 + '<div><label>Ordinary Dividends (Box 1a)</label><input type="text" name="' + prefix + '_ordinary" placeholder="1000"></div>'
                 + '<div><label>Qualified Dividends (Box 1b)</label><input type="text" name="' + prefix + '_qualified" placeholder="800"></div>'
                 + '<div><label>Federal Withheld</label><input type="text" name="' + prefix + '_federal_withheld" placeholder="0"></div>'
+                + '</div></div>';
+        }
+        if (section.endsWith('_1099nec')) {
+            return '<div class="dynamic-row" data-section="' + section + '" data-index="' + idx + '">'
+                + '<button type="button" class="remove-btn">Remove</button>'
+                + '<div><label>Payer Name</label><input type="text" name="' + prefix + '_payer" placeholder="Client name"></div>'
+                + '<div class="form-row">'
+                + '<div><label>Nonemployee Compensation (Box 1)</label><input type="text" name="' + prefix + '_compensation" placeholder="30000"></div>'
+                + '<div><label>Federal Withheld (Box 4)</label><input type="text" name="' + prefix + '_federal_withheld" placeholder="0"></div>'
                 + '</div></div>';
         }
         if (section.endsWith('_1099b')) {
