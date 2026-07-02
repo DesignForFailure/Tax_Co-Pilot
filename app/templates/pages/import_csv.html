@@ -36,7 +36,7 @@
 
         <div>
             <label>CSV Data</label>
-            <p class="text-dim text-sm" style="margin-bottom: 10px;">
+            <p class="text-dim text-sm u-mb-10">
                 W-2 columns: <code>employer_name,wages,federal_withheld,state,state_wages,state_withheld</code><br>
                 1099-B columns: <code>description,proceeds,cost_basis,is_long_term</code><br>
                 1099-INT columns: <code>payer_name,interest_income,federal_withheld</code><br>
@@ -45,13 +45,12 @@
             <textarea
                 name="csv_text"
                 rows="10"
-                class="code-block"
-                style="resize: vertical;"
+                class="code-block resize-vertical"
                 placeholder="employer_name,wages,federal_withheld&#10;Acme Corp,85000,12000"
             >{{ csv_text if csv_text is defined else "" }}</textarea>
         </div>
 
-        <div class="action-row" style="margin-top: 18px;">
+        <div class="action-row u-mt-18">
             <button type="submit" class="btn">Import</button>
             <a href="/dashboard" class="btn btn-outline">Dashboard</a>
         </div>
@@ -60,10 +59,10 @@
 
 {% if errors is defined and errors %}
 <div class="notice notice-error">
-    <h2 style="color: var(--red);">Parse Errors</h2>
-    <ul style="margin-top: 10px; padding-left: 20px;">
+    <h2 class="heading-danger">Parse Errors</h2>
+    <ul class="list-plain-indent">
     {% for err in errors %}
-        <li style="color: var(--red); font-size: 13px; margin-bottom: 4px;">{{ err }}</li>
+        <li class="error-item">{{ err }}</li>
     {% endfor %}
     </ul>
 </div>
@@ -72,7 +71,7 @@
 {% if records is defined and records %}
 <div class="card">
     <h2>Imported Records ({{ records|length }})</h2>
-    <p class="text-dim text-sm" style="margin-bottom: 12px;">
+    <p class="text-dim text-sm u-mb-12">
         Records parsed successfully. <a href="/calculate">Go to Calculate</a> to run a full tax return.
     </p>
     <div class="table-wrap">

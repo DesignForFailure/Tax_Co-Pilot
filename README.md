@@ -260,6 +260,15 @@ Tax_Co-Pilot/
 │   │   ├── encryption.py
 │   │   ├── form_mapper.py
 │   │   └── rule_pack_editor.py
+│   ├── static/
+│   │   ├── css/
+│   │   │   └── main.css
+│   │   └── js/
+│   │       ├── compare.js
+│   │       ├── forms.js
+│   │       ├── rule-editor.js
+│   │       ├── submit-guard.js
+│   │       └── theme.js
 │   └── templates/
 │       ├── layouts/
 │       │   └── base.html
@@ -414,6 +423,7 @@ Tax_Co-Pilot/
     ├── test_itemized_credits.py
     ├── test_logging.py
     ├── test_milestone12_structure.py
+    ├── test_milestone14_csp.py
     ├── test_milestone6_routes.py
     ├── test_multi_year.py
     ├── test_parse_money.py

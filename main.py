@@ -25,6 +25,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -57,11 +58,12 @@ app = FastAPI(title="Tax Copilot", version=__version__, lifespan=lifespan)
 app.state.base_dir = BASE_DIR
 app.state.templates = TEMPLATES
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "app" / "static")), name="static")
 
 _CSP = (
     "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline'; "
-    "style-src 'self' 'unsafe-inline'; "
+    "script-src 'self'; "
+    "style-src 'self'; "
     "img-src 'self' data:; "
     "connect-src 'self'; "
     "base-uri 'self'; "
@@ -91,7 +93,6 @@ app.include_router(runs_router)
 app.include_router(import_export_router)
 app.include_router(encryption_router)
 app.include_router(rule_packs_router)
-
 
 @app.exception_handler(ValueError)
 def value_error_handler(request: Request, exc: ValueError) -> PlainTextResponse:

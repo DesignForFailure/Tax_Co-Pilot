@@ -78,9 +78,9 @@
             </form>
             <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/export" class="btn btn-sm btn-outline">Export YAML</a>
             {% if pack.is_custom %}
-            <form method="POST" action="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/delete" class="inline-form">
+            <form method="POST" action="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/delete" class="inline-form" data-confirm="Delete pack {{ pack.variant }}? This cannot be undone.">
                 <input type="hidden" name="csrf_token" value="{{ csrf }}">
-                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete pack {{ pack.variant }}? This cannot be undone.')">Delete</button>
+                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
             </form>
             {% endif %}
         </div>
@@ -141,12 +141,12 @@
                                 {% if pack.is_custom %}Edit{% else %}View{% endif %}
                             </a>
                             {% if pack.is_custom %}
-                            <form method="POST" action="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/rules/{{ rule.id }}/delete" class="inline-form">
+                            <form method="POST" action="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/rules/{{ rule.id }}/delete" class="inline-form" data-confirm="Delete this rule?">
                                 <input type="hidden" name="csrf_token" value="{{ csrf }}">
                                 {# rule.id must not be interpolated into the JS string: HTML
                                    entity escaping is undone by the attribute parser before the
                                    JS engine sees it. #}
-                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this rule?')">Delete</button>
+                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                             </form>
                             {% endif %}
                         </div>

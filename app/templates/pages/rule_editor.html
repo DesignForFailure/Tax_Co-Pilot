@@ -77,7 +77,7 @@
             </div>
             <div>
                 <label>Type</label>
-                <select name="rule_type" id="rule_type" onchange="switchType(this.value)" {% if readonly %}disabled{% endif %}>
+                <select name="rule_type" id="rule_type" {% if readonly %}disabled{% endif %}>
                     <option value="sum" {% if rtype == 'sum' %}selected{% endif %}>sum</option>
                     <option value="formula" {% if rtype == 'formula' %}selected{% endif %}>formula</option>
                     <option value="lookup" {% if rtype == 'lookup' %}selected{% endif %}>lookup</option>
@@ -111,7 +111,7 @@
                 <p class="text-dim text-sm">Map named inputs into an expression that can use `max()` and `min()`.</p>
             </div>
             {% if not readonly %}
-            <button type="button" class="btn btn-sm btn-outline" onclick="addFormulaInput()">Add Input</button>
+            <button type="button" class="btn btn-sm btn-outline" data-add-formula-input>Add Input</button>
             {% endif %}
         </div>
         <div class="stack-md">
@@ -122,7 +122,7 @@
             </div>
             <div>
                 <h3>Inputs</h3>
-                <div id="formula-inputs">
+                <div id="formula-inputs" data-next-index="{{ (r.get('inputs', {}) | length) if (r and rtype == 'formula') else 0 }}">
                     {% if rtype == 'formula' and r.get('inputs') %}
                         {% for name, val in r['inputs'].items() %}
                         <div class="form-grid-4 formula-input-row">
@@ -142,7 +142,7 @@
                                 <input type="text" name="input_value_{{ loop.index0 }}" value="{{ val.get('ref', val.get('literal', '')) }}" {% if readonly %}readonly{% endif %} placeholder="value">
                             </div>
                             {% if not readonly %}
-                            <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.formula-input-row').remove()">Remove</button>
+                            <button type="button" class="btn btn-sm btn-danger" data-remove-closest=".formula-input-row">Remove</button>
                             {% endif %}
                         </div>
                         {% endfor %}
@@ -191,11 +191,11 @@
                 <div class="section-header">
                     <h3>{{ status | upper }}</h3>
                     {% if not readonly %}
-                    <button type="button" class="btn btn-sm btn-outline" onclick="addBracketRow('{{ status }}')">Add Row</button>
+                    <button type="button" class="btn btn-sm btn-outline" data-add-bracket-row="{{ status }}">Add Row</button>
                     {% endif %}
                 </div>
                 <div class="table-wrap">
-                    <table class="data-table" id="bracket-table-{{ status }}">
+                    <table class="data-table" id="bracket-table-{{ status }}" data-next-index="{{ (r.get('tables', {}).get(status, []) | length) if (rtype == 'bracket_table' and r.get('tables')) else 1 }}">
                         <thead>
                             <tr>
                                 <th>Lower</th>
@@ -214,7 +214,7 @@
                                     <td><input type="text" name="bracket_{{ status }}_{{ loop.index0 }}_upper" value="{{ b.upper if b.upper is not none else '' }}" {% if readonly %}readonly{% endif %}></td>
                                     <td><input type="text" name="bracket_{{ status }}_{{ loop.index0 }}_rate" value="{{ b.rate }}" {% if readonly %}readonly{% endif %}></td>
                                     {% if not readonly %}
-                                    <td class="align-right"><button type="button" class="btn btn-sm btn-danger" onclick="this.closest('tr').remove()">Remove</button></td>
+                                    <td class="align-right"><button type="button" class="btn btn-sm btn-danger" data-remove-closest="tr">Remove</button></td>
                                     {% endif %}
                                 </tr>
                                 {% endfor %}
@@ -224,7 +224,7 @@
                                     <td><input type="text" name="bracket_{{ status }}_0_upper" value="" {% if readonly %}readonly{% endif %}></td>
                                     <td><input type="text" name="bracket_{{ status }}_0_rate" value="" {% if readonly %}readonly{% endif %}></td>
                                     {% if not readonly %}
-                                    <td class="align-right"><button type="button" class="btn btn-sm btn-danger" onclick="this.closest('tr').remove()">Remove</button></td>
+                                    <td class="align-right"><button type="button" class="btn btn-sm btn-danger" data-remove-closest="tr">Remove</button></td>
                                     {% endif %}
                                 </tr>
                             {% endif %}
@@ -246,49 +246,8 @@
     </div>
 </form>
 
-<script>
-function switchType(type) {
-  document.querySelectorAll('.type-section').forEach(function (section) {
-    section.hidden = true;
-  });
-  var sec = document.getElementById('section-' + type);
-  if (sec) {
-    sec.hidden = false;
-  }
-}
+{% endblock %}
 
-var formulaIdx = {{ (r.get('inputs', {}) | length) if (r and rtype == 'formula') else 0 }};
-function addFormulaInput() {
-  var container = document.getElementById('formula-inputs');
-  var html = '<div class="form-grid-4 formula-input-row">'
-    + '<div><label>Variable Name</label><input type="text" name="input_name_' + formulaIdx + '" placeholder="variable name"></div>'
-    + '<div><label>Source Type</label><select name="input_type_' + formulaIdx + '"><option value="ref">ref</option><option value="literal">literal</option></select></div>'
-    + '<div><label>Value</label><input type="text" name="input_value_' + formulaIdx + '" placeholder="value"></div>'
-    + '<button type="button" class="btn btn-sm btn-danger" onclick="this.closest(\\'.formula-input-row\\').remove()">Remove</button>'
-    + '</div>';
-  container.insertAdjacentHTML('beforeend', html);
-  formulaIdx++;
-}
-
-var bracketCounters = {single: 0, mfj: 0, mfs: 0, hoh: 0, qss: 0};
-{% if rtype == 'bracket_table' and r.get('tables') %}
-  {% for status in ['single', 'mfj', 'mfs', 'hoh', 'qss'] %}
-  bracketCounters['{{ status }}'] = {{ r.get('tables', {}).get(status, []) | length }};
-  {% endfor %}
-{% else %}
-  for (var k in bracketCounters) { bracketCounters[k] = 1; }
-{% endif %}
-
-function addBracketRow(status) {
-  var idx = bracketCounters[status];
-  var tbody = document.querySelector('#bracket-table-' + status + ' tbody');
-  var tr = document.createElement('tr');
-  tr.innerHTML = '<td><input type="text" name="bracket_' + status + '_' + idx + '_lower"></td>'
-    + '<td><input type="text" name="bracket_' + status + '_' + idx + '_upper"></td>'
-    + '<td><input type="text" name="bracket_' + status + '_' + idx + '_rate"></td>'
-    + '<td class="align-right"><button type="button" class="btn btn-sm btn-danger" onclick="this.closest(\\'tr\\').remove()">Remove</button></td>';
-  tbody.appendChild(tr);
-  bracketCounters[status] = idx + 1;
-}
-</script>
+{% block scripts %}
+<script src="/static/js/rule-editor.js"></script>
 {% endblock %}
