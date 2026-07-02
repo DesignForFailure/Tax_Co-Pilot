@@ -231,15 +231,6 @@ def _compute_integrity_hash(run_data: dict, version: int = _HASH_VERSION) -> str
     return _compute_integrity_hash_v2(run_data)
 
 
-def _get_latest_hash() -> str:
-    """Get the integrity_hash of the most recent run (for chain linking)."""
-    with closing(get_connection()) as conn:
-        row = conn.execute(
-            "SELECT integrity_hash FROM return_runs ORDER BY created_at DESC, rowid DESC LIMIT 1"
-        ).fetchone()
-    return row["integrity_hash"] if row else ""
-
-
 def init_db() -> None:
     """Create tables if they do not exist.
 
@@ -410,13 +401,44 @@ def get_return_run(run_id: str) -> dict | None:
 
 
 def delete_return_run(run_id: str) -> None:
-    """Delete a single run by id.
+    """Delete a single run by id, relinking the integrity chain around it.
+
+    The successor's previous_hash is re-pointed at the deleted row's
+    previous_hash (a linked-list unlink); otherwise verify_chain would
+    report an indistinguishable-from-tampering chain_break forever.
 
     Security:
-    - Uses parameterized query (prevents SQL injection).
+    - Uses parameterized queries (prevents SQL injection).
     """
     with closing(get_connection()) as conn:
-        conn.execute("DELETE FROM return_runs WHERE id = ?", (run_id,))
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            row = conn.execute(
+                "SELECT integrity_hash, previous_hash, created_at, rowid "
+                "FROM return_runs WHERE id = ?",
+                (run_id,),
+            ).fetchone()
+            if row is None:
+                conn.execute("COMMIT")
+                return
+
+            successor = conn.execute(
+                "SELECT id FROM return_runs "
+                "WHERE (created_at > ? OR (created_at = ? AND rowid > ?)) "
+                "ORDER BY created_at ASC, rowid ASC LIMIT 1",
+                (row["created_at"], row["created_at"], row["rowid"]),
+            ).fetchone()
+            if successor is not None:
+                conn.execute(
+                    "UPDATE return_runs SET previous_hash = ? WHERE id = ?",
+                    (row["previous_hash"], successor["id"]),
+                )
+
+            conn.execute("DELETE FROM return_runs WHERE id = ?", (run_id,))
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
 
 
 def update_run_annotation(run_id: str, tags: str, notes: str) -> bool:
@@ -495,7 +517,9 @@ def verify_chain() -> list[dict]:
                 "actual_hash": stored_hash,
             })
 
-        # Propagate expected hash so one bad row doesn't poison the chain
-        prev_hash = expected_hash if stored_hash else stored_hash
+        # Propagate the STORED hash: insert-time linking records the stored
+        # integrity_hash of the previous row, so comparing against the
+        # recomputed hash would falsely flag the row after a tampered one.
+        prev_hash = stored_hash
 
     return errors
