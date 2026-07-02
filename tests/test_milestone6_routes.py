@@ -59,9 +59,9 @@ def _create_run(client: TestClient) -> str:
     """POST to /calculate and return the saved run ID."""
     r = client.post("/calculate", data=_BASE_FORM, follow_redirects=False)
     assert r.status_code == 303
-    from app.services.database import list_return_runs
+    from app.services.database import list_all_return_runs
 
-    runs = list_return_runs()
+    runs = list_all_return_runs()
     assert runs, "Expected at least one saved run after posting to /calculate"
     return str(runs[0]["id"])
 
@@ -302,9 +302,9 @@ def test_compare_runs_renders_diff_table() -> None:
     form2["p_w2_0_federal_withheld"] = "20000"
     r2 = client.post("/calculate", data=form2, follow_redirects=False)
     assert r2.status_code == 303
-    from app.services.database import list_return_runs
+    from app.services.database import list_all_return_runs
 
-    runs = list_return_runs()
+    runs = list_all_return_runs()
     run_id_b = str(runs[0]["id"])
 
     r = client.get(f"/runs/compare?a={run_id_a}&b={run_id_b}")

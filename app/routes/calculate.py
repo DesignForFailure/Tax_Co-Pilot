@@ -49,8 +49,11 @@ def home(request: Request) -> Response:
 
     recent_runs: list[dict[str, Any]] = []
     latest_run: ReturnRun | None = None
+    run_count = 0
     if not locked:
-        recent_runs = list_return_runs()
+        # The home page only needs the newest five runs plus a total count —
+        # never the full table.
+        recent_runs, run_count = list_return_runs(page=1, page_size=5)
         if recent_runs:
             latest_run = load_run_from_row(recent_runs[0])
 
@@ -61,8 +64,8 @@ def home(request: Request) -> Response:
         {
             "locked": locked,
             "latest_run": latest_run,
-            "recent_runs": recent_runs[:5],
-            "run_count_display": "Locked" if locked else len(recent_runs),
+            "recent_runs": recent_runs,
+            "run_count_display": "Locked" if locked else run_count,
             "available_years": available_years,
             "latest_state_count": len(get_state_packs(latest_year)) if latest_year else 0,
             "pack_count": len(list_rule_packs()),

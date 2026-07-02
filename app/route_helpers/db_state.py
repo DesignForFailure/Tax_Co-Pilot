@@ -103,7 +103,7 @@ def locked_database_response() -> RedirectResponse | HTMLResponse | None:
 
 def load_latest_run() -> ReturnRun | None:
     """Return the newest saved run, if one exists."""
-    runs = list_return_runs()
+    runs, _total = list_return_runs(page=1, page_size=1)
     if not runs:
         return None
     return load_run_from_row(runs[0])

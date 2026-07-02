@@ -6,7 +6,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from app.services.database import init_db, list_return_runs
+from app.services.database import init_db, list_all_return_runs
 from main import app
 
 CSRF = "test-csrf-token"
@@ -37,7 +37,7 @@ def _client() -> TestClient:
 def _create_run() -> str:
     c = _client()
     c.post("/calculate", data=_BASE_FORM, follow_redirects=False)
-    runs = list_return_runs()
+    runs = list_all_return_runs()
     assert runs
     return str(runs[0]["id"])
 
@@ -87,7 +87,7 @@ def test_export_import_round_trip() -> None:
     assert "Imported" in resp.text
 
     # Verify the run is back
-    runs_after = list_return_runs()
+    runs_after = list_all_return_runs()
     assert len(runs_after) >= 1
 
 

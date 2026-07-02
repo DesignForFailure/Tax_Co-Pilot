@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from math import ceil
 from typing import Any, cast
 
 from fastapi import APIRouter, Request
@@ -27,17 +28,37 @@ def _templates(request: Request) -> Jinja2Templates:
     return cast(Jinja2Templates, request.app.state.templates)
 
 
+_RUNS_PAGE_SIZE = 25
+
+
 @router.get("/runs", response_class=HTMLResponse)
-def past_runs(request: Request) -> Response:
+def past_runs(request: Request, page: int = 1) -> Response:
     locked_response = locked_database_response()
     if locked_response is not None:
         return locked_response
+
+    page = max(1, page)
+    runs, total_count = list_return_runs(page=page, page_size=_RUNS_PAGE_SIZE)
+    total_pages = max(1, ceil(total_count / _RUNS_PAGE_SIZE))
+    if page > total_pages:
+        # Past-the-end pages redirect to the last real page instead of
+        # rendering an empty table.
+        return RedirectResponse(url=f"/runs?page={total_pages}", status_code=303)
 
     csrf = get_csrf_token(request)
     response = _templates(request).TemplateResponse(
         request,
         "pages/runs.html",
-        {"runs": list_return_runs(), "csrf": csrf},
+        {
+            "runs": runs,
+            "csrf": csrf,
+            "page": page,
+            "page_size": _RUNS_PAGE_SIZE,
+            "total_pages": total_pages,
+            "total_count": total_count,
+            "showing_start": (page - 1) * _RUNS_PAGE_SIZE + 1 if total_count else 0,
+            "showing_end": (page - 1) * _RUNS_PAGE_SIZE + len(runs),
+        },
     )
     response.set_cookie("csrf", csrf, httponly=True, samesite="strict")
     return response

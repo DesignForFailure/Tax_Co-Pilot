@@ -20,7 +20,7 @@ from app.models.domain import (
     TaxReturnInput,
     W2Data,
 )
-from app.services.database import init_db, list_return_runs
+from app.services.database import init_db, list_all_return_runs
 from main import app
 
 FED_2023 = RulePack.load(Path("rule_packs/federal/2023"))
@@ -284,7 +284,7 @@ def test_calculate_with_2023(_ensure_db: None) -> None:
     r = client.post("/calculate", data=form, follow_redirects=False)
     assert r.status_code == 303
 
-    runs = list_return_runs()
+    runs = list_all_return_runs()
     assert runs
     # Verify at least one run used 2023 (don't rely on ordering)
     assert any(r["tax_year"] == 2023 for r in runs)

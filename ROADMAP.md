@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–14 complete; Phase 1 concludes with M15.
-**SemVer line:** `0.1.x`
-**Test suite:** 382 passing, 4 skipped, 0 failures.
+**Status:** Late Alpha — milestones 1–15 complete; Phase 1 (structural hardening) is done. Next up: Phase 2 (M16).
+**SemVer line:** `0.2.x` (promoted from `0.1.x` on Phase 1 completion, per the release trajectory below).
+**Test suite:** 396 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -227,6 +227,8 @@ main.py                      # App factory, lifespan, middleware, router include
 ---
 
 ### M15: Paginate Run Listings
+
+**Status:** Complete on 2026-07-02. `list_return_runs()` returns `(runs, total_count)` with clamped `page`/`page_size`; `count_return_runs()` and `list_all_return_runs()` cover the count-only and export-all callers; `/runs?page=N` renders windowed pagination controls with a "Showing X–Y of Z runs" summary. Version promoted to `0.2.0` (Phase 1 complete).
 
 **Goal:** Add server-side pagination to `list_return_runs()` and the `/runs` page so the system handles thousands of saved runs without degrading.
 
