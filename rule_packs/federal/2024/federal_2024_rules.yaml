@@ -22,6 +22,18 @@ constants:
     mfs: "-1500"
     hoh: "-3000"
     qss: "-3000"
+  ltcg_threshold_0:
+    single: "47025"
+    mfj: "94050"
+    mfs: "47025"
+    hoh: "63000"
+    qss: "94050"
+  ltcg_threshold_15:
+    single: "518900"
+    mfj: "583750"
+    mfs: "291850"
+    hoh: "551350"
+    qss: "583750"
   standard_deduction:
     single: "14600"
     mfj: "29200"
@@ -473,8 +485,8 @@ rules:
     rounding_precision: 0
 
   - id: "fed.2024.tax.brackets"
-    description: "Federal income tax using 2024 bracket tables"
-    form_line: "1040 Line 16"
+    description: "Tax on all taxable income at ordinary rates (QDCGT Worksheet comparison figure)"
+    form_line: "QDCGT Worksheet Line 24"
     type: "bracket_table"
     input: { ref: "fed.2024.taxable_income" }
     key: { ref: "input.filing_status" }
@@ -521,6 +533,149 @@ rules:
         - { lower: "383900", upper: "487450", rate: "0.32" }
         - { lower: "487450", upper: "731200", rate: "0.35" }
         - { lower: "731200", upper: null, rate: "0.37" }
+
+  - id: "fed.2024.income.long_term_gains"
+    description: "Net long-term capital gain or loss (1099-B long-term lots)"
+    form_line: "Schedule D Line 15"
+    type: "sum"
+    inputs:
+      items: { ref: "input.1099b.long_term_gain" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.income.short_term_gains"
+    description: "Net short-term capital gain or loss (1099-B short-term lots)"
+    form_line: "Schedule D Line 7"
+    type: "sum"
+    inputs:
+      items: { ref: "input.1099b.short_term_gain" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.income.net_capital_gain"
+    description: "Net capital gain eligible for preferential rates (smaller of Schedule D lines 15 and 16, not below zero)"
+    form_line: "Schedule D Line 16"
+    type: "formula"
+    expression: "max(min(lt, lt + st), 0)"
+    inputs:
+      lt: { ref: "fed.2024.income.long_term_gains" }
+      st: { ref: "fed.2024.income.short_term_gains" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.income.preferential"
+    description: "Preferential-rate income: qualified dividends + net capital gain, capped at taxable income"
+    form_line: "QDCGT Worksheet Line 6"
+    type: "formula"
+    expression: "min(qualified + net_gain, taxable)"
+    inputs:
+      qualified: { ref: "input.1099div.qualified" }
+      net_gain: { ref: "fed.2024.income.net_capital_gain" }
+      taxable: { ref: "fed.2024.taxable_income" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2024.income.ordinary"
+    description: "Taxable income taxed at ordinary rates (taxable income minus preferential income)"
+    form_line: "QDCGT Worksheet Line 7"
+    type: "formula"
+    expression: "taxable - preferential"
+    inputs:
+      taxable: { ref: "fed.2024.taxable_income" }
+      preferential: { ref: "fed.2024.income.preferential" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2024.ltcg.threshold_0"
+    description: "Top of the 0% long-term capital gains bracket by filing status"
+    form_line: "QDCGT Worksheet Line 9"
+    type: "lookup"
+    table: "constants.ltcg_threshold_0"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2024.ltcg.threshold_15"
+    description: "Top of the 15% long-term capital gains bracket by filing status"
+    form_line: "QDCGT Worksheet Line 15"
+    type: "lookup"
+    table: "constants.ltcg_threshold_15"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2024.tax.ordinary"
+    description: "Ordinary-rate tax on non-preferential income using 2024 bracket tables"
+    form_line: "QDCGT Worksheet Line 22"
+    type: "bracket_table"
+    input: { ref: "fed.2024.income.ordinary" }
+    key: { ref: "input.filing_status" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+    tables:
+      single:
+        - { lower: "0", upper: "11600", rate: "0.10" }
+        - { lower: "11600", upper: "47150", rate: "0.12" }
+        - { lower: "47150", upper: "100525", rate: "0.22" }
+        - { lower: "100525", upper: "191950", rate: "0.24" }
+        - { lower: "191950", upper: "243725", rate: "0.32" }
+        - { lower: "243725", upper: "609350", rate: "0.35" }
+        - { lower: "609350", upper: null, rate: "0.37" }
+      mfj:
+        - { lower: "0", upper: "23200", rate: "0.10" }
+        - { lower: "23200", upper: "94300", rate: "0.12" }
+        - { lower: "94300", upper: "201050", rate: "0.22" }
+        - { lower: "201050", upper: "383900", rate: "0.24" }
+        - { lower: "383900", upper: "487450", rate: "0.32" }
+        - { lower: "487450", upper: "731200", rate: "0.35" }
+        - { lower: "731200", upper: null, rate: "0.37" }
+      mfs:
+        - { lower: "0", upper: "11600", rate: "0.10" }
+        - { lower: "11600", upper: "47150", rate: "0.12" }
+        - { lower: "47150", upper: "100525", rate: "0.22" }
+        - { lower: "100525", upper: "191950", rate: "0.24" }
+        - { lower: "191950", upper: "243725", rate: "0.32" }
+        - { lower: "243725", upper: "365600", rate: "0.35" }
+        - { lower: "365600", upper: null, rate: "0.37" }
+      hoh:
+        - { lower: "0", upper: "16550", rate: "0.10" }
+        - { lower: "16550", upper: "63100", rate: "0.12" }
+        - { lower: "63100", upper: "100500", rate: "0.22" }
+        - { lower: "100500", upper: "191950", rate: "0.24" }
+        - { lower: "191950", upper: "243700", rate: "0.32" }
+        - { lower: "243700", upper: "609350", rate: "0.35" }
+        - { lower: "609350", upper: null, rate: "0.37" }
+      qss:
+        - { lower: "0", upper: "23200", rate: "0.10" }
+        - { lower: "23200", upper: "94300", rate: "0.12" }
+        - { lower: "94300", upper: "201050", rate: "0.22" }
+        - { lower: "201050", upper: "383900", rate: "0.24" }
+        - { lower: "383900", upper: "487450", rate: "0.32" }
+        - { lower: "487450", upper: "731200", rate: "0.35" }
+        - { lower: "731200", upper: null, rate: "0.37" }
+
+  - id: "fed.2024.tax.ltcg"
+    description: "Tax on preferential income at 0%/15%/20% rates, stacked on top of ordinary income"
+    form_line: "QDCGT Worksheet Lines 18-21"
+    type: "formula"
+    expression: "(min(pref, max(t15 - ordinary, 0)) - min(pref, max(t0 - ordinary, 0))) * r15 + (pref - min(pref, max(t15 - ordinary, 0))) * r20"
+    inputs:
+      pref: { ref: "fed.2024.income.preferential" }
+      ordinary: { ref: "fed.2024.income.ordinary" }
+      t0: { ref: "fed.2024.ltcg.threshold_0" }
+      t15: { ref: "fed.2024.ltcg.threshold_15" }
+      r15: { literal: "0.15" }
+      r20: { literal: "0.20" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2024.tax.total_before_credits"
+    description: "Tax before credits: smaller of stacked ordinary+LTCG tax or all-ordinary bracket tax (QDCGT Worksheet Line 25)"
+    form_line: "1040 Line 16"
+    type: "formula"
+    expression: "min(ordinary_tax + ltcg_tax, all_ordinary_tax)"
+    inputs:
+      ordinary_tax: { ref: "fed.2024.tax.ordinary" }
+      ltcg_tax: { ref: "fed.2024.tax.ltcg" }
+      all_ordinary_tax: { ref: "fed.2024.tax.brackets" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
 
   - id: "fed.2024.credits.ctc.base"
     description: "Child tax credit base amount ($2,000 per qualifying child)"
@@ -592,7 +747,7 @@ rules:
     type: "formula"
     expression: "max(tax - credits, zero)"
     inputs:
-      tax: { ref: "fed.2024.tax.brackets" }
+      tax: { ref: "fed.2024.tax.total_before_credits" }
       credits: { ref: "fed.2024.credits.total" }
       zero: { literal: "0" }
     rounding: "ROUND_HALF_UP"

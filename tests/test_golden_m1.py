@@ -362,7 +362,7 @@ def test_trace_explanations_include_form_line() -> None:
     deduction_trace = next(t for t in run.trace if t.rule_id == "fed.2024.standard_deduction")
     assert "1040 Line 13" in deduction_trace.explanation
 
-    tax_trace = next(t for t in run.trace if t.rule_id == "fed.2024.tax.brackets")
+    tax_trace = next(t for t in run.trace if t.rule_id == "fed.2024.tax.total_before_credits")
     assert "1040 Line 16" in tax_trace.explanation
 
 

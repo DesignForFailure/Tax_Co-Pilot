@@ -233,6 +233,16 @@ def test_trace_contains_all_rules() -> None:
         "fed.2024.itemized.total",
         "fed.2024.deductions.applied",
         "fed.2024.taxable_income",
+        "fed.2024.income.long_term_gains",
+        "fed.2024.income.short_term_gains",
+        "fed.2024.income.net_capital_gain",
+        "fed.2024.income.preferential",
+        "fed.2024.income.ordinary",
+        "fed.2024.ltcg.threshold_0",
+        "fed.2024.ltcg.threshold_15",
+        "fed.2024.tax.ordinary",
+        "fed.2024.tax.ltcg",
+        "fed.2024.tax.total_before_credits",
         "fed.2024.tax.brackets",
         "fed.2024.credits.ctc.base",
         "fed.2024.credits.ctc.threshold",
@@ -272,7 +282,7 @@ def test_immutable_run_has_snapshot_and_metadata() -> None:
     run = CalculationEngine(FED, inputs).run()
 
     assert run.input_snapshot.taxpayers[0].w2s[0].wages == Decimal("75000")
-    assert run.rule_pack_version == "1.1.0"
+    assert run.rule_pack_version == "1.2.0"
     assert len(run.rule_pack_checksum) == 64  # SHA-256 hex
 
 

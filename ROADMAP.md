@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–16 complete; Phases 1 and 2 are done. Next up: Phase 3 tax correctness (M17/M18, then M19).
+**Status:** Late Alpha — milestones 1–17 complete; Phase 3 continues with M18, then M19.
 **SemVer line:** `0.3.x` (promoted on Phase 2 completion, per the release trajectory below).
-**Test suite:** 418 passing, 4 skipped, 0 failures.
+**Test suite:** 434 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -348,6 +348,8 @@ These milestones add missing engine capabilities that unlock blocked features.
 These milestones fix known calculation inaccuracies.
 
 ### M17: Long-Term Capital Gains Preferential Rates
+
+**Status:** Complete on 2026-07-02. The 2023/2024/2025 federal packs (v1.2.0) implement the Qualified Dividends and Capital Gain Tax Worksheet: Schedule D short/long netting, preferential income capped at taxable income, year-correct 0%/15% ceilings, 0%/15%/20% stacking on top of ordinary income, and the worksheet's final smaller-of comparison against all-ordinary tax (which binds in the narrow band where 15% exceeds the ordinary marginal rate). `fed.YYYY.tax.total_before_credits` now owns 1040 Line 16; `ReturnOutput.tax_before_credits` falls back to the bracket tax for older custom packs. 16 hand-verified golden vectors in `tests/test_ltcg_rates.py`.
 
 **Goal:** Tax long-term capital gains and qualified dividends at the correct preferential rates (0%/15%/20%) instead of ordinary income rates.
 
