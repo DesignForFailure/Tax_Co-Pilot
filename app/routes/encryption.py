@@ -146,12 +146,16 @@ async def rotate_key_submit(request: Request) -> RedirectResponse:
             url=f"/rotate-key?error={urllib.parse.quote_plus('New passwords do not match')}",
             status_code=303,
         )
-    if not secrets.compare_digest(current_password, get_cached_password() or ""):
+    # Compare bytes: compare_digest raises TypeError on non-ASCII str, which
+    # would turn a legitimately non-ASCII password into a 500.
+    if not secrets.compare_digest(
+        current_password.encode("utf-8"), (get_cached_password() or "").encode("utf-8")
+    ):
         return RedirectResponse(
             url=f"/rotate-key?error={urllib.parse.quote_plus('Current password is incorrect')}",
             status_code=303,
         )
-    if secrets.compare_digest(current_password, new_password):
+    if secrets.compare_digest(current_password.encode("utf-8"), new_password.encode("utf-8")):
         return RedirectResponse(
             url=f"/rotate-key?error={urllib.parse.quote_plus('New password must differ from current password')}",
             status_code=303,

@@ -143,7 +143,10 @@
                             {% if pack.is_custom %}
                             <form method="POST" action="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/rules/{{ rule.id }}/delete" class="inline-form">
                                 <input type="hidden" name="csrf_token" value="{{ csrf }}">
-                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete rule {{ rule.id }}?')">Delete</button>
+                                {# rule.id must not be interpolated into the JS string: HTML
+                                   entity escaping is undone by the attribute parser before the
+                                   JS engine sees it. #}
+                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this rule?')">Delete</button>
                             </form>
                             {% endif %}
                         </div>

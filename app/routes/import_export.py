@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import sqlite3 as sqlite3_stdlib
 import tempfile
 from contextlib import closing
@@ -22,6 +23,7 @@ from fastapi.responses import (
 from fastapi.templating import Jinja2Templates
 from starlette.datastructures import UploadFile
 
+from app.config import config as encryption_config
 from app.models.domain import ReturnRun
 from app.route_helpers.csrf import get_csrf_token, verify_csrf
 from app.route_helpers.db_state import load_run_from_row, locked_database_response
@@ -68,6 +70,11 @@ async def import_csv_submit(request: Request) -> Response:
     fd = await request.form()
     verify_csrf(request, str(fd.get("csrf_token", "")))
     csv_text = str(fd.get("csv_text", "") or "")
+    if len(csv_text.encode("utf-8", errors="ignore")) > MAX_IMPORT_BYTES:
+        return HTMLResponse(
+            f"CSV text too large (max {MAX_IMPORT_BYTES // (1024 * 1024)} MB)",
+            status_code=400,
+        )
     record_type = str(fd.get("record_type", "W2") or "W2")
     records_raw, errors = import_csv_records(csv_text, record_type)
     csrf = get_csrf_token(request)
@@ -241,22 +248,29 @@ async def restore_database(request: Request) -> Response:
             f"File too large (max {MAX_RESTORE_BYTES // (1024 * 1024)} MB)",
             status_code=400,
         )
-    if not content[:16].startswith(b"SQLite format 3"):
+    is_plaintext_sqlite = content[:16].startswith(b"SQLite format 3")
+    if not is_plaintext_sqlite and not encryption_config.enabled:
         return HTMLResponse("Not a valid SQLite database file", status_code=400)
 
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-        tmp.write(content)
-        tmp_path = tmp.name
-    try:
-        test_conn = sqlite3_stdlib.connect(tmp_path)
-        result = test_conn.execute("PRAGMA integrity_check").fetchone()
-        test_conn.close()
-        if not result or result[0] != "ok":
+    if is_plaintext_sqlite:
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        try:
+            test_conn = sqlite3_stdlib.connect(tmp_path)
+            result = test_conn.execute("PRAGMA integrity_check").fetchone()
+            test_conn.close()
+            if not result or result[0] != "ok":
+                return HTMLResponse(
+                    "Uploaded file is not a valid SQLite database", status_code=400
+                )
+        except Exception:
             return HTMLResponse("Uploaded file is not a valid SQLite database", status_code=400)
-    except Exception:
-        return HTMLResponse("Uploaded file is not a valid SQLite database", status_code=400)
-    finally:
-        Path(tmp_path).unlink(missing_ok=True)
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+    # else: with encryption enabled the upload may be a SQLCipher backup,
+    # whose header is indistinguishable from random bytes. init_db() below
+    # verifies it with the active password; failure rolls back.
 
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     backup_copy = DB_PATH.with_suffix(".pre_restore_backup") if DB_PATH.exists() else None
@@ -264,12 +278,29 @@ async def restore_database(request: Request) -> Response:
         import shutil
 
         shutil.copy2(DB_PATH, backup_copy)
-    DB_PATH.write_bytes(content)
+
+    # Write to a temp file in the same directory and swap atomically, and
+    # drop stale WAL/SHM sidecars: the app runs in WAL mode, and replacing
+    # only the main file could let SQLite replay the OLD database's WAL
+    # frames into the restored file on next open.
+    with tempfile.NamedTemporaryFile(
+        dir=DB_PATH.parent, suffix=".restore.tmp", delete=False
+    ) as tmp:
+        tmp.write(content)
+        tmp.flush()
+        os.fsync(tmp.fileno())
+        staged_path = Path(tmp.name)
+    for suffix in ("-wal", "-shm"):
+        Path(str(DB_PATH) + suffix).unlink(missing_ok=True)
+    os.replace(staged_path, DB_PATH)
+
     try:
         init_db()
     except Exception as exc:
         if backup_copy and backup_copy.exists():
-            backup_copy.rename(DB_PATH)
+            for suffix in ("-wal", "-shm"):
+                Path(str(DB_PATH) + suffix).unlink(missing_ok=True)
+            os.replace(backup_copy, DB_PATH)
         return PlainTextResponse(
             f"Restore failed — original database has been preserved. Error: {exc}. "
             "If the backup is encrypted, ensure the same password is active.",

@@ -306,7 +306,10 @@ def taxpayer_has_form_data(taxpayer: Taxpayer) -> bool:
 
 def parse_tax_input_from_form(fd: FormData, available_years: Sequence[int]) -> TaxReturnInput:
     """Convert raw multi-part form data into a validated TaxReturnInput."""
-    tax_year = int(str(fd.get("tax_year", "2024") or "2024"))
+    raw_year = str(fd.get("tax_year", "2024") or "2024").strip()
+    if not raw_year.isdigit():
+        raise ValueError(f"Unsupported tax year: {raw_year!r}")
+    tax_year = int(raw_year)
     if tax_year not in available_years:
         raise ValueError(f"Unsupported tax year: {tax_year}")
     filing_status = FilingStatus(str(fd.get("filing_status", "mfj") or "mfj"))
@@ -320,8 +323,16 @@ def parse_tax_input_from_form(fd: FormData, available_years: Sequence[int]) -> T
     if filing_status == FilingStatus.MFJ:
         if has_spouse_data:
             taxpayers.append(spouse)
-    elif filing_status == FilingStatus.MFS and has_spouse_data:
-        raise ValueError("MFS is per-person; submit each spouse as a separate run")
+    elif has_spouse_data:
+        # The spouse section stays in the DOM when the status dropdown
+        # changes; silently dropping its income/withholding would save a
+        # confidently wrong run.
+        if filing_status == FilingStatus.MFS:
+            raise ValueError("MFS is per-person; submit each spouse as a separate run")
+        raise ValueError(
+            f"Spouse information was submitted but filing status is "
+            f"{filing_status.value}; clear the spouse section or choose MFJ"
+        )
 
     adjustments = AdjustmentsData(
         student_loan_interest=form_money(fd, "adj_student_loan"),
@@ -341,7 +352,14 @@ def parse_tax_input_from_form(fd: FormData, available_years: Sequence[int]) -> T
     )
 
     raw_children = str(fd.get("qualifying_children", "0")).strip()
-    qualifying_children = min(int(raw_children), 20) if raw_children.isdigit() else 0
+    if not raw_children:
+        qualifying_children = 0
+    elif raw_children.isdigit():
+        qualifying_children = min(int(raw_children), 20)
+    else:
+        # Silently coercing "-1" or "2.0" to 0 wiped the child tax credit
+        # without feedback.
+        raise ValueError("Qualifying children must be a whole number of 0 or more")
 
     return TaxReturnInput(
         tax_year=tax_year,
