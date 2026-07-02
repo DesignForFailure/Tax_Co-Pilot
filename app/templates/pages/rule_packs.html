@@ -128,9 +128,9 @@
                             <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}" class="btn btn-sm">View</a>
                             <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/export" class="btn btn-sm btn-outline">Export</a>
                             {% if pack.is_custom %}
-                            <form method="POST" action="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/delete" class="inline-form">
+                            <form method="POST" action="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/delete" class="inline-form" data-confirm="Delete pack {{ pack.variant }}? This cannot be undone.">
                                 <input type="hidden" name="csrf_token" value="{{ csrf }}">
-                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete pack {{ pack.variant }}? This cannot be undone.')">Delete</button>
+                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                             </form>
                             {% endif %}
                         </div>

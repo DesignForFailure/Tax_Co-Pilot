@@ -305,7 +305,9 @@ def test_security_headers_present() -> None:
     assert "Permissions-Policy" in resp.headers
     assert "Content-Security-Policy" in resp.headers
     csp = resp.headers.get("Content-Security-Policy", "")
-    assert "script-src 'self' 'unsafe-inline'" in csp
+    assert "script-src 'self'" in csp
+    assert "style-src 'self'" in csp
+    assert "unsafe-inline" not in csp
     assert "unpkg.com" not in csp
     assert resp.headers.get("Cache-Control") == "no-store"
 

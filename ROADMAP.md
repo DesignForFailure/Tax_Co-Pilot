@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–13 complete; Phase 1 continues with M14–M15.
+**Status:** Late Alpha — milestones 1–14 complete; Phase 1 concludes with M15.
 **SemVer line:** `0.1.x`
-**Test suite:** 373 passing, 4 skipped, 0 failures.
+**Test suite:** 382 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -163,6 +163,8 @@ main.py                      # App factory, lifespan, middleware, router include
 ---
 
 ### M14: Remove `unsafe-inline` from CSP
+
+**Status:** Complete on 2026-07-02. All inline CSS/JS extracted to `app/static/`; CSP is now `script-src 'self'; style-src 'self'`. Inline event handlers (`onclick=`/`onchange=`/`onsubmit=`) were also removed (they are blocked by `script-src 'self'` too) in favor of delegated listeners and `data-*` attributes; per-request data (state lists, editor row counts) travels via `data-*` attributes instead of Jinja-generated scripts. Enforced by `tests/test_milestone14_csp.py` and verified interactively in Chromium under the strict policy.
 
 **Goal:** Eliminate `'unsafe-inline'` from both `script-src` and `style-src` in the Content-Security-Policy header by extracting all inline CSS and JavaScript to external static files.
 
@@ -555,6 +557,42 @@ These milestones fix known calculation inaccuracies.
 - NY: NYC income tax, Yonkers surcharge
 - GA: Low-income credit
 
+### M24: Military-Specific Tax Calculations
+
+**Goal:** Model the federal tax treatment of U.S. armed forces members: the combat zone pay exclusion and the military-only deductions that survive TCJA. Verify every parameter against IRS Publication 3 (Armed Forces' Tax Guide) for the target tax year.
+
+**Depends on:** M12 (routes split). The EITC combat-pay election additionally depends on M19 (EITC).
+
+**What to build:**
+
+1. **Domain model inputs** (`app/models/domain.py`) — per-taxpayer military service data:
+   - `nontaxable_combat_pay: Decimal` — W-2 Box 12 code Q amount (already excluded from Box 1 wages by the employer; the engine must *not* re-subtract it from wages).
+   - `is_commissioned_officer: bool` — officers' monthly exclusion is capped; enlisted members and warrant officers exclude all pay for qualifying months (IRC §112(a)–(b)).
+   - `combat_zone_months: int` — months (or part-months, which count as full months) served in a designated combat zone.
+   - `active_duty_moving_expenses: Decimal` — unreimbursed PCS moving expenses (Form 3903). Military moves remain deductible post-TCJA (IRC §217(g)).
+   - `reservist_travel_expenses: Decimal` — overnight travel >100 miles for reserve duty (above-the-line, IRC §62(a)(2)(E)).
+
+2. **Officer exclusion cap validation** — commissioned officers' monthly exclusion is limited to the highest enlisted pay rate plus hostile fire / imminent danger pay for that month (2024: $9,736.50 + $225 per month; confirm against the year's rate tables). Add a `fed.YYYY.military.officer_exclusion_cap` constant per year pack and flag (in trace output) when the reported Box 12 Q amount exceeds `cap × combat_zone_months` for an officer.
+
+3. **Rules** (`fed.YYYY.military.*` namespace in the federal rule packs):
+   - `fed.YYYY.adjustments.military_moving` — Form 3903 amount flows into the AGI adjustments sum.
+   - `fed.YYYY.adjustments.reservist_travel` — above-the-line adjustment.
+   - Trace entries must show the exclusion, caps applied, and form-line mapping (1040 Schedule 1).
+
+4. **EITC combat pay election (with M19):** taxpayers may elect to *include* nontaxable combat pay in earned income when it increases EITC (IRC §32(c)(2)(B)(vi)). Compute EITC both ways (with and without the election, all-or-nothing per taxpayer) and take the higher credit; record the election in the trace.
+
+5. **What-if integration:** expose the EITC election as a scenario in `WhatIfEngine` so members can see both outcomes.
+
+6. **Out of scope (document explicitly):** filing-deadline extensions for combat service (IRC §7508 — administrative, not computational), veterans' disability compensation (never on a W-2), state military pay exemptions and SCRA residency rules (follow-on state milestone).
+
+**Acceptance criteria:**
+- Combat pay reported via Box 12 Q stays excluded from federal wages and taxable income, with a trace node documenting the exclusion.
+- Officer cap warnings appear when Q exceeds the monthly cap × qualifying months.
+- Military moving expenses and reservist travel expenses reduce AGI as adjustments.
+- With M19 in place, the EITC combat-pay election picks whichever treatment yields the larger credit.
+- Golden test vectors sourced from IRS Pub 3 examples.
+- `ruff check . && mypy . && pytest` clean.
+
 ---
 
 ## Versioning & Release Trajectory
@@ -585,4 +623,6 @@ Phase 4 (after Phase 1; M20 depends on M16):
   M21 (dependent care)       — independent, can start after M12
   M22 (NIIT)                 — independent, can start after M12 (simple formula rule)
   M23 (state credits)        — independent, can start after M12
+  M24 (military provisions)  — core exclusion/adjustments after M12;
+                               EITC combat-pay election depends on M19
 ```

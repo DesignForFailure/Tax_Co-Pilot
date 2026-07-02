@@ -25,7 +25,7 @@
             <h2>Comparison Mode</h2>
             <p id="compare-hint" class="text-dim text-sm">Check exactly two runs, then open the comparison view.</p>
         </div>
-        <button class="btn btn-sm btn-outline" onclick="compareSelected()">Compare Selected</button>
+        <button class="btn btn-sm btn-outline" data-compare-selected>Compare Selected</button>
     </div>
 </div>
 {% endif %}
@@ -37,20 +37,20 @@
             <p class="text-dim text-sm">Export the run history, back up the database, or import validated files into the local store.</p>
         </div>
     </div>
-    <div class="action-row" style="margin-bottom: 14px;">
+    <div class="action-row u-mb-14">
         <a href="/export-all" class="btn btn-sm btn-outline">Export All Runs (JSON)</a>
         <a href="/backup" class="btn btn-sm btn-outline">Backup Database</a>
     </div>
     <div class="action-row">
-        <form method="POST" action="/import-returns" enctype="multipart/form-data" class="action-row" style="margin: 0;">
+        <form method="POST" action="/import-returns" enctype="multipart/form-data" class="action-row">
             <input type="hidden" name="csrf_token" value="{{ csrf }}">
-            <input type="file" name="file" accept=".json" style="font-size:12px; max-width: 220px;">
+            <input type="file" name="file" accept=".json" class="input-file-compact">
             <button type="submit" class="btn btn-sm btn-outline">Import Runs</button>
         </form>
-        <form method="POST" action="/restore" enctype="multipart/form-data" class="action-row" style="margin: 0;"
-              onsubmit="return confirm('This will REPLACE your entire database. All current runs will be lost. Continue?')">
+        <form method="POST" action="/restore" enctype="multipart/form-data" class="action-row"
+              data-confirm="This will REPLACE your entire database. All current runs will be lost. Continue?">
             <input type="hidden" name="csrf_token" value="{{ csrf }}">
-            <input type="file" name="file" accept=".db,.sqlite" style="font-size:12px; max-width: 220px;">
+            <input type="file" name="file" accept=".db,.sqlite" class="input-file-compact">
             <button type="submit" class="btn btn-sm btn-danger">Restore Database</button>
         </form>
     </div>
@@ -62,7 +62,7 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th style="width: 52px;">Select</th>
+                        <th class="col-select">Select</th>
                         <th>Created</th>
                         <th>Filing Status</th>
                         <th>Rule Pack</th>
@@ -74,7 +74,7 @@
                 {% for r in runs %}
                     <tr>
                         <td>
-                            <input type="checkbox" class="compare-cb" value="{{ r.id }}" onchange="updateCompare()">
+                            <input type="checkbox" class="compare-cb" value="{{ r.id }}">
                         </td>
                         <td>{{ r.created_at }}</td>
                         <td>{{ r.filing_status }}</td>
@@ -88,11 +88,11 @@
                             </form>
                         </td>
                         <td class="align-right">
-                            <div class="action-row" style="justify-content: flex-end;">
+                            <div class="action-row justify-end">
                                 <a href="/runs/{{ r.id }}" class="btn btn-sm">View</a>
                                 <a href="/runs/{{ r.id }}/audit" class="btn btn-sm btn-outline">Audit</a>
-                                <form method="POST" action="/runs/{{ r.id }}/delete" style="display:inline;"
-                                      onsubmit="return confirm('Delete this run? This cannot be undone.')">
+                                <form method="POST" action="/runs/{{ r.id }}/delete" class="inline-form-plain"
+                                      data-confirm="Delete this run? This cannot be undone.">
                                     <input type="hidden" name="csrf_token" value="{{ csrf }}">
                                     <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                                 </form>
@@ -109,42 +109,8 @@
     {% endif %}
 </div>
 
-<script>
-function updateCompare() {
-    var boxes = document.querySelectorAll('.compare-cb:checked');
-    var hint = document.getElementById('compare-hint');
-    if (hint) {
-        if (boxes.length === 0) {
-            hint.textContent = 'Check exactly two runs, then open the comparison view.';
-        } else if (boxes.length === 1) {
-            hint.textContent = 'Select one more run to enable a side-by-side comparison.';
-        } else {
-            hint.textContent = 'Two runs selected. Open the comparison view when ready.';
-        }
-    }
-}
+{% endblock %}
 
-document.addEventListener('change', function(e) {
-    if (!e.target.classList.contains('compare-cb')) return;
-    var boxes = document.querySelectorAll('.compare-cb:checked');
-    if (boxes.length > 2) {
-        e.target.checked = false;
-    }
-    updateCompare();
-});
-
-function compareSelected() {
-    var boxes = document.querySelectorAll('.compare-cb:checked');
-    if (boxes.length !== 2) {
-        alert('Please select exactly two runs to compare.');
-        return;
-    }
-    var a = boxes[0].value;
-    var b = boxes[1].value;
-    window.location.href = '/runs/compare?a=' + encodeURIComponent(a) + '&b=' + encodeURIComponent(b);
-}
-
-document.addEventListener('DOMContentLoaded', updateCompare);
-</script>
-
+{% block scripts %}
+<script src="/static/js/compare.js"></script>
 {% endblock %}

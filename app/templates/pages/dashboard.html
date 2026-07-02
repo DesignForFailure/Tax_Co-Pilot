@@ -41,7 +41,7 @@ $$$$$$$$╱______   __    __       ╱$$$$$$  │  ______          $$$$$$$  │$
     <div class="stack-lg">
         <div>
             <div class="eyebrow">{% if is_latest %}Latest saved run{% else %}Run detail{% endif %}</div>
-            <h2 class="card-title" style="font-size: 2rem; margin-bottom: 8px;">
+            <h2 class="card-title card-title-lg">
                 Federal{% if run.state_outputs %} + state{% endif %} return snapshot
             </h2>
             <p class="page-subtitle">
@@ -134,7 +134,7 @@ $$$$$$$$╱______   __    __       ╱$$$$$$  │  ______          $$$$$$$  │$
         </div>
     </div>
     {% for st in run.state_outputs %}
-    <div class="stack-sm" {% if not loop.first %}style="margin-top: 22px;"{% endif %}>
+    <div class="stack-sm{% if not loop.first %} u-mt-22{% endif %}">
         <h3>{{ st.state }} State Return</h3>
         <div class="summary-grid">
             {% for label, val in [
@@ -186,14 +186,14 @@ $$$$$$$$╱______   __    __       ╱$$$$$$  │  ______          $$$$$$$  │$
         <div class="trace-body">
             {% for t in run.trace[:6] %}
             <div class="trace-preview-item">
-                <div style="display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                <div class="row-between">
                     <div>
                         <div class="trace-summary-title">{{ t.rule_id }}</div>
                         <div class="text-dim text-sm">{{ t.description }}</div>
                     </div>
                     <div class="trace-result">{{ t.result["value"] }}</div>
                 </div>
-                <p class="text-dim text-sm" style="margin-top: 8px;">{{ t.explanation }}</p>
+                <p class="text-dim text-sm u-mt-8">{{ t.explanation }}</p>
             </div>
             {% endfor %}
         </div>
@@ -220,7 +220,7 @@ $$$$$$$$╱______   __    __       ╱$$$$$$  │  ______          $$$$$$$  │$
     <div class="stack-lg">
         <div>
             <div class="eyebrow">Ready to begin</div>
-            <h2 class="card-title" style="font-size: 2rem; margin-bottom: 8px;">Create a run, then return here for the summary.</h2>
+            <h2 class="card-title card-title-lg">Create a run, then return here for the summary.</h2>
             <p class="page-subtitle">
                 Saved calculations flow back into this dashboard automatically. Once you have a run, this page will show the
                 federal summary, any state outputs, and a compact audit preview with a dedicated full-trace page.
