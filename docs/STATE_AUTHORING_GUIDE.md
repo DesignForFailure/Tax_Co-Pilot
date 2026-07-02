@@ -89,7 +89,7 @@ The `{ ref: "fed.2024.agi.total" }` syntax tells the engine to resolve the value
 
 ## 6. Rule Types
 
-Tax Co-Pilot supports four rule types. Here is a brief example of each.
+Tax Co-Pilot supports five rule types (see the [Rule Pack Authoring Guide](RULE_PACK_AUTHORING.md) for `matrix_lookup`). Here is a brief example of the four most common.
 
 ### formula
 

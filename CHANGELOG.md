@@ -12,6 +12,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 _Nothing yet._
 
+## [0.3.0] - 2026-07-02
+
+Phase 2 (capability expansion, milestone 16) is complete; per the roadmap the version line is promoted to `0.3.0`.
+
+### Added
+- **Roadmap v2 Milestone 16 (complete): `matrix_lookup` rule type.** Rules can now index nested constant tables by two or more keys simultaneously (e.g. filing status × number of children — the shape EITC parameter tables need). The loader validates that `keys` lists at least two reference entries and that `table` nests exactly as deep as the key list with numeric-string leaves (non-string YAML keys are rejected with quoting guidance). The evaluator canonicalizes numeric key values (a rounded `2.00` indexes key `"2"`), participates in dependency ordering via `{ref: ...}` keys, emits a `TraceNode` recording the full lookup path, and fails unknown key paths with the dimension, failing key, and available options. Documented in `docs/RULE_PACK_AUTHORING.md` §4.5; covered by `tests/test_matrix_lookup.py` (22 tests). The web rule editor rejects `matrix_lookup` edits with a clear message instead of silently rewriting the rule shape (no form section for nested tables yet).
+
 ## [0.2.0] - 2026-07-02
 
 Phase 1 (structural hardening, milestones 12–15) is complete; per the roadmap the version line is promoted from `0.1.x` to `0.2.0`.

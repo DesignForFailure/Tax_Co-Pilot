@@ -38,7 +38,7 @@ ruff check . && mypy . && pytest
 
 - **`app/engine/`** — Tax computation logic only. No persistence, no I/O.
   - `calculator.py` — Deterministic CalculationEngine: normalizes inputs to `resolved[...]` namespace, evaluates rules in topological order using Decimal math, produces TraceNodes.
-  - `rule_loader.py` — Loads YAML rule packs, validates expressions against an allowlist, computes SHA-256 checksums, topologically sorts rules. Four rule types: `sum`, `formula`, `lookup`, `bracket_table`.
+  - `rule_loader.py` — Loads YAML rule packs, validates expressions against an allowlist, computes SHA-256 checksums, topologically sorts rules. Five rule types: `sum`, `formula`, `lookup`, `bracket_table`, `matrix_lookup`.
   - `whatif.py` — WhatIfEngine for scenario comparison (e.g., MFJ vs MFS).
 
 - **`app/services/`** — Persistence, encryption, adapters. No tax/business logic.

@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–15 complete; Phase 1 (structural hardening) is done. Next up: Phase 2 (M16).
-**SemVer line:** `0.2.x` (promoted from `0.1.x` on Phase 1 completion, per the release trajectory below).
-**Test suite:** 396 passing, 4 skipped, 0 failures.
+**Status:** Late Alpha — milestones 1–16 complete; Phases 1 and 2 are done. Next up: Phase 3 tax correctness (M17/M18, then M19).
+**SemVer line:** `0.3.x` (promoted on Phase 2 completion, per the release trajectory below).
+**Test suite:** 418 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -285,6 +285,8 @@ main.py                      # App factory, lifespan, middleware, router include
 These milestones add missing engine capabilities that unlock blocked features.
 
 ### M16: Multi-Dimensional Rule Lookups
+
+**Status:** Complete on 2026-07-02. `matrix_lookup` is the fifth rule type: `keys` (2+ reference entries) index a nested `table` validated to the exact key depth with numeric-string leaves; numeric key values are canonicalized (a `2.00` result indexes key `"2"`); `{ref: ...}` keys participate in topological ordering and bare-string keys resolve lazily; unknown key paths fail with the dimension, key, and available options; the trace records the full lookup path. Documented in `docs/RULE_PACK_AUTHORING.md` §4.5. The web rule editor intentionally rejects `matrix_lookup` edits (no form section yet — edit the YAML); version promoted to `0.3.0` (Phase 2 complete).
 
 **Goal:** Add a `matrix_lookup` rule type to the engine so rules can index by two or more keys simultaneously. This unblocks EITC and any future credit/deduction with multi-dimensional phase-in/phase-out tables.
 

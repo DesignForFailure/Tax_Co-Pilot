@@ -81,7 +81,7 @@ The loader enforces this at load time — a rule whose ID does not start with th
 
 ---
 
-## 4. The Four Rule Types
+## 4. The Five Rule Types
 
 ### 4.1 `formula` — Arithmetic over named inputs
 
@@ -188,6 +188,37 @@ Bracket rules:
 - Each filing status must be a non-empty list.
 - Required fields per bracket entry: `lower`, `rate`. (`upper` is optional only for the final bracket.)
 - The `tables` mapping must include every filing status your users may file under.
+
+### 4.5 `matrix_lookup` — Multi-dimensional constant lookup
+
+Indexes a nested table by two or more keys at once — for example filing status × number of children, the shape the Earned Income Credit parameter tables need. Each entry in `keys` is resolved in order and selects the next level of the `table` mapping.
+
+```yaml
+- id: "fed.2024.credits.eic.max_credit"
+  description: "EIC maximum credit by filing status and children"
+  type: "matrix_lookup"
+  keys:
+    - "input.filing_status"
+    - { ref: "fed.2024.credits.eic.num_children" }
+  table:
+    single:
+      "0": "632"
+      "1": "4213"
+      "2": "6960"
+      "3": "7830"
+    mfj:
+      "0": "632"
+      "1": "4213"
+      "2": "6960"
+      "3": "7830"
+```
+
+Matrix lookup rules:
+- `keys` must list **at least two** entries. Each entry is a reference string (`"input.filing_status"`, a rule id) or a `{ ref: ... }` mapping.
+- `table` must nest exactly as deep as `keys` is long: one mapping level per key, with numeric string leaves.
+- Table keys must be **strings** — quote numeric keys in YAML (`"2":` not `2:`). Numeric key values are canonicalized before lookup, so a rule result of `2.00` indexes key `"2"`.
+- Like `lookup`, matrix rules return the raw table value and do not need `rounding` or `inputs` fields.
+- An unknown key value fails the calculation with an error naming the dimension, the failing key, and the available keys — clamp open-ended inputs (e.g. `min(children, 3)`) with an upstream `formula` rule.
 
 ---
 
