@@ -36,13 +36,13 @@ CSRF = "test-csrf-token"
 def test_2023_pack_loads_correct_year() -> None:
     assert FED_2023.tax_year == 2023
     assert FED_2023.jurisdiction == "federal"
-    assert len(FED_2023.rules) == 46
+    assert len(FED_2023.rules) == 49
 
 
 def test_2024_pack_loads_correct_year() -> None:
     assert FED_2024.tax_year == 2024
     assert FED_2024.jurisdiction == "federal"
-    assert len(FED_2024.rules) == 46
+    assert len(FED_2024.rules) == 49
 
 
 # ─── 2023 Federal golden tests ───────────────────────────────
@@ -170,6 +170,7 @@ def test_2023_trace_completeness() -> None:
         "fed.2023.gross_income.interest",
         "fed.2023.gross_income.dividends",
         "fed.2023.gross_income.capital_gains",
+        "fed.2023.gross_income.capital_loss_limit",
         "fed.2023.gross_income.capital_gains_limited",
         "fed.2023.gross_income.self_employment",
         "fed.2023.gross_income.other",
@@ -197,6 +198,7 @@ def test_2023_trace_completeness() -> None:
         "fed.2023.itemized.medical",
         "fed.2023.itemized.mortgage_interest",
         "fed.2023.itemized.charitable_agi_cap",
+        "fed.2023.itemized.charitable_noncash_agi_cap",
         "fed.2023.itemized.charitable",
         "fed.2023.itemized.total",
         "fed.2023.deductions.applied",
@@ -204,6 +206,7 @@ def test_2023_trace_completeness() -> None:
         "fed.2023.tax.brackets",
         "fed.2023.credits.ctc.base",
         "fed.2023.credits.ctc.threshold",
+        "fed.2023.credits.ctc.phaseout_units",
         "fed.2023.credits.ctc.phaseout",
         "fed.2023.credits.ctc.final",
         "fed.2023.credits.total",

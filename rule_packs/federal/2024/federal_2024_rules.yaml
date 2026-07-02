@@ -16,6 +16,12 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 constants:
+  capital_loss_limit:
+    single: "-3000"
+    mfj: "-3000"
+    mfs: "-1500"
+    hoh: "-3000"
+    qss: "-3000"
   standard_deduction:
     single: "14600"
     mfj: "29200"
@@ -109,14 +115,21 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
+  - id: "fed.2024.gross_income.capital_loss_limit"
+    description: "Capital loss deduction limit (IRC 1211(b): -$1,500 for MFS)"
+    form_line: "1040 Line 7"
+    type: "lookup"
+    table: "constants.capital_loss_limit"
+    key: { ref: "input.filing_status" }
+
   - id: "fed.2024.gross_income.capital_gains_limited"
-    description: "Net capital gains after loss limitation (-$3,000 max loss)"
+    description: "Net capital gains after loss limitation (-$3,000; -$1,500 MFS)"
     form_line: "1040 Line 7"
     type: "formula"
     expression: "max(gains, neg_limit)"
     inputs:
       gains: { ref: "fed.2024.gross_income.capital_gains" }
-      neg_limit: { literal: "-3000" }
+      neg_limit: { ref: "fed.2024.gross_income.capital_loss_limit" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
@@ -167,31 +180,37 @@ rules:
     rounding_precision: 2
 
   - id: "fed.2024.gross_income.ss_provisional"
-    description: "Provisional income for SS taxability (non-SS income + 50% benefits)"
+    description: "Provisional income for SS taxability (Pub 915 WS1 Line 8: non-SS income incl. tax-exempt interest + 50% benefits - adjustments other than student loan interest)"
     form_line: "SS Worksheet Line 6"
     type: "formula"
-    expression: "wages + interest + dividends + gains + se + other + half_ss"
+    expression: "wages + interest + tax_exempt + dividends + gains + se + other + half_ss - educator - hsa - ira - se_tax"
     inputs:
       wages: { ref: "fed.2024.gross_income.wages" }
       interest: { ref: "fed.2024.gross_income.interest" }
+      tax_exempt: { ref: "input.1099int.tax_exempt" }
       dividends: { ref: "fed.2024.gross_income.dividends" }
       gains: { ref: "fed.2024.gross_income.capital_gains_limited" }
       se: { ref: "fed.2024.gross_income.self_employment" }
       other: { ref: "fed.2024.gross_income.other" }
       half_ss: { ref: "fed.2024.gross_income.ss_half_benefits" }
+      educator: { ref: "fed.2024.adjustments.educator" }
+      hsa: { ref: "fed.2024.adjustments.hsa" }
+      ira: { ref: "fed.2024.adjustments.ira" }
+      se_tax: { ref: "fed.2024.adjustments.se_tax" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
   - id: "fed.2024.gross_income.ss_lower_calc"
-    description: "SS taxability lower-tier amount (50% of provisional above base)"
+    description: "SS taxability lower-tier amount (50% of provisional above base, capped at 50% of benefits)"
     form_line: "SS Worksheet Line 10"
     type: "formula"
-    expression: "max(min((prov - base) * rate, (upper - base) * rate), zero)"
+    expression: "max(min((prov - base) * rate, (upper - base) * rate, half_ss), zero)"
     inputs:
       prov: { ref: "fed.2024.gross_income.ss_provisional" }
       base: { ref: "fed.2024.gross_income.ss_base_threshold" }
       upper: { ref: "fed.2024.gross_income.ss_upper_threshold" }
       rate: { literal: "0.50" }
+      half_ss: { ref: "fed.2024.gross_income.ss_half_benefits" }
       zero: { literal: "0" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
@@ -394,15 +413,27 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
+  - id: "fed.2024.itemized.charitable_noncash_agi_cap"
+    description: "30% of AGI cap for noncash charitable contributions"
+    form_line: "Schedule A"
+    type: "formula"
+    expression: "agi * rate"
+    inputs:
+      agi: { ref: "fed.2024.agi.total" }
+      rate: { literal: "0.30" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
   - id: "fed.2024.itemized.charitable"
-    description: "Charitable contributions (cash capped at 60% AGI + noncash)"
+    description: "Charitable contributions (cash capped at 60% AGI, noncash at 30% AGI)"
     form_line: "Schedule A Line 14"
     type: "formula"
-    expression: "min(cash, agi_cap) + noncash"
+    expression: "min(cash, agi_cap) + min(noncash, noncash_cap)"
     inputs:
       cash: { ref: "input.itemized.charitable_cash" }
       noncash: { ref: "input.itemized.charitable_noncash" }
       agi_cap: { ref: "fed.2024.itemized.charitable_agi_cap" }
+      noncash_cap: { ref: "fed.2024.itemized.charitable_noncash_agi_cap" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
@@ -509,16 +540,27 @@ rules:
     table: "constants.ctc_phaseout_threshold"
     key: { ref: "input.filing_status" }
 
-  - id: "fed.2024.credits.ctc.phaseout"
-    description: "CTC phaseout reduction ($50 per $1,000 of AGI over threshold)"
+  - id: "fed.2024.credits.ctc.phaseout_units"
+    description: "AGI excess over CTC threshold in $1,000 units, rounded up to the next whole unit (Form 8812)"
     form_line: "CTC Worksheet"
     type: "formula"
-    expression: "max((agi - threshold) * rate, zero)"
+    expression: "max((agi - threshold) / thousand, zero)"
     inputs:
       agi: { ref: "fed.2024.agi.total" }
       threshold: { ref: "fed.2024.credits.ctc.threshold" }
-      rate: { literal: "0.05" }
+      thousand: { literal: "1000" }
       zero: { literal: "0" }
+    rounding: "ROUND_UP"
+    rounding_precision: 0
+
+  - id: "fed.2024.credits.ctc.phaseout"
+    description: "CTC phaseout reduction ($50 per $1,000 or fraction thereof of AGI over threshold)"
+    form_line: "CTC Worksheet"
+    type: "formula"
+    expression: "units * fifty"
+    inputs:
+      units: { ref: "fed.2024.credits.ctc.phaseout_units" }
+      fifty: { literal: "50" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
