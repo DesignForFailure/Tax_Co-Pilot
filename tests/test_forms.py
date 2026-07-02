@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Tests for Milestone 3: Forms Support.
 
 Covers: form_line on TraceNode, form data models, form mapper,

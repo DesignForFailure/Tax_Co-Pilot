@@ -11,6 +11,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Added
+- **Full-repository code review remediation (2026-07):** engine/loader hardening (runtime cycle detection and memoized rule evaluation, strict rounding-mode and bracket-table validation, reserved `input` namespace, state-pack prefix enforcement, rule-id charset validation), integrity-chain repair (stored-hash propagation in `verify_chain`, chain relinking on run deletion), CSV header validation, rule-editor validate-before-delete, atomic YAML/restore writes with WAL sidecar cleanup, spouse-data guard for non-MFJ filing statuses, and test isolation via `tests/conftest.py` (the suite previously wiped/replaced the real `data/tax_copilot.db`).
+- New regression/golden test suites: `test_engine_hardening.py`, `test_chain_integrity.py`, `test_services_hardening.py`, `test_web_hardening.py`, `test_federal_corrections.py`, `test_state_corrections.py`.
+
+### Rule pack corrections (affected packs bumped to 1.1.0)
+- **Federal 2023/2024/2025:** Social Security lower tier capped at 50% of benefits (Pub 915); provisional income now includes tax-exempt interest and subtracts non-student-loan adjustments; MFS capital loss limit −$1,500 (IRC §1211(b)); CTC phaseout rounds AGI excess up to the next $1,000 (Form 8812); noncash charitable contributions capped at 30% of AGI.
+- **GA 2024:** SB 56 standard deduction ($24,000 MFJ / $12,000 others), personal exemptions repealed — the pack previously used pre-2024 amounts, overstating GA tax. **GA 2023:** HoH now uses the MFJ bracket schedule; MFS exemption corrected to $3,700.
+- **CA 2024:** bracket thresholds updated from the 2023 to the 2024 FTB schedules; HoH now uses Schedule Z. **NY 2024:** middle-bracket rates corrected to 5.5%/6.0%; HoH now has its own schedule.
+- **NH 2024:** models the 3% Interest & Dividends tax (final year before repeal) instead of a no-tax stub.
+
+### Known limitations (documented, not yet modeled)
+- Qualified dividends and long-term capital gains are taxed at ordinary rates (no Qualified Dividends & Capital Gain Tax Worksheet yet).
+- No EITC, refundable ACTC, $500 credit for other dependents, or additional standard deduction for age 65+/blind.
+- GA dependent exemption ($4,000) not modeled; NY tax-benefit recapture above $107,650 NYAGI not modeled.
+- SQLCipher key handling caveat documented in `docs/ENCRYPTION.md` (raw-key interpretation for passwords whose UTF-8 form is exactly 32/48 bytes; `TAX_COPILOT_KEY_ITERATIONS` is pinned by `cipher_compatibility = 4`).
+
+### Added
 - **Roadmap v2 Milestone 12 (complete):** Split the `main.py` monolith into `app/routes/` and `app/route_helpers/`, keeping `main.py` as a 93-line app-wiring module and adding `tests/test_milestone12_structure.py` to guard the new boundary.
 - UI workspace refresh: added a dedicated landing page (`GET /`), moved the latest-run summary to `GET /dashboard`, and added `GET /runs/{run_id}/audit` for a full audit-trace page with collapsed rule-evaluation rows.
 - **Milestone 12 — Rule Pack Editor (complete):** GUI-based rule pack management system. Create, edit, clone, import, and export YAML rule packs via web UI. Standard packs are read-only; custom variants stored in `custom_vN/` subdirectories. Type-adaptive rule editor for sum, formula, lookup, and bracket_table rules with inline bracket table editing. Calculate form integration with variant selector dropdown. Full validation via `RulePack.load()` on every save. CSRF-protected POST routes. Path traversal protection on all route parameters.

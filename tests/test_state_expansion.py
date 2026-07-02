@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """State expansion tests — generalized engine, multi-state, and wiring."""
 
 from decimal import Decimal

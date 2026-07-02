@@ -392,3 +392,26 @@ For issues or questions:
 - **SQLCipher Version**: 4.x
 - **Python Cryptography**: `cryptography` library (Fernet)
 - **Keyring Support**: `keyring` library (SecretService, Keychain, WinCred)
+
+## Known Limitations (documented 2026-07 review)
+
+Two behaviors of the current SQLCipher integration are intentionally left
+unchanged because changing them would lock existing users out of their
+databases; both would require a keyed migration to fix.
+
+1. **Key encoding raw-key edge case.** Passwords are passed to SQLCipher as
+   `PRAGMA key = "x'<hex>'"` (hex of the UTF-8 password, chosen to prevent
+   SQL injection through quote characters). SQLCipher treats an `x'...'`
+   literal of exactly 64 hex characters as a **raw 32-byte key** (96 as raw
+   key + salt), skipping PBKDF2 entirely. Consequently, a password whose
+   UTF-8 encoding is exactly 32 or 48 bytes receives no key stretching.
+   Recommendation: avoid passwords of exactly 32 or 48 bytes until a keyed
+   migration lands.
+
+2. **`TAX_COPILOT_KEY_ITERATIONS` is currently inert.** Connections execute
+   `PRAGMA cipher_compatibility = 4` after `PRAGMA kdf_iter`, and the
+   compatibility pragma resets all cipher settings to SQLCipher v4 defaults
+   — including `kdf_iter = 256,000`. Every existing database was created
+   under those defaults, so the effective iteration count is 256,000
+   (stronger than the documented 100,000 default). Reordering the pragmas
+   would change the KDF and make existing databases unreadable.
