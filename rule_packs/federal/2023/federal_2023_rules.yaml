@@ -320,12 +320,15 @@ rules:
     rounding_precision: 2
 
   - id: "fed.2023.adjustments.se_tax"
-    description: "Self-employment tax deduction (user provides deductible half)"
+    description: "SE tax deduction: calculated employer-equivalent half when 1099-NEC income exists, else the manual input"
     form_line: "Schedule 1 Line 15"
     type: "formula"
-    expression: "input"
+    expression: "calc * gate + manual * (one - gate)"
     inputs:
-      input: { ref: "input.adjustments.self_employment_tax_deduction" }
+      calc: { ref: "fed.2023.se.deduction" }
+      gate: { ref: "fed.2023.se.has_nec" }
+      manual: { ref: "input.adjustments.self_employment_tax_deduction" }
+      one: { literal: "1" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
@@ -753,6 +756,120 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
+  - id: "fed.2023.se.has_nec"
+    description: "1 when any 1099-NEC self-employment income exists, else 0 (gates the SE deduction override)"
+    form_line: "Schedule SE"
+    type: "formula"
+    expression: "min(max(nec * mult, 0), one)"
+    inputs:
+      nec: { ref: "input.1099nec.compensation" }
+      mult: { literal: "1000" }
+      one: { literal: "1" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.se.net_earnings_raw"
+    description: "Net earnings from self-employment (92.35% of 1099-NEC income)"
+    form_line: "Schedule SE Line 4a"
+    type: "formula"
+    expression: "nec * factor"
+    inputs:
+      nec: { ref: "input.1099nec.compensation" }
+      factor: { literal: "0.9235" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.se.applies"
+    description: "SE tax $400 net-earnings floor (IRC 1402(b)(2)): 1 when net earnings reach $400, else 0. The 399.995 cutoff with a x1000 step puts the switch between representable cent values."
+    form_line: "Schedule SE Line 4c"
+    type: "formula"
+    expression: "min(max((net - cutoff) * mult, 0), one)"
+    inputs:
+      net: { ref: "fed.2023.se.net_earnings_raw" }
+      cutoff: { literal: "399.995" }
+      mult: { literal: "1000" }
+      one: { literal: "1" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.se.net_earnings"
+    description: "Net SE earnings subject to SE tax (zero below the $400 floor)"
+    form_line: "Schedule SE Line 6"
+    type: "formula"
+    expression: "raw * gate"
+    inputs:
+      raw: { ref: "fed.2023.se.net_earnings_raw" }
+      gate: { ref: "fed.2023.se.applies" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.se.ss_taxable"
+    description: "SE earnings subject to Social Security (2023 wage base $160200 reduced by W-2 wages)"
+    form_line: "Schedule SE Lines 8-9"
+    type: "formula"
+    expression: "max(min(net, base - wages), 0)"
+    inputs:
+      net: { ref: "fed.2023.se.net_earnings" }
+      base: { literal: "160200" }
+      wages: { ref: "input.w2.wages" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.se.ss_tax"
+    description: "Social Security portion of SE tax (12.4%)"
+    form_line: "Schedule SE Line 10"
+    type: "formula"
+    expression: "ss_taxable * rate"
+    inputs:
+      ss_taxable: { ref: "fed.2023.se.ss_taxable" }
+      rate: { literal: "0.124" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.se.medicare_tax"
+    description: "Medicare portion of SE tax (2.9%, no wage cap)"
+    form_line: "Schedule SE Line 11"
+    type: "formula"
+    expression: "net * rate"
+    inputs:
+      net: { ref: "fed.2023.se.net_earnings" }
+      rate: { literal: "0.029" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.se.total"
+    description: "Total self-employment tax (Schedule SE Line 12, reported via Schedule 2 Line 4)"
+    form_line: "1040 Line 23"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "fed.2023.se.ss_tax" }
+        - { ref: "fed.2023.se.medicare_tax" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.se.deduction"
+    description: "Deduction for one-half of SE tax (employer-equivalent portion)"
+    form_line: "Schedule SE Line 13"
+    type: "formula"
+    expression: "total * half"
+    inputs:
+      total: { ref: "fed.2023.se.total" }
+      half: { literal: "0.5" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.tax.total_liability"
+    description: "Total tax: income tax after credits plus self-employment tax"
+    form_line: "1040 Line 24"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "fed.2023.tax.after_credits" }
+        - { ref: "fed.2023.se.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
   - id: "fed.2023.total_withholding"
     description: "Total federal withholding"
     form_line: "1040 Line 25d"
@@ -789,6 +906,6 @@ rules:
     expression: "payments - tax"
     inputs:
       payments: { ref: "fed.2023.total_payments" }
-      tax: { ref: "fed.2023.tax.after_credits" }
+      tax: { ref: "fed.2023.tax.total_liability" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0

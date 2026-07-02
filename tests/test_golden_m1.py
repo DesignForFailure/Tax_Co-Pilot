@@ -470,6 +470,9 @@ def test_mixed_income_household() -> None:
     run = CalculationEngine(FED, inp).run()
 
     assert run.output.gross_income > Decimal("85000")
-    assert run.output.adjustments_total == Decimal("2800.00")
-    assert run.output.agi == run.output.gross_income - Decimal("2800.00")
+    # 2,500 student loan + 300 educator + 707 auto-calculated SE deduction
+    # (10,000 NEC x 92.35% x 15.3% / 2, rounded).
+    assert run.output.adjustments_total == Decimal("3507.00")
+    assert run.output.agi == run.output.gross_income - Decimal("3507.00")
+    assert run.output.self_employment_tax == Decimal("1413")
     assert run.output.federal_tax > Decimal("0")
