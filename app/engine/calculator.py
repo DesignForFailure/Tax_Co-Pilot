@@ -62,7 +62,11 @@ def _to_decimal(val: Any) -> Decimal:
 def _round(val: Decimal, mode: str, precision: int) -> Decimal:
     if precision < 0:
         raise ValueError(f"rounding_precision must be >= 0, got {precision}")
-    rm = ROUNDING_MODES.get(mode, ROUND_HALF_UP)
+    rm = ROUNDING_MODES.get(mode)
+    if rm is None:
+        # A silent fallback would apply a different mode than the audit
+        # trace records, so unknown modes must fail loudly.
+        raise RulePackError(f"Unsupported rounding mode: {mode!r}")
     if precision == 0:
         return val.quantize(Decimal("1"), rounding=rm)
     return val.quantize(Decimal(10) ** -precision, rounding=rm)
@@ -100,6 +104,7 @@ class CalculationEngine:
         self.resolved: dict[str, Decimal] = {}
         self.traces: list[TraceNode] = []
         self._filing_status: str = inputs.filing_status.value
+        self._evaluating: list[str] = []
 
     def run(self) -> ReturnRun:
         # 1) Normalize inputs into resolved values (engine inputs are also traceable).
@@ -163,6 +168,16 @@ class CalculationEngine:
 
         for state_code in sorted(self.state_packs):
             sp = self.state_packs[state_code]
+            expected_prefix = f"{state_code.lower()}."
+            if sp.id_prefix != expected_prefix:
+                # A pack declaring a foreign jurisdiction (e.g. "federal" or
+                # another state) could overwrite resolved values outside its
+                # namespace; the prefix must match the key it runs under.
+                raise RulePackError(
+                    f"State pack for {state_code!r} declares jurisdiction "
+                    f"{sp.jurisdiction!r} (prefix {sp.id_prefix!r}); expected "
+                    f"prefix {expected_prefix!r}"
+                )
             orig_pack = self.rp
             self.rp = sp
             try:
@@ -208,7 +223,9 @@ class CalculationEngine:
     def _resolve_inputs(self) -> None:
         self.resolved["input.w2.wages"] = self.inputs.total_wages()
         self.resolved["input.1099int.amount"] = self.inputs.total_interest()
+        self.resolved["input.1099int.tax_exempt"] = self.inputs.total_tax_exempt_interest()
         self.resolved["input.1099div.ordinary"] = self.inputs.total_dividends()
+        self.resolved["input.1099div.qualified"] = self.inputs.total_qualified_dividends()
         self.resolved["input.1099b.net_gain"] = self.inputs.total_capital_gains()
         self.resolved["input.withholding.federal"] = self.inputs.total_federal_withholding()
         self.resolved["input.1099nec.compensation"] = self.inputs.total_self_employment_income()
@@ -259,17 +276,32 @@ class CalculationEngine:
     # ─── Rule evaluation dispatch ───────────────────────────────
 
     def _evaluate_rule(self, rule: dict[str, Any]) -> None:
-        rule_type = rule.get("type")
-        if rule_type == "sum":
-            self._eval_sum(rule)
-        elif rule_type == "formula":
-            self._eval_formula(rule)
-        elif rule_type == "lookup":
-            self._eval_lookup(rule)
-        elif rule_type == "bracket_table":
-            self._eval_bracket_table(rule)
-        else:
-            raise RulePackError(f"Unknown rule type: {rule_type}")
+        rule_id = rule.get("id", "")
+        # Bare-string references can trigger on-demand evaluation ahead of the
+        # topological order (the loader only graphs {ref: ...} dicts), so a
+        # rule may be requested twice. Re-evaluating would append a duplicate
+        # TraceNode to the sealed run.
+        if rule_id in self.resolved:
+            return
+        if rule_id in self._evaluating:
+            cycle = " -> ".join([*self._evaluating, rule_id])
+            raise RulePackError(f"Rule dependency cycle detected at runtime: {cycle}")
+
+        self._evaluating.append(rule_id)
+        try:
+            rule_type = rule.get("type")
+            if rule_type == "sum":
+                self._eval_sum(rule)
+            elif rule_type == "formula":
+                self._eval_formula(rule)
+            elif rule_type == "lookup":
+                self._eval_lookup(rule)
+            elif rule_type == "bracket_table":
+                self._eval_bracket_table(rule)
+            else:
+                raise RulePackError(f"Unknown rule type: {rule_type}")
+        finally:
+            self._evaluating.pop()
 
     def _enforce_rule_namespace(self, rule_id: str) -> None:
         """Ensure the currently-active RulePack cannot write outside its namespace."""
@@ -303,7 +335,10 @@ class CalculationEngine:
             if "ref" in spec:
                 return self._resolve_ref(spec["ref"])
 
-        return _to_decimal(spec)
+        try:
+            return _to_decimal(spec)
+        except Exception as e:
+            raise RulePackError(f"Cannot resolve value spec: {spec!r}") from e
 
     # ─── Rule evaluators ───────────────────────────────────────
 

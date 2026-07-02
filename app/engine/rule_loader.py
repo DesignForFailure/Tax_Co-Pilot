@@ -42,6 +42,7 @@ import hashlib
 import re
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +55,14 @@ _ALLOWED_EXPR_CHARS = set(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_+-*/(),. "
 )
 _ALLOWED_FUNCS = {"max", "min"}
+_ALLOWED_ROUNDING_MODES = {"ROUND_HALF_UP", "ROUND_DOWN", "ROUND_UP"}
+# Rule ids flow into HTML templates and JS-string contexts; a conservative
+# charset keeps quotes, angle brackets, and whitespace out of that path.
+_RULE_ID_CHARSET_RE = re.compile(r"^[A-Za-z0-9_.\-]+$")
+# Prefixes owned by the engine ("input.") or reachable only through the
+# federal aliases ("fed.") must not be claimable via a free-form
+# jurisdiction string.
+_RESERVED_JURISDICTIONS = {"input", "inputs"}
 _LEGACY_NUMERIC_VERSION_RE = re.compile(
     r"^(0|[1-9]\d*)(?:\.(0|[1-9]\d*))?$"
 )
@@ -114,6 +123,8 @@ def _jurisdiction_prefix(jurisdiction: str) -> str:
     j = (jurisdiction or "").strip().lower()
     if j in {"federal", "fed", "us", "usa"}:
         return "fed."
+    if j in _RESERVED_JURISDICTIONS:
+        raise RulePackError(f"Jurisdiction {jurisdiction!r} is reserved")
     if len(j) == 2 and j.isalpha():
         return f"{j}."
     if j.isidentifier():
@@ -329,12 +340,41 @@ def _validate_bracket_table_rule(rule: dict[str, Any]) -> None:
             raise RulePackError(
                 f"Rule {rid} (bracket_table) tables[{status}] must be a non-empty list"
             )
-        for b in brackets:
+        # The evaluator walks brackets in order and stops at the first one
+        # whose lower bound exceeds income, so out-of-order, overlapping, or
+        # open-ended middle brackets silently compute the wrong tax.
+        prev_upper: Decimal | None = None
+        for i, b in enumerate(brackets):
             if not isinstance(b, dict):
                 raise RulePackError(f"Rule {rid} (bracket_table) has non-mapping bracket")
             for req in ("lower", "rate"):
                 if req not in b:
                     raise RulePackError(f"Rule {rid} (bracket_table) bracket missing '{req}'")
+            try:
+                lower = Decimal(str(b["lower"]))
+                upper = Decimal(str(b["upper"])) if b.get("upper") is not None else None
+                Decimal(str(b["rate"]))
+            except InvalidOperation as e:
+                raise RulePackError(
+                    f"Rule {rid} (bracket_table) tables[{status}] bracket {i} "
+                    f"has a non-numeric bound or rate"
+                ) from e
+            if upper is None and i != len(brackets) - 1:
+                raise RulePackError(
+                    f"Rule {rid} (bracket_table) tables[{status}] bracket {i} "
+                    f"omits 'upper' but is not the last bracket"
+                )
+            if upper is not None and upper <= lower:
+                raise RulePackError(
+                    f"Rule {rid} (bracket_table) tables[{status}] bracket {i} "
+                    f"has upper {upper} <= lower {lower}"
+                )
+            if prev_upper is not None and lower < prev_upper:
+                raise RulePackError(
+                    f"Rule {rid} (bracket_table) tables[{status}] bracket {i} "
+                    f"overlaps the previous bracket (lower {lower} < previous upper {prev_upper})"
+                )
+            prev_upper = upper
 
 
 def _validate_formula_rule(rule: dict[str, Any]) -> None:
@@ -417,6 +457,11 @@ class RulePack:
 
             if not isinstance(rid, str) or not rid:
                 raise RulePackError("Each rule must have a non-empty string 'id'")
+            if not _RULE_ID_CHARSET_RE.fullmatch(rid):
+                raise RulePackError(
+                    f"Rule id {rid!r} contains unsupported characters "
+                    f"(allowed: letters, digits, '_', '.', '-')"
+                )
             if not rid.startswith(id_prefix):
                 raise RulePackError(
                     f"Rule id {rid!r} does not match jurisdiction prefix {id_prefix!r} "
@@ -428,6 +473,12 @@ class RulePack:
                 raise RulePackError(f"Unsupported rule type for {rid}: {rtype}")
             if not isinstance(r.get("description", ""), str):
                 raise RulePackError(f"Rule {rid} description must be a string")
+            rounding = r.get("rounding", "ROUND_HALF_UP")
+            if rounding not in _ALLOWED_ROUNDING_MODES:
+                raise RulePackError(
+                    f"Rule {rid} has unsupported rounding mode {rounding!r} "
+                    f"(allowed: {sorted(_ALLOWED_ROUNDING_MODES)})"
+                )
 
             # Type-specific validation for early failure (startup time)
             if rtype == "formula":
