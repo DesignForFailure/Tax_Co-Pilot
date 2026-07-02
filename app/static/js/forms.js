@@ -6,7 +6,8 @@
 (function () {
     var counters = {
         p_w2: 1, p_1099int: 0, p_1099div: 0, p_1099b: 0, p_1099nec: 0,
-        s_w2: 0, s_1099int: 0, s_1099div: 0, s_1099b: 0, s_1099nec: 0
+        s_w2: 0, s_1099int: 0, s_1099div: 0, s_1099b: 0, s_1099nec: 0,
+        edu: 0
     };
 
     function getTemplate(section, idx) {
@@ -51,6 +52,14 @@
                 + '<div class="form-row">'
                 + '<div><label>Nonemployee Compensation (Box 1)</label><input type="text" name="' + prefix + '_compensation" placeholder="30000"></div>'
                 + '<div><label>Federal Withheld (Box 4)</label><input type="text" name="' + prefix + '_federal_withheld" placeholder="0"></div>'
+                + '</div></div>';
+        }
+        if (section === 'edu') {
+            return '<div class="dynamic-row" data-section="' + section + '" data-index="' + idx + '">'
+                + '<button type="button" class="remove-btn">Remove</button>'
+                + '<div class="form-row">'
+                + '<div><label>Student Name</label><input type="text" name="' + prefix + '_student" placeholder="Student name"></div>'
+                + '<div><label>Qualified Expenses</label><input type="text" name="' + prefix + '_expenses" placeholder="4000"></div>'
                 + '</div></div>';
         }
         if (section.endsWith('_1099b')) {

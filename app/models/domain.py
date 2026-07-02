@@ -122,6 +122,13 @@ class AdjustmentsData(BaseModel):
     self_employment_tax_deduction: Decimal = Decimal("0")
 
 
+class EducationExpenseData(BaseModel):
+    """Qualified education expenses for one AOTC-eligible student (Form 8863 Part III)."""
+
+    student_name: str = ""
+    qualified_expenses: Decimal = Decimal("0")
+
+
 class ItemizedDeductionData(BaseModel):
     """Schedule A itemized deductions."""
 
@@ -165,6 +172,8 @@ class TaxReturnInput(BaseModel):
     estimated_tax_payments: Decimal = Decimal("0")
     itemized_deductions: ItemizedDeductionData = Field(default_factory=ItemizedDeductionData)
     qualifying_children: int = 0
+    education_students: list[EducationExpenseData] = Field(default_factory=list)
+    llc_expenses: Decimal = Decimal("0")
 
     def total_wages(self) -> Decimal:
         return sum((w.wages for tp in self.taxpayers for w in tp.w2s), Decimal("0"))
@@ -233,6 +242,25 @@ class TaxReturnInput(BaseModel):
             + a.self_employment_tax_deduction
         )
 
+    def aotc_expenses_tier1(self) -> Decimal:
+        """Sum of per-student AOTC expenses capped at $2,000 (Form 8863 Part III line 28).
+
+        The $2,000/$4,000 per-student tiers are part of the Form 8863 line
+        structure (unchanged since 2009); the credit arithmetic itself stays
+        in the rule packs.
+        """
+        return sum(
+            (min(s.qualified_expenses, Decimal("2000")) for s in self.education_students),
+            Decimal("0"),
+        )
+
+    def aotc_expenses_tier2(self) -> Decimal:
+        """Sum of per-student AOTC expenses capped at $4,000 (Form 8863 Part III line 27)."""
+        return sum(
+            (min(s.qualified_expenses, Decimal("4000")) for s in self.education_students),
+            Decimal("0"),
+        )
+
     def total_qualified_dividends(self) -> Decimal:
         return sum(
             (f.qualified_dividends for tp in self.taxpayers for f in tp.form_1099_divs),
@@ -283,6 +311,7 @@ class ReturnOutput(BaseModel):
     tax_before_credits: Decimal = Decimal("0")
     self_employment_tax: Decimal = Decimal("0")
     earned_income_credit: Decimal = Decimal("0")
+    education_credits: Decimal = Decimal("0")
 
 
 class StateReturnOutput(BaseModel):

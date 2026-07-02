@@ -143,6 +143,10 @@ class CalculationEngine:
             earned_income_credit=self.resolved.get(
                 f"fed.{yr}.credits.eic.final", Decimal("0")
             ),
+            education_credits=(
+                self.resolved.get(f"fed.{yr}.credits.edu.aotc", Decimal("0"))
+                + self.resolved.get(f"fed.{yr}.credits.edu.llc", Decimal("0"))
+            ),
         )
 
         state_outputs = self._run_states()
@@ -290,6 +294,11 @@ class CalculationEngine:
         self.resolved["input.qualifying_children"] = Decimal(
             self.inputs.qualifying_children
         )
+
+        # Education credits (Form 8863)
+        self.resolved["input.education.aotc_tier1"] = self.inputs.aotc_expenses_tier1()
+        self.resolved["input.education.aotc_tier2"] = self.inputs.aotc_expenses_tier2()
+        self.resolved["input.education.llc_expenses"] = self.inputs.llc_expenses
 
     # ─── Rule evaluation dispatch ───────────────────────────────
 
