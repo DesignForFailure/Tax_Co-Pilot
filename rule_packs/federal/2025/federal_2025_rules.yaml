@@ -65,6 +65,12 @@ constants:
     mfs: "0"
     hoh: "1"
     qss: "1"
+  care_spouse_required:
+    single: "0"
+    mfj: "1"
+    mfs: "0"
+    hoh: "0"
+    qss: "0"
   standard_deduction:
     single: "15750"
     mfj: "31500"
@@ -886,6 +892,7 @@ rules:
         - { ref: "fed.2025.credits.ctc.final" }
         - { ref: "fed.2025.credits.edu.aotc_nonrefundable" }
         - { ref: "fed.2025.credits.edu.llc" }
+        - { ref: "fed.2025.credits.care.final" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
@@ -1225,6 +1232,96 @@ rules:
     inputs:
       tentative: { ref: "fed.2025.credits.edu.llc_tentative" }
       ratio: { ref: "fed.2025.credits.edu.ratio" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.care.spouse_required"
+    description: "1 for MFJ (both spouses' earned income limits Form 2441), else 0"
+    form_line: "Form 2441"
+    type: "lookup"
+    table: "constants.care_spouse_required"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2025.credits.care.persons_capped"
+    description: "Qualifying persons for dependent care, capped at 2 (expense limit does not grow past two)"
+    form_line: "Form 2441 Line 2"
+    type: "formula"
+    expression: "min(persons, cap)"
+    inputs:
+      persons: { ref: "input.care.qualifying_persons" }
+      cap: { literal: "2" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.care.dollar_cap"
+    description: "Care expense dollar limit: $3,000 for one qualifying person, $6,000 for two or more"
+    form_line: "Form 2441 Line 3"
+    type: "formula"
+    expression: "persons * per_person"
+    inputs:
+      persons: { ref: "fed.2025.credits.care.persons_capped" }
+      per_person: { literal: "3000" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.care.earned_cap"
+    description: "Earned income limit: taxpayer's earned income; for MFJ the smaller of the two spouses' (a no-income spouse zeroes the credit)"
+    form_line: "Form 2441 Lines 4-5"
+    type: "formula"
+    expression: "primary * (one - mfj) + min(primary, spouse) * mfj"
+    inputs:
+      primary: { ref: "input.earned_income.primary" }
+      spouse: { ref: "input.earned_income.spouse" }
+      mfj: { ref: "fed.2025.credits.care.spouse_required" }
+      one: { literal: "1" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.credits.care.eligible_expenses"
+    description: "Care expenses limited by the dollar cap and the earned income cap"
+    form_line: "Form 2441 Line 6"
+    type: "formula"
+    expression: "max(min(expenses, dollar_cap, earned_cap), 0)"
+    inputs:
+      expenses: { ref: "input.care.expenses" }
+      dollar_cap: { ref: "fed.2025.credits.care.dollar_cap" }
+      earned_cap: { ref: "fed.2025.credits.care.earned_cap" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.credits.care.agi_steps"
+    description: "AGI steps of $2,000 (or fraction) above $15,000, rounded up (Form 2441 rate table)"
+    form_line: "Form 2441 Line 8"
+    type: "formula"
+    expression: "max((agi - base) / step, 0)"
+    inputs:
+      agi: { ref: "fed.2025.agi.total" }
+      base: { literal: "15000" }
+      step: { literal: "2000" }
+    rounding: "ROUND_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.care.rate"
+    description: "Applicable percentage: 35% minus 1% per step, floored at 20% (AGI over $43,000)"
+    form_line: "Form 2441 Line 8"
+    type: "formula"
+    expression: "max(top - steps * point, floor)"
+    inputs:
+      top: { literal: "0.35" }
+      steps: { ref: "fed.2025.credits.care.agi_steps" }
+      point: { literal: "0.01" }
+      floor: { literal: "0.20" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.credits.care.final"
+    description: "Credit for child and dependent care expenses (nonrefundable)"
+    form_line: "Form 2441 Line 9"
+    type: "formula"
+    expression: "expenses * rate"
+    inputs:
+      expenses: { ref: "fed.2025.credits.care.eligible_expenses" }
+      rate: { ref: "fed.2025.credits.care.rate" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 

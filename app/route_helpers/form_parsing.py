@@ -409,6 +409,14 @@ def parse_tax_input_from_form(fd: FormData, available_years: Sequence[int]) -> T
         # without feedback.
         raise ValueError("Qualifying children must be a whole number of 0 or more")
 
+    raw_care_persons = str(fd.get("care_persons", "0")).strip()
+    if not raw_care_persons:
+        care_persons = 0
+    elif raw_care_persons.isdigit():
+        care_persons = min(int(raw_care_persons), 20)
+    else:
+        raise ValueError("Care qualifying persons must be a whole number of 0 or more")
+
     return TaxReturnInput(
         tax_year=tax_year,
         filing_status=filing_status,
@@ -420,4 +428,6 @@ def parse_tax_input_from_form(fd: FormData, available_years: Sequence[int]) -> T
         qualifying_children=qualifying_children,
         education_students=parse_education_students(fd),
         llc_expenses=form_money(fd, "llc_expenses"),
+        dependent_care_expenses=form_money(fd, "care_expenses"),
+        dependent_care_qualifying_persons=care_persons,
     )
