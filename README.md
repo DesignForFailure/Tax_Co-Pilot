@@ -225,7 +225,6 @@ Tax_Co-Pilot/
 ├── .gitignore
 ├── .pre-commit-config.yaml
 ├── AGENTS.md
-├── CLAUDE.md
 ├── app/
 │   ├── __init__.py
 │   ├── config.py
@@ -280,6 +279,10 @@ Tax_Co-Pilot/
 │           ├── runs.html
 │           ├── unlock.html
 │           └── whatif.html
+├── CHANGELOG.md
+├── CLAUDE.md
+├── CODE_OF_CONDUCT.md
+├── CONTRIBUTING.md
 ├── docs/
 │   ├── DISCLAIMER.md
 │   ├── ENCRYPTION.md
@@ -307,16 +310,25 @@ Tax_Co-Pilot/
 │           ├── 2026-03-16-state-expansion-design.md
 │           ├── 2026-03-22-hardening-qa-design.md
 │           └── 2026-03-22-rule-pack-editor-design.md
-├── scripts/
-│   └── validate_rule_pack.py
+├── LICENSE
+├── main.py
+├── pyproject.toml
+├── README.md
+├── README.txt
+├── requirements-dev.txt
+├── requirements.txt
+├── ROADMAP.md
 ├── rule_packs/
 │   ├── federal/
 │   │   ├── 2023/
 │   │   │   ├── federal_2023_manifest.yaml
 │   │   │   └── federal_2023_rules.yaml
-│   │   └── 2024/
-│   │       ├── federal_2024_manifest.yaml
-│   │       └── federal_2024_rules.yaml
+│   │   ├── 2024/
+│   │   │   ├── federal_2024_manifest.yaml
+│   │   │   └── federal_2024_rules.yaml
+│   │   └── 2025/
+│   │       ├── federal_2025_manifest.yaml
+│   │       └── federal_2025_rules.yaml
 │   └── state/
 │       ├── _template/
 │       │   └── 2024/
@@ -338,9 +350,12 @@ Tax_Co-Pilot/
 │       │   ├── 2023/
 │       │   │   ├── state_GA_2023_manifest.yaml
 │       │   │   └── state_GA_2023_rules.yaml
-│       │   └── 2024/
-│       │       ├── state_GA_2024_manifest.yaml
-│       │       └── state_GA_2024_rules.yaml
+│       │   ├── 2024/
+│       │   │   ├── state_GA_2024_manifest.yaml
+│       │   │   └── state_GA_2024_rules.yaml
+│       │   └── 2025/
+│       │       ├── state_GA_2025_manifest.yaml
+│       │       └── state_GA_2025_rules.yaml
 │       ├── NH/
 │       │   └── 2024/
 │       │       ├── state_NH_2024_manifest.yaml
@@ -373,43 +388,41 @@ Tax_Co-Pilot/
 │           └── 2024/
 │               ├── state_WY_2024_manifest.yaml
 │               └── state_WY_2024_rules.yaml
-├── tests/
-│   ├── __init__.py
-│   ├── test_calculate_name_validation.py
-│   ├── test_calculator_resolve_ref.py
-│   ├── test_data_mgmt.py
-│   ├── test_encoding_guard.py
-│   ├── test_encrypted_database.py
-│   ├── test_encryption.py
-│   ├── test_error_paths.py
-│   ├── test_forms.py
-│   ├── test_golden.py
-│   ├── test_golden2.py
-│   ├── test_golden_m1.py
-│   ├── test_hash_versioning.py
-│   ├── test_itemized_credits.py
-│   ├── test_milestone12_structure.py
-│   ├── test_milestone6_routes.py
-│   ├── test_multi_year.py
-│   ├── test_parse_money.py
-│   ├── test_route_coverage.py
-│   ├── test_rule_pack_editor.py
-│   ├── test_rule_pack_routes.py
-│   ├── test_state_ca_ny.py
-│   └── test_state_expansion.py
-├── CHANGELOG.md
-├── CODE_OF_CONDUCT.md
-├── CONTRIBUTING.md
-├── LICENSE
-├── README.md
-├── README.txt
-├── ROADMAP.md
+├── run.sh
+├── scripts/
+│   └── validate_rule_pack.py
 ├── SECURITY.md
-├── main.py
-├── pyproject.toml
-├── requirements-dev.txt
-├── requirements.txt
-└── run.sh
+└── tests/
+    ├── __init__.py
+    ├── conftest.py
+    ├── test_calculate_name_validation.py
+    ├── test_calculator_resolve_ref.py
+    ├── test_chain_integrity.py
+    ├── test_data_mgmt.py
+    ├── test_encoding_guard.py
+    ├── test_encrypted_database.py
+    ├── test_encryption.py
+    ├── test_engine_hardening.py
+    ├── test_error_paths.py
+    ├── test_federal_corrections.py
+    ├── test_forms.py
+    ├── test_golden.py
+    ├── test_golden2.py
+    ├── test_golden_m1.py
+    ├── test_hash_versioning.py
+    ├── test_itemized_credits.py
+    ├── test_milestone12_structure.py
+    ├── test_milestone6_routes.py
+    ├── test_multi_year.py
+    ├── test_parse_money.py
+    ├── test_route_coverage.py
+    ├── test_rule_pack_editor.py
+    ├── test_rule_pack_routes.py
+    ├── test_services_hardening.py
+    ├── test_state_ca_ny.py
+    ├── test_state_corrections.py
+    ├── test_state_expansion.py
+    └── test_web_hardening.py
 ```
 
 ---

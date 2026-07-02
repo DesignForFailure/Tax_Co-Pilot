@@ -23,6 +23,7 @@ The engine's rule_loader.py stays purely for loading/validation.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import tempfile
@@ -286,15 +287,19 @@ def _next_custom_variant_number(pack_parent_dir: Path) -> int:
 
 
 def _atomic_write_yaml(path: Path, data: dict[str, Any]) -> None:
-    """Write YAML atomically: write to .tmp, then rename."""
+    """Write YAML atomically: write to .tmp, fsync, then replace."""
     tmp_fd, tmp_path_str = tempfile.mkstemp(
         dir=str(path.parent), suffix=".tmp", prefix=path.name
     )
     tmp_path = Path(tmp_path_str)
     try:
         with open(tmp_fd, "w", encoding="utf-8") as f:
-            yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
-        tmp_path.rename(path)
+            yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+            f.flush()
+            os.fsync(f.fileno())
+        # os.replace overwrites atomically on POSIX and Windows;
+        # Path.rename raises FileExistsError on Windows when the target exists.
+        os.replace(tmp_path, path)
     except Exception:
         tmp_path.unlink(missing_ok=True)
         raise
@@ -435,6 +440,11 @@ def save_rule(
     """
     if variant == "standard":
         raise ValueError("Cannot modify a standard pack — clone it as custom first")
+    if not _RULE_ID_RE.fullmatch(rule_id):
+        raise ValueError(
+            "Rule id must look like '<jurisdiction>.<year>.<name>' using "
+            "lowercase letters, digits, dots, and underscores"
+        )
 
     pack_dir = _pack_path(jurisdiction, year, variant, base_dir=base_dir)
     rules_path = pack_dir / "rules.yaml"
@@ -498,6 +508,23 @@ def delete_rule(
     if len(filtered) == len(rule_list):
         raise ValueError(f"Rule {rule_id!r} not found in pack")
     rules_yaml["rules"] = filtered
+
+    # Validate before writing (mirrors save_rule): deleting a rule that
+    # others reference would otherwise leave the pack unloadable on disk.
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+        manifest_src = pack_dir / "manifest.yaml"
+        if not manifest_src.exists():
+            candidates = list(pack_dir.glob("*_manifest*.yaml"))
+            manifest_src = candidates[0] if candidates else manifest_src
+        manifest_data = _canonicalize_manifest_version(_read_yaml(manifest_src))
+        _atomic_write_yaml(tmp / "manifest.yaml", manifest_data)
+        _atomic_write_yaml(tmp / "rules.yaml", rules_yaml)
+        try:
+            RulePack.load(tmp)
+        except Exception as exc:
+            raise ValueError(f"Validation failed: {exc}") from exc
+
     _atomic_write_yaml(rules_path, rules_yaml)
 
 
@@ -530,7 +557,10 @@ def import_yaml(
         raise ValueError("Manifest must be a YAML mapping")
 
     jurisdiction = str(manifest.get("jurisdiction", "")).strip()
-    tax_year = int(manifest.get("tax_year", 0))
+    try:
+        tax_year = int(manifest.get("tax_year", 0))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Manifest tax_year must be an integer") from exc
     if not jurisdiction or tax_year <= 0:
         raise ValueError("Manifest must include jurisdiction and positive tax_year")
 
@@ -542,7 +572,10 @@ def import_yaml(
     variant_number = _next_custom_variant_number(parent_dir)
     variant = f"custom_v{variant_number}"
     target_dir = parent_dir / variant
-    target_dir.mkdir(parents=True, exist_ok=False)
+    try:
+        target_dir.mkdir(parents=True, exist_ok=False)
+    except FileExistsError as exc:
+        raise ValueError(f"Pack variant {variant!r} already exists") from exc
 
     # Write files
     manifest = _canonicalize_manifest_version(manifest)

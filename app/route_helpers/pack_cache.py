@@ -22,6 +22,17 @@ def bust_pack_cache(jurisdiction: str, year: int) -> None:
         federal_cache.pop(year, None)
     else:
         state_cache.pop(year, None)
+    refresh_available_years()
+
+
+def refresh_available_years() -> None:
+    """Re-scan pack years in place so import-time bindings stay current.
+
+    Other modules bind the ``available_years`` list object at import time;
+    mutating it in place (rather than rebinding) propagates a newly
+    imported or deleted year to every consumer without a server restart.
+    """
+    available_years[:] = discover_available_years()
 
 
 def discover_available_years() -> list[int]:

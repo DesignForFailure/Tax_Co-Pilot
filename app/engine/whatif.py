@@ -57,6 +57,10 @@ class WhatIfEngine:
 
     def _run_mfs_household(self, base: TaxReturnInput) -> tuple[Decimal, Decimal]:
         """Run MFS as one return per taxpayer and aggregate totals."""
+        if not base.taxpayers:
+            # With zero taxpayers the MFS side would total $0 while the MFJ
+            # run still taxes household-level income, fabricating "savings".
+            raise ValueError("What-if comparison requires at least one taxpayer")
         if len(base.taxpayers) > 1 and self._has_unallocated_household_fields(base):
             raise ValueError(
                 "MFS what-if cannot safely allocate household-level income, deductions, "

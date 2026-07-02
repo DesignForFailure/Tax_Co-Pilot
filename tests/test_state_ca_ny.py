@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Tests for California and New York state rule packs."""
 
 from decimal import Decimal
@@ -55,10 +55,13 @@ def _make_input(
 
 
 def test_ca_single_75k() -> None:
-    """CA single filer at $75k — golden test with hand-verified values.
+    """CA single filer at $75k — golden test, hand-verified against the
+    FTB 2024 Schedule X.
 
     Taxable income: 75000 - 5540 = 69460
-    Bracket tax: 104.12 + 285.44 + 571.00 + 907.32 + 1141.52 + 103.23 = 3112.63 → 3113
+    Bracket tax: 107.56 (1% to 10756) + 294.86 (2% to 25499)
+    + 589.84 (4% to 40245) + 937.26 (6% to 55866)
+    + 1087.52 (8% on 69460-55866) = 3017.04 → 3017
     """
     inp = _make_input("CA")
     run = CalculationEngine(FED, inp, state_packs={"CA": CA}).run()
@@ -66,7 +69,7 @@ def test_ca_single_75k() -> None:
     ca = run.state_outputs[0]
     assert ca.state == "CA"
     assert ca.state_taxable_income == Decimal("69460")
-    assert ca.state_tax == Decimal("3113")
+    assert ca.state_tax == Decimal("3017")
     assert ca.state_withholding == Decimal("3000")
     assert ca.state_refund_or_owed == ca.state_withholding - ca.state_tax
 
@@ -119,7 +122,9 @@ def test_ny_single_75k() -> None:
     """NY single filer at $75k — golden test with hand-verified values.
 
     Taxable income: 75000 - 8000 = 67000
-    Bracket tax: 340.00 + 144.00 + 115.50 + 3106.35 = 3705.85 → 3706
+    Bracket tax (IT-201 2024, 5.5% middle rate): 340.00 (4% to 8500)
+    + 144.00 (4.5% to 11700) + 115.50 (5.25% to 13900)
+    + 2920.50 (5.5% on 67000-13900) = 3520.00 → 3520
     """
     inp = _make_input("NY")
     run = CalculationEngine(FED, inp, state_packs={"NY": NY}).run()
@@ -127,7 +132,7 @@ def test_ny_single_75k() -> None:
     ny = run.state_outputs[0]
     assert ny.state == "NY"
     assert ny.state_taxable_income == Decimal("67000")
-    assert ny.state_tax == Decimal("3706")
+    assert ny.state_tax == Decimal("3520")
     assert ny.state_withholding == Decimal("3000")
     assert ny.state_refund_or_owed == ny.state_withholding - ny.state_tax
 

@@ -135,7 +135,13 @@ async def calculate_submit(request: Request) -> Response:
         pack_variant = form_str(fd, "pack_variant") or "standard"
         if pack_variant != "standard":
             fed_custom_dir = _pack_path("federal", inputs.tax_year, pack_variant)
-            fed_pack = RulePack.load(fed_custom_dir) if fed_custom_dir.exists() else get_federal_pack(inputs.tax_year)
+            if not fed_custom_dir.exists():
+                # Falling back to the standard pack would save a run the user
+                # believes used their custom rules.
+                raise ValueError(
+                    f"Selected rule pack variant {pack_variant!r} no longer exists"
+                )
+            fed_pack = RulePack.load(fed_custom_dir)
         else:
             fed_pack = get_federal_pack(inputs.tax_year)
 
@@ -150,7 +156,10 @@ async def calculate_submit(request: Request) -> Response:
         return RedirectResponse(url="/dashboard", status_code=303)
     except ValueError as exc:
         states_by_year = available_states_by_year()
-        posted_year = int(str(fd.get("tax_year", 0)) or 0)
+        raw_year = str(fd.get("tax_year", "") or "")
+        # Must not raise inside the error handler: a non-numeric year would
+        # replace the form re-render with a raw plaintext 400.
+        posted_year = int(raw_year) if raw_year.isdigit() else 0
         if posted_year in available_years:
             default_year = posted_year
         else:
@@ -191,7 +200,8 @@ async def whatif_submit(request: Request) -> Response:
     fd = await request.form()
     verify_csrf(request, str(fd.get("csrf_token", "")))
     csrf = get_csrf_token(request)
-    selected_year = int(str(fd.get("tax_year", "2024") or "2024"))
+    raw_year = str(fd.get("tax_year", "2024") or "2024")
+    selected_year = int(raw_year) if raw_year.isdigit() else 2024
     context: dict[str, Any] = {
         "csrf": csrf,
         "available_years": available_years,

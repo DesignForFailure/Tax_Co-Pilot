@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Route integration tests for rule pack editor."""
 
 from __future__ import annotations
@@ -193,12 +193,32 @@ def test_delete_rule_via_post() -> None:
         follow_redirects=False,
     )
     variant = resp.headers["location"].rstrip("/").split("/")[-1]
+    # refund_or_owed is a leaf rule: nothing references it, so deletion
+    # leaves the pack loadable and passes validate-before-write.
+    r = c.post(
+        f"/rule-packs/federal/2024/{variant}/rules/fed.2024.refund_or_owed/delete",
+        data={"csrf_token": CSRF},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+
+
+def test_delete_referenced_rule_via_post_is_rejected() -> None:
+    c = _client()
+    resp = c.post(
+        "/rule-packs/federal/2024/standard/clone",
+        data={"csrf_token": CSRF, "custom_name": "for_rule_del_ref"},
+        follow_redirects=False,
+    )
+    variant = resp.headers["location"].rstrip("/").split("/")[-1]
+    # gross_income.wages is referenced by downstream rules; deleting it
+    # previously wrote an unloadable pack to disk.
     r = c.post(
         f"/rule-packs/federal/2024/{variant}/rules/fed.2024.gross_income.wages/delete",
         data={"csrf_token": CSRF},
         follow_redirects=False,
     )
-    assert r.status_code == 303
+    assert r.status_code == 400
 
 
 def test_import_page_renders() -> None:

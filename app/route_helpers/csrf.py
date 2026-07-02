@@ -19,6 +19,9 @@ def get_csrf_token(request: Request) -> str:
 def verify_csrf(request: Request, form_token: str) -> None:
     """Validate the submitted CSRF token."""
     cookie_token = request.cookies.get("csrf")
-    if not cookie_token or not secrets.compare_digest(cookie_token, form_token or ""):
+    # Compare bytes: compare_digest raises TypeError (a 500) on non-ASCII str.
+    if not cookie_token or not secrets.compare_digest(
+        cookie_token.encode("utf-8"), (form_token or "").encode("utf-8")
+    ):
         raise ValueError("CSRF validation failed")
 

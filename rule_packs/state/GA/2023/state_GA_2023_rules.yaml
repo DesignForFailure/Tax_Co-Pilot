@@ -25,7 +25,7 @@ constants:
   personal_exemption:
     single: "2700"
     mfj: "7400"
-    mfs: "2700"
+    mfs: "3700"
     hoh: "2700"
     qss: "7400"
 
@@ -91,13 +91,14 @@ rules:
         - { lower: "2500", upper: "3500", rate: "0.04" }
         - { lower: "3500", upper: "5000", rate: "0.05" }
         - { lower: "5000", upper: null, rate: "0.0575" }
+      # Pre-2024 O.C.G.A. 48-7-20(b): HoH uses the MFJ schedule.
       hoh:
-        - { lower: "0", upper: "750", rate: "0.01" }
-        - { lower: "750", upper: "2250", rate: "0.02" }
-        - { lower: "2250", upper: "3750", rate: "0.03" }
-        - { lower: "3750", upper: "5250", rate: "0.04" }
-        - { lower: "5250", upper: "7000", rate: "0.05" }
-        - { lower: "7000", upper: null, rate: "0.0575" }
+        - { lower: "0", upper: "1000", rate: "0.01" }
+        - { lower: "1000", upper: "3000", rate: "0.02" }
+        - { lower: "3000", upper: "5000", rate: "0.03" }
+        - { lower: "5000", upper: "7000", rate: "0.04" }
+        - { lower: "7000", upper: "10000", rate: "0.05" }
+        - { lower: "10000", upper: null, rate: "0.0575" }
       qss:
         - { lower: "0", upper: "1000", rate: "0.01" }
         - { lower: "1000", upper: "3000", rate: "0.02" }

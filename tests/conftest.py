@@ -15,6 +15,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-version: "1.1.0"
-tax_year: 2024
-jurisdiction: "NH"
+"""Session-wide test configuration.
+
+Redirects the application database to a per-session temporary directory
+BEFORE any app module is imported, so the suite never reads, wipes, or
+replaces a developer's real ``data/tax_copilot.db``. Several tests delete
+all rows or POST /restore, which would otherwise be destructive.
+"""
+
+import os
+import tempfile
+
+# Must run at import time: app modules bind DB_PATH when first imported by a
+# test module, which happens after pytest loads this conftest.
+_SESSION_TMP = tempfile.mkdtemp(prefix="tax_copilot_test_db_")
+os.environ.setdefault("TAX_COPILOT_DB_PATH", os.path.join(_SESSION_TMP, "tax_copilot.db"))

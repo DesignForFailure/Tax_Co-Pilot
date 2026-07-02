@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Golden tests for Federal Completeness milestone.
 
 Covers: new income categories (1099-NEC, SSA, other income),
