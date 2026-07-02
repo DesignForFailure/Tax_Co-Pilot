@@ -155,6 +155,15 @@ def parse_rule_form(fd: FormData) -> dict[str, Any]:
         if tables:
             rule["tables"] = tables
 
+    elif rule_type == "matrix_lookup":
+        # The type-adaptive editor has no form section for nested matrix
+        # tables; without this guard, saving would silently rewrite the rule
+        # with a different shape. Edit the pack YAML directly instead.
+        raise ValueError(
+            "matrix_lookup rules cannot be edited in the web editor yet; "
+            "edit the pack YAML and re-import it"
+        )
+
     return rule
 
 

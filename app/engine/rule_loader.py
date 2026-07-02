@@ -377,6 +377,60 @@ def _validate_bracket_table_rule(rule: dict[str, Any]) -> None:
             prev_upper = upper
 
 
+def _validate_matrix_table(
+    rid: str, node: Any, remaining_dims: int, path: tuple[str, ...]
+) -> None:
+    """Recursively validate that a matrix table matches its declared key depth."""
+    where = " → ".join(path) if path else "<root>"
+    if remaining_dims == 0:
+        try:
+            Decimal(str(node))
+        except InvalidOperation as e:
+            raise RulePackError(
+                f"Rule {rid} (matrix_lookup) leaf at {where} must be numeric, got {node!r}"
+            ) from e
+        return
+    if not isinstance(node, dict) or not node:
+        raise RulePackError(
+            f"Rule {rid} (matrix_lookup) expects {remaining_dims} more nested "
+            f"mapping level(s) at {where}, got {type(node).__name__}"
+        )
+    for key, child in node.items():
+        if not isinstance(key, str):
+            raise RulePackError(
+                f"Rule {rid} (matrix_lookup) table key {key!r} at {where} must be a "
+                f"string (quote numeric keys in YAML)"
+            )
+        _validate_matrix_table(rid, child, remaining_dims - 1, path + (key,))
+
+
+def _validate_matrix_lookup_rule(rule: dict[str, Any]) -> None:
+    rid = rule.get("id", "<unknown>")
+    keys = rule.get("keys")
+    if not isinstance(keys, list) or len(keys) < 2:
+        raise RulePackError(
+            f"Rule {rid} (matrix_lookup) must include a 'keys' list with at least 2 entries"
+        )
+    for i, key_spec in enumerate(keys):
+        if isinstance(key_spec, str) and key_spec.strip():
+            continue
+        if (
+            isinstance(key_spec, dict)
+            and set(key_spec.keys()) == {"ref"}
+            and isinstance(key_spec.get("ref"), str)
+            and key_spec["ref"].strip()
+        ):
+            continue
+        raise RulePackError(
+            f"Rule {rid} (matrix_lookup) keys[{i}] must be a reference string "
+            f"or a {{ref: ...}} mapping"
+        )
+    table = rule.get("table")
+    if not isinstance(table, dict) or not table:
+        raise RulePackError(f"Rule {rid} (matrix_lookup) must include non-empty 'table'")
+    _validate_matrix_table(rid, table, len(keys), ())
+
+
 def _validate_formula_rule(rule: dict[str, Any]) -> None:
     rid = rule.get("id", "<unknown>")
     expr = rule.get("expression")
@@ -469,7 +523,7 @@ class RulePack:
                 )
             if rid in rules:
                 raise RulePackError(f"Duplicate rule id: {rid}")
-            if rtype not in {"sum", "formula", "lookup", "bracket_table"}:
+            if rtype not in {"sum", "formula", "lookup", "bracket_table", "matrix_lookup"}:
                 raise RulePackError(f"Unsupported rule type for {rid}: {rtype}")
             if not isinstance(r.get("description", ""), str):
                 raise RulePackError(f"Rule {rid} description must be a string")
@@ -489,6 +543,8 @@ class RulePack:
                 _validate_lookup_rule(r)
             elif rtype == "bracket_table":
                 _validate_bracket_table_rule(r)
+            elif rtype == "matrix_lookup":
+                _validate_matrix_lookup_rule(r)
 
             rules[rid] = r
 

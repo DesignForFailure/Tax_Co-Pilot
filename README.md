@@ -422,6 +422,7 @@ Tax_Co-Pilot/
     ├── test_hash_versioning.py
     ├── test_itemized_credits.py
     ├── test_logging.py
+    ├── test_matrix_lookup.py
     ├── test_milestone12_structure.py
     ├── test_milestone14_csp.py
     ├── test_milestone15_pagination.py

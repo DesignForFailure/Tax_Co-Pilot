@@ -301,6 +301,8 @@ class CalculationEngine:
                 self._eval_lookup(rule)
             elif rule_type == "bracket_table":
                 self._eval_bracket_table(rule)
+            elif rule_type == "matrix_lookup":
+                self._eval_matrix_lookup(rule)
             else:
                 raise RulePackError(f"Unknown rule type: {rule_type}")
         finally:
@@ -451,6 +453,65 @@ class CalculationEngine:
                     f"{rule.get('form_line', '')}: " if rule.get("form_line") else ""
                 )
                 + f"{key} → {_format_usd(value)}",
+                form_line=rule.get("form_line", ""),
+            )
+        )
+
+    def _matrix_key_str(self, spec: Any) -> str:
+        """Resolve a matrix_lookup key spec to the string used for table indexing.
+
+        Numeric values are canonicalized (Decimal("2.00") indexes key "2") so
+        rounded rule results still match integer-keyed tables.
+        """
+        if isinstance(spec, str) and spec.strip() == "input.filing_status":
+            return self._filing_status
+        if isinstance(spec, dict) and spec.get("ref") == "input.filing_status":
+            return self._filing_status
+        value = self._resolve_ref(spec)
+        integral = value.to_integral_value()
+        if value == integral:
+            return str(int(integral))
+        return str(value.normalize())
+
+    def _eval_matrix_lookup(self, rule: dict[str, Any]) -> None:
+        rule_id = rule["id"]
+        self._enforce_rule_namespace(rule_id)
+
+        keys = [self._matrix_key_str(spec) for spec in rule["keys"]]
+
+        node: Any = rule["table"]
+        path: list[str] = []
+        for dim, key in enumerate(keys):
+            if not isinstance(node, dict):
+                raise RulePackError(
+                    f"Rule {rule_id} (matrix_lookup) table is too shallow at "
+                    f"dimension {dim} (path: {' → '.join(path) or '<root>'})"
+                )
+            if key not in node:
+                raise RulePackError(
+                    f"Rule {rule_id} (matrix_lookup) has no entry for key {key!r} at "
+                    f"dimension {dim} (path: {' → '.join(path) or '<root>'}; "
+                    f"available: {sorted(node)})"
+                )
+            path.append(key)
+            node = node[key]
+
+        value = _to_decimal(node)
+        self.resolved[rule_id] = value
+
+        self.traces.append(
+            TraceNode(
+                node_id=rule_id,
+                rule_id=rule_id,
+                rule_pack_version=self.rp.version,
+                description=rule.get("description", ""),
+                inputs={"keys": keys, "path": " → ".join(path)},
+                intermediates=[],
+                result={"value": str(value), "units": "USD"},
+                explanation=(
+                    f"{rule.get('form_line', '')}: " if rule.get("form_line") else ""
+                )
+                + f"{' × '.join(path)} → {_format_usd(value)}",
                 form_line=rule.get("form_line", ""),
             )
         )
