@@ -265,6 +265,16 @@ def test_trace_contains_all_rules() -> None:
         "fed.2024.credits.eic.investment_income",
         "fed.2024.credits.eic.eligible",
         "fed.2024.credits.eic.final",
+        "fed.2024.credits.edu.phaseout_lower",
+        "fed.2024.credits.edu.phaseout_upper",
+        "fed.2024.credits.edu.eligible",
+        "fed.2024.credits.edu.ratio",
+        "fed.2024.credits.edu.aotc_tentative",
+        "fed.2024.credits.edu.aotc",
+        "fed.2024.credits.edu.aotc_refundable",
+        "fed.2024.credits.edu.aotc_nonrefundable",
+        "fed.2024.credits.edu.llc_tentative",
+        "fed.2024.credits.edu.llc",
         "fed.2024.tax.brackets",
         "fed.2024.credits.ctc.base",
         "fed.2024.credits.ctc.threshold",
@@ -304,7 +314,7 @@ def test_immutable_run_has_snapshot_and_metadata() -> None:
     run = CalculationEngine(FED, inputs).run()
 
     assert run.input_snapshot.taxpayers[0].w2s[0].wages == Decimal("75000")
-    assert run.rule_pack_version == "1.4.0"
+    assert run.rule_pack_version == "1.5.0"
     assert len(run.rule_pack_checksum) == 64  # SHA-256 hex
 
 

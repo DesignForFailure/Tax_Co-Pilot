@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–19 complete; Phases 1–3 are done. Next up: Phase 4 (M20–M24).
+**Status:** Late Alpha — milestones 1–20 complete; Phase 4 continues with M21–M24.
 **SemVer line:** `0.3.x`.
-**Test suite:** 467 passing, 4 skipped, 0 failures.
+**Test suite:** 487 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -539,6 +539,8 @@ These milestones fix known calculation inaccuracies.
 
 ### M20: Education Credits (AOTC / LLC)
 
+**Status:** Complete on 2026-07-02. The 2023/2024/2025 packs (v1.5.0) implement Form 8863: per-student AOTC tiers (100% of the first $2,000 + 25% of the next $2,000) via input aggregation, the 40% refundable / 60% nonrefundable split (refundable portion flows to 1040 Line 29 in payments; nonrefundable joins the credit total), the per-return LLC (20% of up to $10,000, nonrefundable), the shared MAGI phaseout ($80k–$90k, doubled for MFJ; AGI used as MAGI), and MFS ineligibility (IRC §25A(g)(6)). New `education_students`/`llc_expenses` inputs with dynamic web-form rows. 19 golden vectors in `tests/test_education_credits.py`.
+
 **Goal:** Add American Opportunity Tax Credit and Lifetime Learning Credit.
 
 - AOTC: 100% of first $2,000 + 25% of next $2,000 per student, max $2,500. Phaseout at $80k/$160k. 40% refundable.
@@ -607,10 +609,12 @@ These milestones fix known calculation inaccuracies.
 
 ## Versioning & Release Trajectory
 
-- Continue **Semantic Versioning** on the `0.1.x` line.
-- Promote to `0.2.0` after Phase 1 (structural hardening) is complete.
-- Promote to `0.3.0` after Phase 2 (capability expansion) is complete.
-- Promote to `1.0.0` when: Phase 3 tax correctness milestones are complete, LTCG rates are correct, EITC works, and the engine handles >90% of common household scenarios accurately.
+- ~~Promote to `0.2.0` after Phase 1 (structural hardening) is complete.~~ Done 2026-07-02.
+- ~~Promote to `0.3.0` after Phase 2 (capability expansion) is complete.~~ Done 2026-07-02.
+- Promote to `0.4.0` after Phase 4 (M20–M24) is complete.
+- Promote to `0.5.0` after closing the remaining common-household gaps (the "missing 10%": e.g. additional standard deduction for age 65+/blind, refundable ACTC, $500 credit for other dependents, Additional Medicare Tax, dependent exemptions in state packs).
+- Promote to `0.9.0` after a deep review of the entire codebase plus testing and patching of well-known/common edge cases.
+- Promote to `1.0.0` after the codebase is packaged for easy installation on Linux and Windows.
 
 ---
 

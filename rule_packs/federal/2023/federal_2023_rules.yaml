@@ -34,6 +34,25 @@ constants:
     mfs: "276900"
     hoh: "523050"
     qss: "553850"
+  education_phaseout:
+    lower:
+      single: "80000"
+      mfj: "160000"
+      mfs: "80000"
+      hoh: "80000"
+      qss: "80000"
+    upper:
+      single: "90000"
+      mfj: "180000"
+      mfs: "90000"
+      hoh: "90000"
+      qss: "90000"
+  education_eligible:
+    single: "1"
+    mfj: "1"
+    mfs: "0"
+    hoh: "1"
+    qss: "1"
   standard_deduction:
     single: "13850"
     mfj: "27700"
@@ -741,6 +760,8 @@ rules:
     inputs:
       items:
         - { ref: "fed.2023.credits.ctc.final" }
+        - { ref: "fed.2023.credits.edu.aotc_nonrefundable" }
+        - { ref: "fed.2023.credits.edu.llc" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
@@ -976,6 +997,109 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
+  - id: "fed.2023.credits.edu.phaseout_lower"
+    description: "Education credit MAGI phaseout floor (IRC 25A(d): fixed since 2021)"
+    form_line: "Form 8863"
+    type: "lookup"
+    table: "constants.education_phaseout.lower"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2023.credits.edu.phaseout_upper"
+    description: "Education credit MAGI phaseout ceiling"
+    form_line: "Form 8863"
+    type: "lookup"
+    table: "constants.education_phaseout.upper"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2023.credits.edu.eligible"
+    description: "Education credit eligibility: MFS filers are barred (IRC 25A(g)(6))"
+    form_line: "Form 8863"
+    type: "lookup"
+    table: "constants.education_eligible"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2023.credits.edu.ratio"
+    description: "MAGI phaseout ratio (Form 8863 lines 2-6; AGI used as MAGI — foreign exclusions unmodeled)"
+    form_line: "Form 8863 Line 6"
+    type: "formula"
+    expression: "min(max((upper - agi) / (upper - lower), 0), one) * eligible"
+    inputs:
+      upper: { ref: "fed.2023.credits.edu.phaseout_upper" }
+      lower: { ref: "fed.2023.credits.edu.phaseout_lower" }
+      agi: { ref: "fed.2023.agi.total" }
+      one: { literal: "1" }
+      eligible: { ref: "fed.2023.credits.edu.eligible" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 3
+
+  - id: "fed.2023.credits.edu.aotc_tentative"
+    description: "Tentative American Opportunity Credit: 100% of first $2,000 + 25% of next $2,000 per student"
+    form_line: "Form 8863 Line 1"
+    type: "formula"
+    expression: "tier1 + quarter * (tier2 - tier1)"
+    inputs:
+      tier1: { ref: "input.education.aotc_tier1" }
+      tier2: { ref: "input.education.aotc_tier2" }
+      quarter: { literal: "0.25" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.credits.edu.aotc"
+    description: "American Opportunity Credit after MAGI phaseout"
+    form_line: "Form 8863 Line 7"
+    type: "formula"
+    expression: "tentative * ratio"
+    inputs:
+      tentative: { ref: "fed.2023.credits.edu.aotc_tentative" }
+      ratio: { ref: "fed.2023.credits.edu.ratio" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.credits.edu.aotc_refundable"
+    description: "Refundable 40% of the AOTC (paid out even with zero tax)"
+    form_line: "1040 Line 29"
+    type: "formula"
+    expression: "aotc * rate"
+    inputs:
+      aotc: { ref: "fed.2023.credits.edu.aotc" }
+      rate: { literal: "0.40" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.credits.edu.aotc_nonrefundable"
+    description: "Nonrefundable 60% of the AOTC (joins the credit total)"
+    form_line: "Form 8863 Line 9"
+    type: "formula"
+    expression: "aotc - refundable"
+    inputs:
+      aotc: { ref: "fed.2023.credits.edu.aotc" }
+      refundable: { ref: "fed.2023.credits.edu.aotc_refundable" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.credits.edu.llc_tentative"
+    description: "Tentative Lifetime Learning Credit: 20% of up to $10,000 expenses per return"
+    form_line: "Form 8863 Line 11"
+    type: "formula"
+    expression: "min(expenses, cap) * rate"
+    inputs:
+      expenses: { ref: "input.education.llc_expenses" }
+      cap: { literal: "10000" }
+      rate: { literal: "0.20" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.credits.edu.llc"
+    description: "Lifetime Learning Credit after MAGI phaseout (nonrefundable)"
+    form_line: "Form 8863 Line 19"
+    type: "formula"
+    expression: "tentative * ratio"
+    inputs:
+      tentative: { ref: "fed.2023.credits.edu.llc_tentative" }
+      ratio: { ref: "fed.2023.credits.edu.ratio" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
   - id: "fed.2023.tax.after_credits"
     description: "Federal tax after credits (cannot go below zero)"
     form_line: "1040 Line 22"
@@ -1129,6 +1253,7 @@ rules:
         - { ref: "fed.2023.total_withholding" }
         - { ref: "fed.2023.estimated_payments" }
         - { ref: "fed.2023.credits.eic.final" }
+        - { ref: "fed.2023.credits.edu.aotc_refundable" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 

@@ -12,6 +12,7 @@ from starlette.datastructures import FormData
 
 from app.models.domain import (
     AdjustmentsData,
+    EducationExpenseData,
     FilingStatus,
     Form1099BData,
     Form1099DIVData,
@@ -300,6 +301,21 @@ def parse_1099necs(fd: FormData, prefix: str) -> list[Form1099NECData]:
     return items
 
 
+def parse_education_students(fd: FormData) -> list[EducationExpenseData]:
+    """Parse per-student AOTC expense rows from indexed form fields."""
+    items: list[EducationExpenseData] = []
+    for idx in collect_indices(fd, "edu"):
+        base = f"edu_{idx}"
+        expenses = form_money(fd, f"{base}_expenses")
+        student = form_str(fd, f"{base}_student")
+        if expenses == 0 and not student:
+            continue
+        items.append(
+            EducationExpenseData(student_name=student, qualified_expenses=expenses)
+        )
+    return items
+
+
 def parse_taxpayer(fd: FormData, prefix: str, role: TaxpayerRole) -> Taxpayer:
     """Build a taxpayer from indexed form fields under the given prefix."""
     first_name = form_str(fd, f"{prefix}_first")
@@ -402,4 +418,6 @@ def parse_tax_input_from_form(fd: FormData, available_years: Sequence[int]) -> T
         other_income=form_money(fd, "other_income"),
         itemized_deductions=itemized,
         qualifying_children=qualifying_children,
+        education_students=parse_education_students(fd),
+        llc_expenses=form_money(fd, "llc_expenses"),
     )
