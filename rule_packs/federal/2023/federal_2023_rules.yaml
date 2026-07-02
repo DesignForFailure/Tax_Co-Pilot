@@ -744,6 +744,238 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
+  - id: "fed.2023.credits.eic.num_children"
+    description: "Qualifying children for EIC, capped at 3 (parameters do not grow past three)"
+    form_line: "Schedule EIC"
+    type: "formula"
+    expression: "min(kids, cap)"
+    inputs:
+      kids: { ref: "input.qualifying_children" }
+      cap: { literal: "3" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.credits.eic.earned_income"
+    description: "Earned income for EIC: wages plus SE net profit minus the half-SE-tax deduction (Pub 596 Worksheet B)"
+    form_line: "EIC Worksheet Line 1"
+    type: "formula"
+    expression: "max(wages + nec - se_ded, 0)"
+    inputs:
+      wages: { ref: "fed.2023.gross_income.wages" }
+      nec: { ref: "fed.2023.gross_income.self_employment" }
+      se_ded: { ref: "fed.2023.se.deduction" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.credits.eic.max_credit"
+    description: "EIC maximum credit by filing status and qualifying children (MFS ineligible)"
+    form_line: "EIC Parameters"
+    type: "matrix_lookup"
+    keys:
+      - "input.filing_status"
+      - { ref: "fed.2023.credits.eic.num_children" }
+    table:
+      single:
+        "0": "600"
+        "1": "3995"
+        "2": "6604"
+        "3": "7430"
+      mfj:
+        "0": "600"
+        "1": "3995"
+        "2": "6604"
+        "3": "7430"
+      mfs:
+        "0": "0"
+        "1": "0"
+        "2": "0"
+        "3": "0"
+      hoh:
+        "0": "600"
+        "1": "3995"
+        "2": "6604"
+        "3": "7430"
+      qss:
+        "0": "600"
+        "1": "3995"
+        "2": "6604"
+        "3": "7430"
+
+  - id: "fed.2023.credits.eic.phase_in_rate"
+    description: "EIC phase-in (credit) percentage by qualifying children"
+    form_line: "EIC Parameters"
+    type: "matrix_lookup"
+    keys:
+      - "input.filing_status"
+      - { ref: "fed.2023.credits.eic.num_children" }
+    table:
+      single:
+        "0": "0.0765"
+        "1": "0.34"
+        "2": "0.40"
+        "3": "0.45"
+      mfj:
+        "0": "0.0765"
+        "1": "0.34"
+        "2": "0.40"
+        "3": "0.45"
+      mfs:
+        "0": "0.0765"
+        "1": "0.34"
+        "2": "0.40"
+        "3": "0.45"
+      hoh:
+        "0": "0.0765"
+        "1": "0.34"
+        "2": "0.40"
+        "3": "0.45"
+      qss:
+        "0": "0.0765"
+        "1": "0.34"
+        "2": "0.40"
+        "3": "0.45"
+
+  - id: "fed.2023.credits.eic.phase_out_start"
+    description: "AGI/earned income where the EIC phaseout begins (higher for MFJ)"
+    form_line: "EIC Parameters"
+    type: "matrix_lookup"
+    keys:
+      - "input.filing_status"
+      - { ref: "fed.2023.credits.eic.num_children" }
+    table:
+      single:
+        "0": "9800"
+        "1": "21560"
+        "2": "21560"
+        "3": "21560"
+      mfj:
+        "0": "16370"
+        "1": "28120"
+        "2": "28120"
+        "3": "28120"
+      mfs:
+        "0": "9800"
+        "1": "21560"
+        "2": "21560"
+        "3": "21560"
+      hoh:
+        "0": "9800"
+        "1": "21560"
+        "2": "21560"
+        "3": "21560"
+      qss:
+        "0": "9800"
+        "1": "21560"
+        "2": "21560"
+        "3": "21560"
+
+  - id: "fed.2023.credits.eic.phase_out_rate"
+    description: "EIC phaseout percentage by qualifying children"
+    form_line: "EIC Parameters"
+    type: "matrix_lookup"
+    keys:
+      - "input.filing_status"
+      - { ref: "fed.2023.credits.eic.num_children" }
+    table:
+      single:
+        "0": "0.0765"
+        "1": "0.1598"
+        "2": "0.2106"
+        "3": "0.2106"
+      mfj:
+        "0": "0.0765"
+        "1": "0.1598"
+        "2": "0.2106"
+        "3": "0.2106"
+      mfs:
+        "0": "0.0765"
+        "1": "0.1598"
+        "2": "0.2106"
+        "3": "0.2106"
+      hoh:
+        "0": "0.0765"
+        "1": "0.1598"
+        "2": "0.2106"
+        "3": "0.2106"
+      qss:
+        "0": "0.0765"
+        "1": "0.1598"
+        "2": "0.2106"
+        "3": "0.2106"
+
+  - id: "fed.2023.credits.eic.phase_in_amount"
+    description: "EIC phase-in amount (earned income times credit rate, capped at the maximum credit)"
+    form_line: "EIC Worksheet"
+    type: "formula"
+    expression: "min(earned * rate, max_credit)"
+    inputs:
+      earned: { ref: "fed.2023.credits.eic.earned_income" }
+      rate: { ref: "fed.2023.credits.eic.phase_in_rate" }
+      max_credit: { ref: "fed.2023.credits.eic.max_credit" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.credits.eic.phase_out_amount"
+    description: "EIC phaseout: reduction based on the greater of AGI or earned income above the threshold"
+    form_line: "EIC Worksheet"
+    type: "formula"
+    expression: "max((max(agi, earned) - start) * rate, 0)"
+    inputs:
+      agi: { ref: "fed.2023.agi.total" }
+      earned: { ref: "fed.2023.credits.eic.earned_income" }
+      start: { ref: "fed.2023.credits.eic.phase_out_start" }
+      rate: { ref: "fed.2023.credits.eic.phase_out_rate" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.credits.eic.tentative"
+    description: "Tentative EIC before the investment income test"
+    form_line: "EIC Worksheet"
+    type: "formula"
+    expression: "max(phase_in - phase_out, 0)"
+    inputs:
+      phase_in: { ref: "fed.2023.credits.eic.phase_in_amount" }
+      phase_out: { ref: "fed.2023.credits.eic.phase_out_amount" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.credits.eic.investment_income"
+    description: "Investment income for the EIC limit: taxable + tax-exempt interest, dividends, and net capital gain (not below zero)"
+    form_line: "Pub 596 Worksheet 1"
+    type: "formula"
+    expression: "interest + tax_exempt + dividends + max(gains, 0)"
+    inputs:
+      interest: { ref: "fed.2023.gross_income.interest" }
+      tax_exempt: { ref: "input.1099int.tax_exempt" }
+      dividends: { ref: "fed.2023.gross_income.dividends" }
+      gains: { ref: "fed.2023.gross_income.capital_gains" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.credits.eic.eligible"
+    description: "Investment income test (2023 limit $11000): 1 when at or under the limit, else 0"
+    form_line: "Pub 596 Rule 6"
+    type: "formula"
+    expression: "one - min(max((inv - limit) * mult, 0), one)"
+    inputs:
+      inv: { ref: "fed.2023.credits.eic.investment_income" }
+      limit: { literal: "11000.005" }
+      mult: { literal: "1000" }
+      one: { literal: "1" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.credits.eic.final"
+    description: "Earned income credit (refundable; reported with payments)"
+    form_line: "1040 Line 27"
+    type: "formula"
+    expression: "tentative * eligible"
+    inputs:
+      tentative: { ref: "fed.2023.credits.eic.tentative" }
+      eligible: { ref: "fed.2023.credits.eic.eligible" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
   - id: "fed.2023.tax.after_credits"
     description: "Federal tax after credits (cannot go below zero)"
     form_line: "1040 Line 22"
@@ -889,13 +1121,14 @@ rules:
     rounding_precision: 2
 
   - id: "fed.2023.total_payments"
-    description: "Total payments (withholding + estimated)"
+    description: "Total payments (withholding + estimated + refundable EIC)"
     form_line: "1040 Line 33"
     type: "sum"
     inputs:
       items:
         - { ref: "fed.2023.total_withholding" }
         - { ref: "fed.2023.estimated_payments" }
+        - { ref: "fed.2023.credits.eic.final" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 

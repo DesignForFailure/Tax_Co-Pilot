@@ -282,6 +282,7 @@ class ReturnOutput(BaseModel):
     total_credits: Decimal = Decimal("0")
     tax_before_credits: Decimal = Decimal("0")
     self_employment_tax: Decimal = Decimal("0")
+    earned_income_credit: Decimal = Decimal("0")
 
 
 class StateReturnOutput(BaseModel):

@@ -47,6 +47,7 @@ class Form1040Lines(BaseModel):
     # Payments
     line_25d: Decimal = Decimal("0")  # Federal income tax withheld
     line_26: Decimal = Decimal("0")   # Estimated tax payments
+    line_27: Decimal = Decimal("0")   # Earned income credit (EIC, refundable)
     line_33: Decimal = Decimal("0")   # Total payments
 
     # Refund or Amount Owed

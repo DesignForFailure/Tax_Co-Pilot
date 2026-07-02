@@ -411,6 +411,7 @@ Tax_Co-Pilot/
     ├── test_data_mgmt.py
     ├── test_encoding_guard.py
     ├── test_encrypted_database.py
+    ├── test_eitc.py
     ├── test_encryption.py
     ├── test_engine_hardening.py
     ├── test_error_paths.py

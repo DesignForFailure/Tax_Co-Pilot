@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–18 complete; Phase 3 concludes with M19 (EITC), whose dependencies (M16, M18) are now both in place.
-**SemVer line:** `0.3.x` (promoted on Phase 2 completion, per the release trajectory below).
-**Test suite:** 449 passing, 4 skipped, 0 failures.
+**Status:** Late Alpha — milestones 1–19 complete; Phases 1–3 are done. Next up: Phase 4 (M20–M24).
+**SemVer line:** `0.3.x`.
+**Test suite:** 467 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -485,6 +485,8 @@ These milestones fix known calculation inaccuracies.
 ---
 
 ### M19: Earned Income Tax Credit (EITC)
+
+**Status:** Complete on 2026-07-02. The 2023/2024/2025 packs (v1.4.0) implement IRC §32 with `matrix_lookup` parameter tables (filing status × children capped at 3; MFS ineligible via a zero column; MFJ gets the higher phaseout thresholds), Pub 596 Worksheet B earned income (wages + SE net profit − half-SE-tax deduction), phaseout on the greater of AGI or earned income, and the per-year investment income limit. Deviation from the sketch below: the EIC is refundable, so it flows into total payments (1040 Line 27) instead of `tax.after_credits` — refundability is preserved and golden-tested. Parameter dollar amounts were corrected to each year's Revenue Procedure (the figures below are TY2023 values). 18 golden vectors in `tests/test_eitc.py`.
 
 **Goal:** Implement EITC using the `matrix_lookup` rule type from M16.
 
