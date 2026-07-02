@@ -133,7 +133,12 @@ class CalculationEngine:
             deduction_applied=self.resolved.get(f"fed.{yr}.deductions.applied", Decimal("0")),
             child_tax_credit=self.resolved.get(f"fed.{yr}.credits.ctc.final", Decimal("0")),
             total_credits=self.resolved.get(f"fed.{yr}.credits.total", Decimal("0")),
-            tax_before_credits=self.resolved.get(f"fed.{yr}.tax.brackets", Decimal("0")),
+            # Prefer the QDCGT-worksheet total (ordinary + LTCG); fall back to
+            # the plain bracket tax for custom packs predating M17.
+            tax_before_credits=self.resolved.get(
+                f"fed.{yr}.tax.total_before_credits",
+                self.resolved.get(f"fed.{yr}.tax.brackets", Decimal("0")),
+            ),
         )
 
         state_outputs = self._run_states()
@@ -230,6 +235,12 @@ class CalculationEngine:
         self.resolved["input.1099div.ordinary"] = self.inputs.total_dividends()
         self.resolved["input.1099div.qualified"] = self.inputs.total_qualified_dividends()
         self.resolved["input.1099b.net_gain"] = self.inputs.total_capital_gains()
+        self.resolved["input.1099b.long_term_gain"] = (
+            self.inputs.total_long_term_capital_gains()
+        )
+        self.resolved["input.1099b.short_term_gain"] = (
+            self.inputs.total_short_term_capital_gains()
+        )
         self.resolved["input.withholding.federal"] = self.inputs.total_federal_withholding()
         self.resolved["input.1099nec.compensation"] = self.inputs.total_self_employment_income()
         self.resolved["input.ssa.total_benefits"] = self.inputs.total_social_security_benefits()

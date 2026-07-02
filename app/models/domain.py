@@ -182,6 +182,18 @@ class TaxReturnInput(BaseModel):
     def total_capital_gains(self) -> Decimal:
         return sum((f.net_gain for tp in self.taxpayers for f in tp.form_1099_bs), Decimal("0"))
 
+    def total_long_term_capital_gains(self) -> Decimal:
+        return sum(
+            (f.net_gain for tp in self.taxpayers for f in tp.form_1099_bs if f.is_long_term),
+            Decimal("0"),
+        )
+
+    def total_short_term_capital_gains(self) -> Decimal:
+        return sum(
+            (f.net_gain for tp in self.taxpayers for f in tp.form_1099_bs if not f.is_long_term),
+            Decimal("0"),
+        )
+
     def total_federal_withholding(self) -> Decimal:
         total = Decimal("0")
         for tp in self.taxpayers:

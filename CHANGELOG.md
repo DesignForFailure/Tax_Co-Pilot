@@ -10,7 +10,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+- **Roadmap v2 Milestone 17 (complete): Long-term capital gains preferential rates.** Long-term capital gains and qualified dividends are now taxed at 0%/15%/20% via the Qualified Dividends and Capital Gain Tax Worksheet instead of ordinary rates. New domain helpers (`total_long_term_capital_gains`, `total_short_term_capital_gains`) and engine inputs (`input.1099b.long_term_gain`/`short_term_gain`); new rules in the 2023/2024/2025 federal packs (bumped to 1.2.0): Schedule D short/long netting (`income.net_capital_gain` = smaller of lines 15/16, floored at zero), `income.preferential` (qualified dividends + net capital gain, capped at taxable income), `income.ordinary`, year-correct 0%/15% ceilings from IRS Rev. Procs. 2022-38/2023-34/2024-40, rate stacking on top of ordinary income (`tax.ltcg`), and the worksheet's final smaller-of comparison against all-ordinary tax (`tax.total_before_credits`, now the owner of 1040 Line 16). Short-term gains remain at ordinary rates; the -$3,000/-$1,500 capital loss limitation is unchanged. `ReturnOutput.tax_before_credits` prefers the worksheet total and falls back to the plain bracket tax for custom packs predating this change. Covered by `tests/test_ltcg_rates.py` (16 hand-verified golden vectors, including the smaller-of band where all-ordinary treatment wins).
 
 ## [0.3.0] - 2026-07-02
 
