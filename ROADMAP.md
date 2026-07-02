@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–12 complete; Phase 1 continues with M13–M15.
+**Status:** Late Alpha — milestones 1–13 complete; Phase 1 continues with M14–M15.
 **SemVer line:** `0.1.x`
-**Test suite:** 308 passing, 4 skipped, 0 failures.
+**Test suite:** 373 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -105,6 +105,8 @@ main.py                      # App factory, lifespan, middleware, router include
 ---
 
 ### M13: Structured Logging
+
+**Status:** Complete on 2026-07-02. `app/log.py` configures the `tax_copilot` logger at startup; security events (unlock, key rotation, run lifecycle, hash verification, CSRF failures, backup/restore, imports) all produce log entries, and an AST guard test in `tests/test_logging.py` enforces that no `except Exception` block swallows silently.
 
 **Goal:** Add Python `logging` throughout the application so that security events, errors, and operational state changes are observable.
 

@@ -233,6 +233,7 @@ Tax_Co-Pilot/
 │   │   ├── calculator.py
 │   │   ├── rule_loader.py
 │   │   └── whatif.py
+│   ├── log.py
 │   ├── models/
 │   │   ├── __init__.py
 │   │   ├── domain.py
@@ -411,6 +412,7 @@ Tax_Co-Pilot/
     ├── test_golden_m1.py
     ├── test_hash_versioning.py
     ├── test_itemized_credits.py
+    ├── test_logging.py
     ├── test_milestone12_structure.py
     ├── test_milestone6_routes.py
     ├── test_multi_year.py

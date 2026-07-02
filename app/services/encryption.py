@@ -43,8 +43,12 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from app.log import get_logger
+
 if TYPE_CHECKING:
     pass
+
+logger = get_logger(__name__)
 
 
 class HybridRow:
@@ -112,6 +116,7 @@ def rotate_key(old_password: str, new_password: str) -> None:
 
     from app.services.database import DB_PATH
 
+    logger.info("Key rotation started (db=%s)", DB_PATH)
     conn = sqlcipher.connect(str(DB_PATH), timeout=10.0, isolation_level=None)
     try:
         old_hex = _hex_encode_key(old_password)
@@ -123,8 +128,12 @@ def rotate_key(old_password: str, new_password: str) -> None:
         conn.execute(f"PRAGMA rekey = \"x'{new_hex}'\"")
         # Verify new key works
         conn.execute("SELECT count(*) FROM sqlite_master")
+    except Exception:
+        logger.error("Key rotation failed", exc_info=True)
+        raise
     finally:
         conn.close()
+    logger.info("Key rotation succeeded")
 
 
 class DatabaseState(Enum):
@@ -192,6 +201,13 @@ def detect_encryption_state(db_path: Path) -> DatabaseState:
     Returns:
         DatabaseState enum value
     """
+    state = _detect_encryption_state(db_path)
+    logger.debug("Encryption state detection: %s (path=%s)", state.value, db_path)
+    return state
+
+
+def _detect_encryption_state(db_path: Path) -> DatabaseState:
+    """Probe the database file; see detect_encryption_state for the strategy."""
     if not db_path.exists():
         return DatabaseState.NONE
 
@@ -247,10 +263,14 @@ def validate_password(password: str) -> None:
         PasswordValidationError: If password doesn't meet requirements
     """
     if not password or not password.strip():
+        logger.warning("Password validation failed: empty password")
         raise PasswordValidationError("Password cannot be empty")
 
     if len(password) < 12:
+        logger.warning("Password validation failed: below minimum length")
         raise PasswordValidationError("Password must be at least 12 characters long")
+
+    logger.debug("Password validation succeeded")
 
     # Optional: Add entropy checking here using zxcvbn or similar
     # For now, just enforce minimum length
@@ -283,6 +303,7 @@ def get_password_from_keyring(service_name: str = "tax_copilot", username: str =
         return str(password) if password is not None else None
     except Exception:
         # keyring library not available or error accessing keyring
+        logger.warning("Keyring read failed", exc_info=True)
         return None
 
 
@@ -305,6 +326,7 @@ def set_password_in_keyring(
         keyring.set_password(service_name, username, password)
         return True
     except Exception:
+        logger.warning("Keyring write failed", exc_info=True)
         return False
 
 
@@ -428,11 +450,12 @@ class SQLCipherProvider(EncryptionProvider):
             return conn  # type: ignore
 
         except Exception as e:
+            logger.warning("Failed to open encrypted database (path=%s): %s", db_path, e)
             if conn is not None:
                 try:
                     conn.close()
                 except Exception:
-                    pass
+                    logger.debug("Closing failed encrypted connection raised", exc_info=True)
             raise ValueError(
                 f"Failed to open encrypted database. "
                 f"Password may be incorrect or database corrupted: {e}"
@@ -592,7 +615,9 @@ def migrate_to_encrypted(
 
     # Determine migration strategy based on provider
     if isinstance(provider, SQLCipherProvider):
+        logger.info("Encryption migration started (path=%s)", db_path)
         _migrate_to_sqlcipher(db_path, password, kdf_iterations, backup_suffix)
+        logger.info("Encryption migration succeeded (path=%s)", db_path)
     else:
         raise RuntimeError(f"Unsupported provider type: {type(provider)}")
 
@@ -687,6 +712,7 @@ def _migrate_to_sqlcipher(
 
     except Exception as e:
         # Cleanup on failure
+        logger.error("Encryption migration failed", exc_info=True)
         if encrypted_path.exists():
             encrypted_path.unlink()
         raise RuntimeError(f"SQLCipher migration failed: {e}") from e

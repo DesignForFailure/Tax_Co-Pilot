@@ -7,6 +7,10 @@ import secrets
 
 from fastapi import Request
 
+from app.log import get_logger
+
+logger = get_logger(__name__)
+
 
 def get_csrf_token(request: Request) -> str:
     """Return the current CSRF token or mint one."""
@@ -23,5 +27,6 @@ def verify_csrf(request: Request, form_token: str) -> None:
     if not cookie_token or not secrets.compare_digest(
         cookie_token.encode("utf-8"), (form_token or "").encode("utf-8")
     ):
+        logger.warning("CSRF validation failed (path=%s)", request.url.path)
         raise ValueError("CSRF validation failed")
 

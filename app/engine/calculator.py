@@ -41,7 +41,10 @@ from decimal import ROUND_DOWN, ROUND_HALF_UP, ROUND_UP, Decimal
 from typing import Any
 
 from app.engine.rule_loader import RulePack, RulePackError
+from app.log import get_logger
 from app.models.domain import ReturnOutput, ReturnRun, StateReturnOutput, TaxReturnInput, TraceNode
+
+logger = get_logger(__name__)
 
 ROUNDING_MODES = {
     "ROUND_HALF_UP": ROUND_HALF_UP,
@@ -338,6 +341,7 @@ class CalculationEngine:
         try:
             return _to_decimal(spec)
         except Exception as e:
+            logger.debug("Cannot resolve value spec: %r", spec, exc_info=True)
             raise RulePackError(f"Cannot resolve value spec: {spec!r}") from e
 
     # ─── Rule evaluators ───────────────────────────────────────
@@ -669,6 +673,7 @@ class CalculationEngine:
         try:
             return Decimal(expr)
         except Exception as e:
+            logger.debug("Cannot evaluate expression atom: %r", expr, exc_info=True)
             raise RulePackError(f"Cannot evaluate expression atom: '{expr}'") from e
 
     def _explain_formula(self, expr: str, inputs: dict[str, Decimal], result: Decimal) -> str:

@@ -24,6 +24,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.datastructures import UploadFile
 
 from app.config import config as encryption_config
+from app.log import get_logger
 from app.models.domain import ReturnRun
 from app.route_helpers.csrf import get_csrf_token, verify_csrf
 from app.route_helpers.db_state import load_run_from_row, locked_database_response
@@ -47,6 +48,8 @@ from app.services.database import (
 from app.services.form_mapper import map_return_run
 
 router = APIRouter(tags=["import-export"])
+
+logger = get_logger(__name__)
 
 
 def _templates(request: Request) -> Jinja2Templates:
@@ -77,6 +80,12 @@ async def import_csv_submit(request: Request) -> Response:
         )
     record_type = str(fd.get("record_type", "W2") or "W2")
     records_raw, errors = import_csv_records(csv_text, record_type)
+    logger.info(
+        "CSV import: record_type=%s, count=%d, error_count=%d",
+        record_type,
+        len(records_raw),
+        len(errors),
+    )
     csrf = get_csrf_token(request)
     response = _templates(request).TemplateResponse(
         request,
@@ -161,6 +170,7 @@ def export_all_runs() -> Response:
         try:
             hydrated.append(json.loads(load_run_from_row(row).model_dump_json()))
         except Exception:
+            logger.warning("Export-all: failed to hydrate run %s", row.get("id"), exc_info=True)
             hydrated.append({"error": f"Failed to hydrate run {row.get('id', '?')}", "id": row.get("id")})
     return Response(
         content=json.dumps(hydrated, ensure_ascii=False, indent=2),
@@ -211,8 +221,12 @@ async def import_returns(request: Request) -> Response:
             save_return_run(json.loads(run.model_dump_json()))
             imported += 1
         except Exception as exc:
+            logger.warning("Bulk import: entry %d rejected: %s", idx, exc)
             errors.append(f"Entry {idx}: {exc}")
 
+    logger.info(
+        "Bulk import complete: imported=%d, skipped_or_errors=%d", imported, len(errors)
+    )
     result = f"Imported {imported} run(s)."
     if errors:
         result += f" {len(errors)} error(s): " + "; ".join(errors[:5])
@@ -227,7 +241,8 @@ def backup_database() -> Response:
         with closing(get_connection()) as conn:
             conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     except Exception:
-        pass
+        logger.warning("Backup: WAL checkpoint failed", exc_info=True)
+    logger.info("Backup downloaded (db=%s)", DB_PATH.name)
     return Response(
         content=DB_PATH.read_bytes(),
         media_type="application/octet-stream",
@@ -261,10 +276,14 @@ async def restore_database(request: Request) -> Response:
             result = test_conn.execute("PRAGMA integrity_check").fetchone()
             test_conn.close()
             if not result or result[0] != "ok":
+                logger.warning("Restore rejected: uploaded file failed integrity check")
                 return HTMLResponse(
                     "Uploaded file is not a valid SQLite database", status_code=400
                 )
         except Exception:
+            logger.warning(
+                "Restore rejected: uploaded file is not readable as SQLite", exc_info=True
+            )
             return HTMLResponse("Uploaded file is not a valid SQLite database", status_code=400)
         finally:
             Path(tmp_path).unlink(missing_ok=True)
@@ -297,6 +316,7 @@ async def restore_database(request: Request) -> Response:
     try:
         init_db()
     except Exception as exc:
+        logger.exception("Restore failed; original database preserved")
         if backup_copy and backup_copy.exists():
             for suffix in ("-wal", "-shm"):
                 Path(str(DB_PATH) + suffix).unlink(missing_ok=True)
@@ -308,4 +328,5 @@ async def restore_database(request: Request) -> Response:
         )
     if backup_copy and backup_copy.exists():
         backup_copy.unlink(missing_ok=True)
+    logger.info("Database restored from uploaded backup")
     return RedirectResponse(url="/runs", status_code=303)

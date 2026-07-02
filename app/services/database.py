@@ -46,6 +46,7 @@ from contextlib import closing
 from pathlib import Path
 
 from app.config import config
+from app.log import get_logger
 from app.services.encryption import (
     DatabaseState,
     detect_encryption_state,
@@ -56,6 +57,8 @@ from app.services.encryption import (
 # Overridable so tests (and packagers) can point at an isolated database file.
 DB_PATH = Path(os.environ.get("TAX_COPILOT_DB_PATH", "data/tax_copilot.db"))
 DB_SCHEMA_VERSION = 1
+
+logger = get_logger(__name__)
 
 # Global password cache (set by main.py startup or unlock route)
 _cached_password: str | None = None
@@ -284,6 +287,7 @@ def init_db() -> None:
         current_schema_version = int(schema_row[0]) if schema_row else 0
         if current_schema_version < DB_SCHEMA_VERSION:
             conn.execute(f"PRAGMA user_version = {DB_SCHEMA_VERSION}")
+    logger.info("Database initialized (path=%s, schema_version=%s)", DB_PATH, DB_SCHEMA_VERSION)
 
 
 def _backfill_hash_versions(conn: sqlite3.Connection) -> None:
@@ -316,6 +320,7 @@ def _backfill_hash_versions(conn: sqlite3.Connection) -> None:
         except (json.JSONDecodeError, TypeError):
             # Corrupted blob — leave hash_version=0 so verify_chain reports it
             # instead of blocking application startup.
+            logger.error("Hash version backfill: JSON decode error at run %s", row["id"])
             continue
         stored = row["integrity_hash"]
         if _compute_integrity_hash_v2(run_data) == stored:
@@ -376,8 +381,18 @@ def save_return_run(run_data: dict) -> None:
             )
             conn.execute("COMMIT")
         except Exception:
+            logger.exception(
+                "Return run insert failed; transaction rolled back (id=%s)",
+                run_data.get("id"),
+            )
             conn.execute("ROLLBACK")
             raise
+    logger.info(
+        "Return run created (id=%s, tax_year=%s, filing_status=%s)",
+        run_data["id"],
+        run_data["tax_year"],
+        run_data["filing_status"],
+    )
 
 
 def list_return_runs(tax_year: int | None = None) -> list[dict]:
@@ -425,6 +440,7 @@ def delete_return_run(run_id: str) -> None:
             ).fetchone()
             if row is None:
                 conn.execute("COMMIT")
+                logger.debug("Return run deletion skipped; id=%s not found", run_id)
                 return
 
             successor = conn.execute(
@@ -442,8 +458,12 @@ def delete_return_run(run_id: str) -> None:
             conn.execute("DELETE FROM return_runs WHERE id = ?", (run_id,))
             conn.execute("COMMIT")
         except Exception:
+            logger.exception(
+                "Return run deletion failed; transaction rolled back (id=%s)", run_id
+            )
             conn.execute("ROLLBACK")
             raise
+    logger.info("Return run deleted (id=%s)", run_id)
 
 
 def update_run_annotation(run_id: str, tags: str, notes: str) -> bool:
@@ -501,6 +521,7 @@ def verify_chain() -> list[dict]:
                 "rule_pack_checksum": row["rule_pack_checksum"],
             }
         except (json.JSONDecodeError, TypeError):
+            logger.error("Hash verification: JSON decode error at run %s", run_id)
             errors.append({
                 "id": run_id,
                 "error": "corrupted",
@@ -527,4 +548,13 @@ def verify_chain() -> list[dict]:
         # recomputed hash would falsely flag the row after a tampered one.
         prev_hash = stored_hash
 
+    if errors:
+        logger.error(
+            "Hash chain verification failed: %d error(s), first at run %s (%s)",
+            len(errors),
+            errors[0].get("id"),
+            errors[0].get("error"),
+        )
+    else:
+        logger.info("Hash chain verification passed (%d run(s))", len(rows))
     return errors
