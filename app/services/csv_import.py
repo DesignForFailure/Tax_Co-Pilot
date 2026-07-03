@@ -148,6 +148,10 @@ def import_csv(csv_text: str, record_type: str) -> tuple[list[BaseModel], list[s
                         federal_withheld=_money(
                             row.get("federal_withheld", "0"), allow_negative=False
                         ),
+                        medicare_wages=_money(
+                            row.get("medicare_wages", "0"), allow_negative=False
+                        ),
+                        medicare_tax=_money(row.get("medicare_tax", "0"), allow_negative=False),
                         state=(row.get("state") or "").strip(),
                         state_withheld=_money(row.get("state_withheld", "0"), allow_negative=False),
                         state_wages=_money(

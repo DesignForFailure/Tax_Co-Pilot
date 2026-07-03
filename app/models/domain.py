@@ -208,6 +208,26 @@ class TaxReturnInput(BaseModel):
     def total_wages(self) -> Decimal:
         return sum((w.wages for tp in self.taxpayers for w in tp.w2s), Decimal("0"))
 
+    def total_medicare_wages(self) -> Decimal:
+        """W-2 Box 5 total, falling back to Box 1 per W-2 when Box 5 is blank.
+
+        Box 5 is usually >= Box 1 (pre-tax retirement deferrals do not
+        reduce Medicare wages), so a blank Box 5 means "not entered",
+        not "zero Medicare wages".
+        """
+        return sum(
+            (
+                w.medicare_wages if w.medicare_wages > 0 else w.wages
+                for tp in self.taxpayers
+                for w in tp.w2s
+            ),
+            Decimal("0"),
+        )
+
+    def total_medicare_withheld(self) -> Decimal:
+        """W-2 Box 6 total (regular 1.45% plus any 0.9% surtax withheld)."""
+        return sum((w.medicare_tax for tp in self.taxpayers for w in tp.w2s), Decimal("0"))
+
     def total_interest(self) -> Decimal:
         return sum(
             (f.interest_income for tp in self.taxpayers for f in tp.form_1099_ints), Decimal("0")

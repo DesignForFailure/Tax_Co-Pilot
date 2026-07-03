@@ -283,6 +283,8 @@ class CalculationEngine:
 
     def _resolve_inputs(self) -> None:
         self.resolved["input.w2.wages"] = self.inputs.total_wages()
+        self.resolved["input.w2.medicare_wages"] = self.inputs.total_medicare_wages()
+        self.resolved["input.w2.medicare_withheld"] = self.inputs.total_medicare_withheld()
         self.resolved["input.1099int.amount"] = self.inputs.total_interest()
         self.resolved["input.1099int.tax_exempt"] = self.inputs.total_tax_exempt_interest()
         self.resolved["input.1099div.ordinary"] = self.inputs.total_dividends()

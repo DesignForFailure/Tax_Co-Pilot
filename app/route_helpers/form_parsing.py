@@ -198,11 +198,15 @@ def parse_w2s(fd: FormData, prefix: str) -> list[W2Data]:
         state = form_str(fd, f"{base}_state").upper()
         state_wages = form_money(fd, f"{base}_state_wages")
         state_withheld = form_money(fd, f"{base}_state_withheld")
+        medicare_wages = form_money(fd, f"{base}_medicare_wages")
+        medicare_withheld = form_money(fd, f"{base}_medicare_withheld")
         if (
             wages == 0
             and withheld == 0
             and state_wages == 0
             and state_withheld == 0
+            and medicare_wages == 0
+            and medicare_withheld == 0
             and not employer
             and not state
         ):
@@ -212,6 +216,8 @@ def parse_w2s(fd: FormData, prefix: str) -> list[W2Data]:
                 employer_name=employer,
                 wages=wages,
                 federal_withheld=withheld,
+                medicare_wages=medicare_wages,
+                medicare_tax=medicare_withheld,
                 state=state,
                 state_wages=state_wages,
                 state_withheld=state_withheld,
