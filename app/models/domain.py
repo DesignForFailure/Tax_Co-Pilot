@@ -339,6 +339,7 @@ class ReturnOutput(BaseModel):
     earned_income_credit: Decimal = Decimal("0")
     education_credits: Decimal = Decimal("0")
     dependent_care_credit: Decimal = Decimal("0")
+    net_investment_income_tax: Decimal = Decimal("0")
 
 
 class StateReturnOutput(BaseModel):

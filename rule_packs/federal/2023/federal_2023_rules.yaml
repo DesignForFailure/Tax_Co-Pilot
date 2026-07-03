@@ -59,6 +59,12 @@ constants:
     mfs: "0"
     hoh: "0"
     qss: "0"
+  niit_threshold:
+    single: "200000"
+    mfj: "250000"
+    mfs: "125000"
+    hoh: "200000"
+    qss: "250000"
   standard_deduction:
     single: "13850"
     mfj: "27700"
@@ -1197,6 +1203,59 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
+  - id: "fed.2023.niit.threshold"
+    description: "NIIT MAGI threshold (IRC 1411(b): statutory, not inflation-indexed)"
+    form_line: "Form 8960 Line 14"
+    type: "lookup"
+    table: "constants.niit_threshold"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2023.niit.investment_income"
+    description: "Net investment income: taxable interest + dividends + net capital gain as included in income, not below zero (tax-exempt interest excluded)"
+    form_line: "Form 8960 Line 8"
+    type: "formula"
+    expression: "max(interest + dividends + gains, 0)"
+    inputs:
+      interest: { ref: "fed.2023.gross_income.interest" }
+      dividends: { ref: "fed.2023.gross_income.dividends" }
+      gains: { ref: "fed.2023.gross_income.capital_gains_limited" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.niit.magi_excess"
+    description: "MAGI above the NIIT threshold (AGI used as MAGI — foreign exclusions unmodeled)"
+    form_line: "Form 8960 Line 15"
+    type: "formula"
+    expression: "max(agi - threshold, 0)"
+    inputs:
+      agi: { ref: "fed.2023.agi.total" }
+      threshold: { ref: "fed.2023.niit.threshold" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.niit.final"
+    description: "Net investment income tax: 3.8% of the smaller of net investment income or the MAGI excess"
+    form_line: "Form 8960 Line 17"
+    type: "formula"
+    expression: "min(nii, excess) * rate"
+    inputs:
+      nii: { ref: "fed.2023.niit.investment_income" }
+      excess: { ref: "fed.2023.niit.magi_excess" }
+      rate: { literal: "0.038" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.tax.other_taxes"
+    description: "Other taxes from Schedule 2: self-employment tax + net investment income tax"
+    form_line: "1040 Line 23"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "fed.2023.se.total" }
+        - { ref: "fed.2023.niit.final" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
   - id: "fed.2023.tax.after_credits"
     description: "Federal tax after credits (cannot go below zero)"
     form_line: "1040 Line 22"
@@ -1292,7 +1351,7 @@ rules:
 
   - id: "fed.2023.se.total"
     description: "Total self-employment tax (Schedule SE Line 12, reported via Schedule 2 Line 4)"
-    form_line: "1040 Line 23"
+    form_line: "Schedule 2 Line 4"
     type: "sum"
     inputs:
       items:
@@ -1319,7 +1378,7 @@ rules:
     inputs:
       items:
         - { ref: "fed.2023.tax.after_credits" }
-        - { ref: "fed.2023.se.total" }
+        - { ref: "fed.2023.tax.other_taxes" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
