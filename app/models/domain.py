@@ -409,6 +409,7 @@ class ReturnOutput(BaseModel):
     dependent_care_credit: Decimal = Decimal("0")
     net_investment_income_tax: Decimal = Decimal("0")
     additional_child_tax_credit: Decimal = Decimal("0")
+    additional_medicare_tax: Decimal = Decimal("0")
 
 
 class StateReturnOutput(BaseModel):

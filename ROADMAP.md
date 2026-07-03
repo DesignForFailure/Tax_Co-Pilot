@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–26 complete; Phase 5 (the "missing 10%", M25–M28) continues toward `0.5.0`.
+**Status:** Late Alpha — milestones 1–27 complete; Phase 5 (the "missing 10%", M25–M28) concludes with M28.
 **SemVer line:** `0.4.x`.
-**Test suite:** 585 passing, 4 skipped, 0 failures.
+**Test suite:** 596 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -632,6 +632,8 @@ Common-household items still absent after Phase 4. Verify every parameter agains
 **Goal:** Schedule 8812 in full: the refundable Additional Child Tax Credit (up to $1,600/$1,700/$1,700 per child for 2023/2024/2025, 15% of earned income over $2,500) flowing to 1040 line 28, and the $500 nonrefundable credit for other dependents (ODC). Requires modeling `other_dependents` alongside `qualifying_children`.
 
 ### M27: Additional Medicare Tax (Form 8959)
+
+**Status:** Complete on 2026-07-03. The 2023/2024/2025 packs (v1.11.0) implement the 0.9% surtax with the wage-reduced SE threshold and the floor-gated Schedule SE earnings base, joining Schedule 2 → line 23. Box 1 stands in for Box 5, and employer surtax withholding remains unmodeled (documented). 11 tests in `tests/test_additional_medicare.py`.
 
 **Goal:** 0.9% on Medicare wages + SE income above $200k single/HoH/QSS, $250k MFJ, $125k MFS (not inflation-indexed). Joins Schedule 2 → 1040 line 23 alongside SE tax and NIIT. Withholding of the surtax (W-2 Box 6 over 1.45%) is out of scope until Box 5/6 inputs exist — document.
 
