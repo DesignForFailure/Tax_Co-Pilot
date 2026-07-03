@@ -58,14 +58,25 @@ rules:
     table: "constants.personal_exemption"
     key: { ref: "input.filing_status" }
 
-  - id: "ga.2023.taxable_income"
-    description: "Georgia taxable income = max(AGI - standard deduction - personal exemption, 0)"
+  - id: "ga.2023.dependent_exemption"
+    description: "Georgia dependent exemption: $3000 per dependent (O.C.G.A. 48-7-26)"
     type: "formula"
-    expression: "max(agi - deduction - exemption, 0)"
+    expression: "amount * dependents"
+    inputs:
+      amount: { literal: "3000" }
+      dependents: { ref: "input.dependents.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ga.2023.taxable_income"
+    description: "Georgia taxable income = max(AGI - standard deduction - personal exemption - dependent exemption, 0)"
+    type: "formula"
+    expression: "max(agi - deduction - exemption - dep_exemption, 0)"
     inputs:
       agi: { ref: "ga.2023.agi" }
       deduction: { ref: "ga.2023.standard_deduction" }
       exemption: { ref: "ga.2023.personal_exemption" }
+      dep_exemption: { ref: "ga.2023.dependent_exemption" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 

@@ -318,6 +318,7 @@ class CalculationEngine:
             self.inputs.qualifying_children
         )
         self.resolved["input.other_dependents"] = Decimal(self.inputs.other_dependents)
+        self.resolved["input.dependents.total"] = self.inputs.total_dependents()
 
         # Education credits (Form 8863)
         self.resolved["input.education.aotc_tier1"] = self.inputs.aotc_expenses_tier1()
@@ -335,6 +336,7 @@ class CalculationEngine:
         # Age / blindness checkboxes (M25)
         self.resolved["input.age_blind.boxes"] = self.inputs.age_blind_boxes()
         self.resolved["input.age_blind.seniors"] = self.inputs.seniors_count()
+        self.resolved["input.age_blind.blind"] = self.inputs.blind_count()
 
         # Military service inputs (M24)
         self.resolved["input.military.combat_pay"] = self.inputs.total_combat_pay()

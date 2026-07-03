@@ -21,8 +21,8 @@
 #     repealed (2024 IT-511 "What's New").
 #   - GA HB 1015 (2024): flat rate accelerated to 5.39% retroactive to
 #     1/1/2024.
-#   - GA HB 1021 (2024): dependent exemption raised to $4,000 (not modeled
-#     here; consistent with the 2025 pack).
+#   - GA HB 1021 (2024): dependent exemption raised to $4,000 (modeled
+#     since pack v1.4.0).
 constants:
   standard_deduction:
     single: "12000"
@@ -54,13 +54,24 @@ rules:
     table: "constants.standard_deduction"
     key: { ref: "input.filing_status" }
 
-  - id: "ga.2024.taxable_income"
-    description: "Georgia taxable income = max(AGI - standard deduction, 0); personal exemptions repealed by SB 56 effective TY 2024"
+  - id: "ga.2024.dependent_exemption"
+    description: "Georgia dependent exemption: $4000 per dependent (O.C.G.A. 48-7-26; HB 1021 raised from $3,000 effective TY 2024)"
     type: "formula"
-    expression: "max(agi - deduction, 0)"
+    expression: "amount * dependents"
+    inputs:
+      amount: { literal: "4000" }
+      dependents: { ref: "input.dependents.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ga.2024.taxable_income"
+    description: "Georgia taxable income = max(AGI - standard deduction - dependent exemption, 0); personal exemptions for self/spouse repealed by SB 56"
+    type: "formula"
+    expression: "max(agi - deduction - dep_exemption, 0)"
     inputs:
       agi: { ref: "ga.2024.agi" }
       deduction: { ref: "ga.2024.standard_deduction" }
+      dep_exemption: { ref: "ga.2024.dependent_exemption" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 

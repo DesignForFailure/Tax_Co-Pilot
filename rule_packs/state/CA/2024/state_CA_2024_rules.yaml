@@ -38,6 +38,17 @@ constants:
     hoh: "104842"
     qss: "104842"
 
+  # Form 540 lines 7-10 exemption credits for 2024: $149 per personal/
+  # blind/senior unit (2 personal units for MFJ and QSS), $461 per
+  # dependent. The high-AGI exemption credit phaseout (R&TC 17054.1)
+  # is unmodeled.
+  exemption_credit_personal:
+    single: "149"
+    mfj: "298"
+    mfs: "149"
+    hoh: "149"
+    qss: "298"
+
 rules:
   - id: "ca.2024.agi"
     description: "California AGI (MVP: starts from federal AGI)"
@@ -174,12 +185,62 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
-  - id: "ca.2024.credits.total"
-    description: "Total California nonrefundable credits"
+  - id: "ca.2024.credits.exemption.personal"
+    description: "Personal exemption credit ($149 per Form 540 line 7 unit; 2 units for MFJ/QSS)"
+    type: "lookup"
+    table: "constants.exemption_credit_personal"
+    key: { ref: "input.filing_status" }
+
+  - id: "ca.2024.credits.exemption.blind"
+    description: "Blind exemption credit: $149 per visually impaired taxpayer (Form 540 line 8)"
+    type: "formula"
+    expression: "amount * blind"
+    inputs:
+      amount: { literal: "149" }
+      blind: { ref: "input.age_blind.blind" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ca.2024.credits.exemption.senior"
+    description: "Senior exemption credit: $149 per taxpayer 65 or older (Form 540 line 9)"
+    type: "formula"
+    expression: "amount * seniors"
+    inputs:
+      amount: { literal: "149" }
+      seniors: { ref: "input.age_blind.seniors" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ca.2024.credits.exemption.dependent"
+    description: "Dependent exemption credit: $461 per dependent (Form 540 line 10)"
+    type: "formula"
+    expression: "amount * dependents"
+    inputs:
+      amount: { literal: "461" }
+      dependents: { ref: "input.dependents.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ca.2024.credits.exemptions"
+    description: "Total Form 540 exemption credits (line 11; high-AGI phaseout unmodeled)"
     type: "sum"
     inputs:
       items:
-        - { ref: "ca.2024.credits.renter" }
+        - { ref: "ca.2024.credits.exemption.personal" }
+        - { ref: "ca.2024.credits.exemption.blind" }
+        - { ref: "ca.2024.credits.exemption.senior" }
+        - { ref: "ca.2024.credits.exemption.dependent" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ca.2024.credits.total"
+    description: "Total California nonrefundable credits (exemption credits + renter's credit), capped at tax"
+    type: "formula"
+    expression: "min(renter + exemptions, tax)"
+    inputs:
+      renter: { ref: "ca.2024.credits.renter" }
+      exemptions: { ref: "ca.2024.credits.exemptions" }
+      tax: { ref: "ca.2024.tax" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
