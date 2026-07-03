@@ -225,6 +225,8 @@ def test_trace_completeness() -> None:
         "fed.2024.addl_medicare.se_threshold",
         "fed.2024.addl_medicare.se_excess",
         "fed.2024.addl_medicare.final",
+        "fed.2024.addl_medicare.regular_withholding",
+        "fed.2024.addl_medicare.withholding",
         "fed.2024.tax.brackets",
         "fed.2024.credits.ctc.base",
         "fed.2024.credits.ctc.threshold",

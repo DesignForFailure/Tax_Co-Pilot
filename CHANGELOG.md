@@ -10,6 +10,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- **Roadmap Milestone 29 (complete): W-2 Box 5/6 and Form 8959 Part IV.** The dormant `medicare_wages` (Box 5) and `medicare_tax` (Box 6) fields on `W2Data` are wired end to end: the 2023/2024/2025 federal packs (bumped to 1.13.0) base the Additional Medicare Tax on **Medicare wages** (Box 5, which pre-tax retirement deferrals do not reduce; a blank Box 5 falls back to Box 1 per W-2), the Form 8959 line-12 SE threshold uses the same base, and **Part IV employer surtax withholding** — Box 6 in excess of 1.45% of Box 5 — is credited into `total_withholding` (1040 line 25d), so employer overwithholding (mandatory above $200k regardless of filing status) correctly refunds to MFJ couples under their $250k threshold. Box 5/6 fields join the W-2 rows on both pages (including the dynamic-row JS template), form parsing, and the CSV importer (optional `medicare_wages`/`medicare_tax` columns). This retires two M27 documented limitations. Covered by `tests/test_medicare_wages.py` (10 tests).
+
 ## [0.9.0] - 2026-07-03
 
 The hardening arc is complete; per the roadmap the version line is promoted to `0.9.0` (beta). Three legs: a four-track deep review of the entire codebase with 18 verified defects fixed (engine trust boundaries, integrity-chain ordering, the encryption activation path, web-layer error handling, and tax-math caps), the NY tax table benefit recapture closing the review's one deferred tax finding, and a 25-test boundary battery that the engine passed unmodified.

@@ -1496,11 +1496,8 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
-  # Additional Medicare Tax (M27, Form 8959). W-2 Box 1 wages stand in
-  # for Medicare wages (Box 5) - Box 5 has no input path yet, so pre-tax
-  # 401(k)-style deferrals that widen Box 5 are unmodeled. Employer
-  # surtax withholding (Form 8959 Part IV) likewise needs Box 6 inputs
-  # and is unmodeled; the liability settles in the refund line.
+  # Additional Medicare Tax (M27, Form 8959; M29 wired W-2 Box 5/6 in,
+  # including Part IV surtax withholding). RRTA compensation unmodeled.
   - id: "fed.2024.addl_medicare.threshold"
     description: "Additional Medicare Tax threshold (IRC 3101(b)(2): $200k single/HoH, $250k MFJ/QSS, $125k MFS; statutory, not indexed)"
     form_line: "Form 8959"
@@ -1509,12 +1506,12 @@ rules:
     key: { ref: "input.filing_status" }
 
   - id: "fed.2024.addl_medicare.wage_excess"
-    description: "Medicare wages above the threshold (Form 8959 Line 7 base; Box 1 wages used as the Box 5 proxy)"
+    description: "Medicare wages above the threshold (Form 8959 Line 6; W-2 Box 5, falling back to Box 1 per W-2 when Box 5 is blank)"
     form_line: "Form 8959 Line 6"
     type: "formula"
     expression: "max(wages - threshold, 0)"
     inputs:
-      wages: { ref: "fed.2024.gross_income.wages" }
+      wages: { ref: "input.w2.medicare_wages" }
       threshold: { ref: "fed.2024.addl_medicare.threshold" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
@@ -1526,7 +1523,7 @@ rules:
     expression: "max(threshold - wages, 0)"
     inputs:
       threshold: { ref: "fed.2024.addl_medicare.threshold" }
-      wages: { ref: "fed.2024.gross_income.wages" }
+      wages: { ref: "input.w2.medicare_wages" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
@@ -1691,12 +1688,36 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
+  - id: "fed.2024.addl_medicare.regular_withholding"
+    description: "Regular Medicare tax on Medicare wages: 1.45% of W-2 Box 5 (Form 8959 Line 20)"
+    form_line: "Form 8959 Line 20"
+    type: "formula"
+    expression: "wages * rate"
+    inputs:
+      wages: { ref: "input.w2.medicare_wages" }
+      rate: { literal: "0.0145" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.addl_medicare.withholding"
+    description: "Additional Medicare Tax withheld by employers: Box 6 in excess of 1.45% of Box 5 (Form 8959 Line 22; credited on 1040 line 25c)"
+    form_line: "Form 8959 Line 22"
+    type: "formula"
+    expression: "max(withheld - regular, 0)"
+    inputs:
+      withheld: { ref: "input.w2.medicare_withheld" }
+      regular: { ref: "fed.2024.addl_medicare.regular_withholding" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
   - id: "fed.2024.total_withholding"
-    description: "Total federal withholding"
+    description: "Total federal withholding (Box 2 income tax plus Form 8959 Part IV Additional Medicare Tax withholding)"
     form_line: "1040 Line 25d"
     type: "sum"
     inputs:
-      items: { ref: "input.withholding.federal" }
+      items:
+        - { ref: "input.withholding.federal" }
+        - { ref: "fed.2024.addl_medicare.withholding" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
