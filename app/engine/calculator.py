@@ -147,6 +147,9 @@ class CalculationEngine:
                 self.resolved.get(f"fed.{yr}.credits.edu.aotc", Decimal("0"))
                 + self.resolved.get(f"fed.{yr}.credits.edu.llc", Decimal("0"))
             ),
+            dependent_care_credit=self.resolved.get(
+                f"fed.{yr}.credits.care.final", Decimal("0")
+            ),
         )
 
         state_outputs = self._run_states()
@@ -299,6 +302,14 @@ class CalculationEngine:
         self.resolved["input.education.aotc_tier1"] = self.inputs.aotc_expenses_tier1()
         self.resolved["input.education.aotc_tier2"] = self.inputs.aotc_expenses_tier2()
         self.resolved["input.education.llc_expenses"] = self.inputs.llc_expenses
+
+        # Dependent care credit (Form 2441)
+        self.resolved["input.care.expenses"] = self.inputs.dependent_care_expenses
+        self.resolved["input.care.qualifying_persons"] = Decimal(
+            self.inputs.dependent_care_qualifying_persons
+        )
+        self.resolved["input.earned_income.primary"] = self.inputs.earned_income_primary()
+        self.resolved["input.earned_income.spouse"] = self.inputs.earned_income_spouse()
 
     # ─── Rule evaluation dispatch ───────────────────────────────
 

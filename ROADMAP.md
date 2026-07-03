@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–20 complete; Phase 4 continues with M21–M24.
+**Status:** Late Alpha — milestones 1–21 complete; Phase 4 continues with M22–M24.
 **SemVer line:** `0.3.x`.
-**Test suite:** 487 passing, 4 skipped, 0 failures.
+**Test suite:** 502 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -549,6 +549,8 @@ These milestones fix known calculation inaccuracies.
 - Add rules and trace.
 
 ### M21: Dependent Care Credit
+
+**Status:** Complete on 2026-07-03. The 2023/2024/2025 packs (v1.6.0) implement Form 2441: $3,000/$6,000 expense caps, the earned-income limit (lesser spouse for MFJ; both spouses must have earned income — the student/disabled deemed-income exception is unmodeled), and the 35%→20% sliding rate matching the IRS table boundaries. Nonrefundable. 15 golden vectors in `tests/test_dependent_care.py`.
 
 **Goal:** Add Credit for Child and Dependent Care Expenses (Form 2441).
 

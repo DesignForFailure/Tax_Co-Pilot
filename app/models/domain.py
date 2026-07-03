@@ -174,6 +174,8 @@ class TaxReturnInput(BaseModel):
     qualifying_children: int = 0
     education_students: list[EducationExpenseData] = Field(default_factory=list)
     llc_expenses: Decimal = Decimal("0")
+    dependent_care_expenses: Decimal = Decimal("0")
+    dependent_care_qualifying_persons: int = 0
 
     def total_wages(self) -> Decimal:
         return sum((w.wages for tp in self.taxpayers for w in tp.w2s), Decimal("0"))
@@ -241,6 +243,30 @@ class TaxReturnInput(BaseModel):
             + a.educator_expenses
             + a.self_employment_tax_deduction
         )
+
+    def earned_income_primary(self) -> Decimal:
+        """Primary taxpayer's earned income: wages + 1099-NEC compensation.
+
+        Form 2441 technically also subtracts the half-SE-tax deduction; the
+        engine computes SE tax household-wide, so the per-person split uses
+        gross figures (documented simplification).
+        """
+        return self._earned_income_for_role(TaxpayerRole.PRIMARY)
+
+    def earned_income_spouse(self) -> Decimal:
+        """Spouse's earned income: wages + 1099-NEC compensation."""
+        return self._earned_income_for_role(TaxpayerRole.SPOUSE)
+
+    def _earned_income_for_role(self, role: TaxpayerRole) -> Decimal:
+        total = Decimal("0")
+        for tp in self.taxpayers:
+            if tp.role != role:
+                continue
+            total += sum((w.wages for w in tp.w2s), Decimal("0"))
+            total += sum(
+                (n.nonemployee_compensation for n in tp.form_1099_necs), Decimal("0")
+            )
+        return total
 
     def aotc_expenses_tier1(self) -> Decimal:
         """Sum of per-student AOTC expenses capped at $2,000 (Form 8863 Part III line 28).
@@ -312,6 +338,7 @@ class ReturnOutput(BaseModel):
     self_employment_tax: Decimal = Decimal("0")
     earned_income_credit: Decimal = Decimal("0")
     education_credits: Decimal = Decimal("0")
+    dependent_care_credit: Decimal = Decimal("0")
 
 
 class StateReturnOutput(BaseModel):
