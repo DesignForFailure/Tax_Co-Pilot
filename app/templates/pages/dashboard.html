@@ -149,6 +149,18 @@ $$$$$$$$╱______   __    __       ╱$$$$$$  │  ______          $$$$$$$  │$
                 <div class="value">${{ "{:,.0f}".format(val) }}</div>
             </div>
             {% endfor %}
+            {% if st.state_credits %}
+            <div class="summary-item">
+                <div class="label">State Credits</div>
+                <div class="value">${{ "{:,.0f}".format(st.state_credits) }}</div>
+            </div>
+            {% endif %}
+            {% if st.state_city_tax %}
+            <div class="summary-item">
+                <div class="label">City Tax</div>
+                <div class="value">${{ "{:,.0f}".format(st.state_city_tax) }}</div>
+            </div>
+            {% endif %}
             <div class="summary-item">
                 <div class="label">{% if st.state_refund_or_owed >= 0 %}Refund{% else %}Amount Owed{% endif %}</div>
                 <div class="value {% if st.state_refund_or_owed >= 0 %}positive{% else %}negative{% endif %}">

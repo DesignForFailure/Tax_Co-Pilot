@@ -110,6 +110,78 @@ rules:
         - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
         - { lower: "25000000", upper: null,        rate: "0.109" }
 
+  # City-level taxes collected with the IT-201 (M23). Full-year residency
+  # only; part-year allocation, the NYC school tax credit, the NYC household
+  # credit, and Yonkers nonresident earnings tax are unmodeled. W-2 Box 19
+  # local withholding has no input path yet, so city tax always settles in
+  # the state balance due.
+  - id: "ny.2024.city_tax.nyc.base"
+    description: "New York City resident income tax before the residency gate (2024 rate schedule, unchanged since 2017)"
+    type: "bracket_table"
+    input: { ref: "ny.2024.taxable_income" }
+    key: { ref: "input.filing_status" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+    tables:
+      single:
+        - { lower: "0",     upper: "12000", rate: "0.03078" }
+        - { lower: "12000", upper: "25000", rate: "0.03762" }
+        - { lower: "25000", upper: "50000", rate: "0.03819" }
+        - { lower: "50000", upper: null,    rate: "0.03876" }
+      mfj:
+        - { lower: "0",     upper: "21600", rate: "0.03078" }
+        - { lower: "21600", upper: "45000", rate: "0.03762" }
+        - { lower: "45000", upper: "90000", rate: "0.03819" }
+        - { lower: "90000", upper: null,    rate: "0.03876" }
+      mfs:
+        - { lower: "0",     upper: "12000", rate: "0.03078" }
+        - { lower: "12000", upper: "25000", rate: "0.03762" }
+        - { lower: "25000", upper: "50000", rate: "0.03819" }
+        - { lower: "50000", upper: null,    rate: "0.03876" }
+      hoh:
+        - { lower: "0",     upper: "14400", rate: "0.03078" }
+        - { lower: "14400", upper: "30000", rate: "0.03762" }
+        - { lower: "30000", upper: "60000", rate: "0.03819" }
+        - { lower: "60000", upper: null,    rate: "0.03876" }
+      qss:
+        - { lower: "0",     upper: "21600", rate: "0.03078" }
+        - { lower: "21600", upper: "45000", rate: "0.03762" }
+        - { lower: "45000", upper: "90000", rate: "0.03819" }
+        - { lower: "90000", upper: null,    rate: "0.03876" }
+
+  - id: "ny.2024.city_tax.nyc"
+    description: "New York City resident tax (zero unless a full-year NYC resident)"
+    form_line: "IT-201 NYC resident tax"
+    type: "formula"
+    expression: "base * resident"
+    inputs:
+      base: { ref: "ny.2024.city_tax.nyc.base" }
+      resident: { ref: "input.state.nyc_resident" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ny.2024.city_tax.yonkers"
+    description: "Yonkers resident income tax surcharge: 16.75% of net state tax (zero unless a full-year Yonkers resident)"
+    form_line: "IT-201 Yonkers surcharge"
+    type: "formula"
+    expression: "tax * rate * resident"
+    inputs:
+      tax: { ref: "ny.2024.tax" }
+      rate: { literal: "0.1675" }
+      resident: { ref: "input.state.yonkers_resident" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ny.2024.city_tax"
+    description: "Total city-level tax collected with the New York return"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "ny.2024.city_tax.nyc" }
+        - { ref: "ny.2024.city_tax.yonkers" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
   - id: "ny.2024.withholding"
     description: "Total New York tax withheld"
     type: "sum"
@@ -119,11 +191,12 @@ rules:
     rounding_precision: 2
 
   - id: "ny.2024.refund_or_owed"
-    description: "New York refund (positive) or amount owed (negative)"
+    description: "New York refund (positive) or amount owed (negative), including city-level tax"
     type: "formula"
-    expression: "withholding - tax"
+    expression: "withholding - tax - city_tax"
     inputs:
       withholding: { ref: "ny.2024.withholding" }
       tax: { ref: "ny.2024.tax" }
+      city_tax: { ref: "ny.2024.city_tax" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0

@@ -227,6 +227,12 @@ class CalculationEngine:
                         state_tax=self.resolved.get(
                             f"{st_lower}.{yr}.tax", Decimal("0")
                         ),
+                        state_credits=self.resolved.get(
+                            f"{st_lower}.{yr}.credits.total", Decimal("0")
+                        ),
+                        state_city_tax=self.resolved.get(
+                            f"{st_lower}.{yr}.city_tax", Decimal("0")
+                        ),
                         state_withholding=self.resolved.get(
                             f"{st_lower}.{yr}.withholding", Decimal("0")
                         ),
@@ -313,6 +319,18 @@ class CalculationEngine:
         )
         self.resolved["input.earned_income.primary"] = self.inputs.earned_income_primary()
         self.resolved["input.earned_income.spouse"] = self.inputs.earned_income_spouse()
+
+        # State residency / credit eligibility flags (M23), exposed as 0/1
+        # so state rules can gate amounts with plain multiplication.
+        self.resolved["input.state.nyc_resident"] = (
+            Decimal("1") if self.inputs.nyc_full_year_resident else Decimal("0")
+        )
+        self.resolved["input.state.yonkers_resident"] = (
+            Decimal("1") if self.inputs.yonkers_full_year_resident else Decimal("0")
+        )
+        self.resolved["input.state.ca_renter"] = (
+            Decimal("1") if self.inputs.ca_renter else Decimal("0")
+        )
 
     # ─── Rule evaluation dispatch ───────────────────────────────
 

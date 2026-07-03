@@ -23,6 +23,21 @@ constants:
     hoh: "11080"
     qss: "11080"
 
+  # FTB nonrefundable renter's credit, TY 2024 (R&TC 17053.5): flat amount
+  # by filing status, allowed only when CA AGI is at or under the ceiling.
+  renter_credit_amount:
+    single: "60"
+    mfj: "120"
+    mfs: "60"
+    hoh: "120"
+    qss: "120"
+  renter_credit_agi_limit:
+    single: "52421"
+    mfj: "104842"
+    mfs: "52421"
+    hoh: "104842"
+    qss: "104842"
+
 rules:
   - id: "ca.2024.agi"
     description: "California AGI (MVP: starts from federal AGI)"
@@ -130,6 +145,44 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
+  # CalEITC is deliberately not modeled: the FTB publishes its two-segment
+  # phaseout only as Form 3514 worksheet tables, which cannot be verified
+  # into a closed-form rule from official sources. Known limitation (M23).
+  - id: "ca.2024.credits.renter.amount"
+    description: "Renter's credit amount by filing status ($60 single/MFS, $120 MFJ/HoH/QSS)"
+    type: "lookup"
+    table: "constants.renter_credit_amount"
+    key: { ref: "input.filing_status" }
+
+  - id: "ca.2024.credits.renter.agi_limit"
+    description: "Renter's credit CA AGI ceiling for 2024 ($52,421 single/MFS, $104,842 MFJ/HoH/QSS)"
+    type: "lookup"
+    table: "constants.renter_credit_agi_limit"
+    key: { ref: "input.filing_status" }
+
+  - id: "ca.2024.credits.renter"
+    description: "Nonrefundable renter's credit: flat amount when the filer paid rent on a principal CA residence at least half the year and CA AGI is at or under the ceiling; capped at tax"
+    form_line: "CA Form 540 Line 46"
+    type: "formula"
+    expression: "min(amount, tax) * renter * min(max((limit - agi) * 1000 + 1, 0), 1)"
+    inputs:
+      amount: { ref: "ca.2024.credits.renter.amount" }
+      tax: { ref: "ca.2024.tax" }
+      renter: { ref: "input.state.ca_renter" }
+      limit: { ref: "ca.2024.credits.renter.agi_limit" }
+      agi: { ref: "ca.2024.agi" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ca.2024.credits.total"
+    description: "Total California nonrefundable credits"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "ca.2024.credits.renter" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
   - id: "ca.2024.withholding"
     description: "Total California tax withheld"
     type: "sum"
@@ -139,11 +192,12 @@ rules:
     rounding_precision: 2
 
   - id: "ca.2024.refund_or_owed"
-    description: "California refund (positive) or amount owed (negative)"
+    description: "California refund (positive) or amount owed (negative), after nonrefundable credits"
     type: "formula"
-    expression: "withholding - tax"
+    expression: "withholding - tax + credits"
     inputs:
       withholding: { ref: "ca.2024.withholding" }
       tax: { ref: "ca.2024.tax" }
+      credits: { ref: "ca.2024.credits.total" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0

@@ -430,4 +430,7 @@ def parse_tax_input_from_form(fd: FormData, available_years: Sequence[int]) -> T
         llc_expenses=form_money(fd, "llc_expenses"),
         dependent_care_expenses=form_money(fd, "care_expenses"),
         dependent_care_qualifying_persons=care_persons,
+        nyc_full_year_resident=str(fd.get("nyc_resident", "")) == "1",
+        yonkers_full_year_resident=str(fd.get("yonkers_resident", "")) == "1",
+        ca_renter=str(fd.get("ca_renter", "")) == "1",
     )
