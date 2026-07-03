@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–22 complete; Phase 4 continues with M23–M24.
+**Status:** Late Alpha — milestones 1–23 complete; Phase 4 concludes with M24.
 **SemVer line:** `0.3.x`.
-**Test suite:** 514 passing, 4 skipped, 0 failures.
+**Test suite:** 543 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -566,6 +566,8 @@ These milestones fix known calculation inaccuracies.
 - Simple formula rule: `max(0, min(net_investment_income, agi - threshold)) * 0.038`
 
 ### M23: Additional State Credits & Deductions
+
+**Status:** Complete on 2026-07-03 (with one documented exclusion). GA packs (2023/2024/2025 → 1.2.0) implement the §48-7A-3 low income credit (per-exemption AGI bands, nonrefundable, capped at tax; age-65 extra exemption unmodeled). The NY 2024 pack (→ 1.2.0) implements the NYC resident income tax (2024 rate schedule, verified against published cumulative amounts) and the 16.75% Yonkers resident surcharge behind mutually-exclusive full-year residency flags. The CA 2024 pack (→ 1.2.0) implements the nonrefundable renter's credit ($60/$120, AGI ceilings $52,421/$104,842). **CalEITC excluded:** the FTB publishes its two-segment phaseout only as worksheet tables that cannot be verified into a closed-form rule from official sources; revisit if the FTB publishes the underlying parameters. 29 tests in `tests/test_state_credits.py`.
 
 **Goal:** Add state-specific credits beyond the basic tax calculation for CA, NY, and GA.
 

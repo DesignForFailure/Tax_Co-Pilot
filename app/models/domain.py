@@ -30,7 +30,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 def new_id() -> str:
@@ -176,6 +176,20 @@ class TaxReturnInput(BaseModel):
     llc_expenses: Decimal = Decimal("0")
     dependent_care_expenses: Decimal = Decimal("0")
     dependent_care_qualifying_persons: int = 0
+    nyc_full_year_resident: bool = False
+    yonkers_full_year_resident: bool = False
+    ca_renter: bool = False
+
+    @model_validator(mode="after")
+    def _exclusive_ny_city_residency(self) -> TaxReturnInput:
+        # NYC and Yonkers residency are modeled full-year only, so both
+        # city taxes applying at once would double-tax the filer.
+        if self.nyc_full_year_resident and self.yonkers_full_year_resident:
+            raise ValueError(
+                "Full-year residency in both New York City and Yonkers is not "
+                "possible; select at most one"
+            )
+        return self
 
     def total_wages(self) -> Decimal:
         return sum((w.wages for tp in self.taxpayers for w in tp.w2s), Decimal("0"))
@@ -349,6 +363,8 @@ class StateReturnOutput(BaseModel):
     state_personal_exemption: Decimal = Decimal("0")
     state_taxable_income: Decimal = Decimal("0")
     state_tax: Decimal = Decimal("0")
+    state_credits: Decimal = Decimal("0")
+    state_city_tax: Decimal = Decimal("0")
     state_withholding: Decimal = Decimal("0")
     state_refund_or_owed: Decimal = Decimal("0")
 
