@@ -311,6 +311,14 @@ class TaxReturnInput(BaseModel):
         """Taxpayers on the return who are 65 or older."""
         return Decimal(sum(1 for tp in self.taxpayers if tp.is_65_or_older))
 
+    def blind_count(self) -> Decimal:
+        """Taxpayers on the return who are legally blind."""
+        return Decimal(sum(1 for tp in self.taxpayers if tp.is_blind))
+
+    def total_dependents(self) -> Decimal:
+        """CTC qualifying children plus other dependents (state exemptions)."""
+        return Decimal(self.qualifying_children + self.other_dependents)
+
     def total_combat_pay(self) -> Decimal:
         """Household W-2 Box 12 code Q total (already excluded from wages)."""
         return sum((tp.nontaxable_combat_pay for tp in self.taxpayers), Decimal("0"))

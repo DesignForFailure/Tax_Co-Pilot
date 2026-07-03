@@ -30,9 +30,8 @@
 #       GA AGI starts from federal AGI (pre-OBBBA conformity date).
 #       Monitor dor.georgia.gov for conformity updates.
 #
-# NOTE: Dependent exemption ($4,000/dependent) is not modeled here.
-#       The 2024 file also did not model dependent exemptions.
-#       This can be added in a future milestone if needed.
+# NOTE: Dependent exemption ($4,000/dependent) is modeled since pack
+#       v1.4.0 (M28).
 # =============================================================================
 
 constants:
@@ -68,13 +67,24 @@ rules:
     table: "constants.standard_deduction"
     key: { ref: "input.filing_status" }
 
-  - id: "ga.2025.taxable_income"
-    description: "Georgia taxable income = max(AGI - standard deduction, 0)"
+  - id: "ga.2025.dependent_exemption"
+    description: "Georgia dependent exemption: $4000 per dependent (O.C.G.A. 48-7-26; HB 1021 raised from $3,000 effective TY 2024)"
     type: "formula"
-    expression: "max(agi - deduction, 0)"
+    expression: "amount * dependents"
+    inputs:
+      amount: { literal: "4000" }
+      dependents: { ref: "input.dependents.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ga.2025.taxable_income"
+    description: "Georgia taxable income = max(AGI - standard deduction - dependent exemption, 0); personal exemptions for self/spouse repealed by SB 56"
+    type: "formula"
+    expression: "max(agi - deduction - dep_exemption, 0)"
     inputs:
       agi: { ref: "ga.2025.agi" }
       deduction: { ref: "ga.2025.standard_deduction" }
+      dep_exemption: { ref: "ga.2025.dependent_exemption" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 

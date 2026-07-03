@@ -40,13 +40,24 @@ rules:
     table: "constants.standard_deduction"
     key: { ref: "input.filing_status" }
 
-  - id: "ny.2024.taxable_income"
-    description: "New York taxable income = max(AGI - deduction, 0)"
+  - id: "ny.2024.dependent_exemption"
+    description: "New York dependent exemption: $1,000 per dependent (IT-201 line 36; no personal exemption for self/spouse)"
     type: "formula"
-    expression: "max(agi - deduction, 0)"
+    expression: "amount * dependents"
+    inputs:
+      amount: { literal: "1000" }
+      dependents: { ref: "input.dependents.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ny.2024.taxable_income"
+    description: "New York taxable income = max(AGI - deduction - dependent exemptions, 0)"
+    type: "formula"
+    expression: "max(agi - deduction - dep_exemption, 0)"
     inputs:
       agi: { ref: "ny.2024.agi" }
       deduction: { ref: "ny.2024.standard_deduction" }
+      dep_exemption: { ref: "ny.2024.dependent_exemption" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 

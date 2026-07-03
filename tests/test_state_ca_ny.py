@@ -71,7 +71,9 @@ def test_ca_single_75k() -> None:
     assert ca.state_taxable_income == Decimal("69460")
     assert ca.state_tax == Decimal("3017")
     assert ca.state_withholding == Decimal("3000")
-    assert ca.state_refund_or_owed == ca.state_withholding - ca.state_tax
+    # M28: the $149 personal exemption credit nets against the balance.
+    assert ca.state_credits == Decimal("149")
+    assert ca.state_refund_or_owed == ca.state_withholding - ca.state_tax + Decimal("149")
 
 
 def test_ca_mfj_150k() -> None:

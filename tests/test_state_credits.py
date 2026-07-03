@@ -198,13 +198,14 @@ def test_nyc_and_yonkers_flags_are_mutually_exclusive() -> None:
 
 
 def test_ca_renter_credit_single() -> None:
-    """Single renter, $50k wages: CA tax $1,245, credit $60 → owes $1,185."""
+    """Single renter, $50k wages: CA tax $1,245, renter $60 + personal
+    exemption credit $149 (added in M28) → owes $1,036."""
     e, run = _run(2024, "CA", "50000", renter=True)
     assert e.resolved["ca.2024.tax"] == Decimal("1245")
     assert e.resolved["ca.2024.credits.renter"] == Decimal("60")
     st = run.state_outputs[0]
-    assert st.state_credits == Decimal("60")
-    assert st.state_refund_or_owed == Decimal("-1185")
+    assert st.state_credits == Decimal("209")
+    assert st.state_refund_or_owed == Decimal("-1036")
 
 
 def test_ca_renter_credit_agi_ceiling_boundary() -> None:

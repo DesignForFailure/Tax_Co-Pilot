@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–27 complete; Phase 5 (the "missing 10%", M25–M28) concludes with M28.
+**Status:** Late Alpha — milestones 1–28 complete; Phase 5 (the "missing 10%", M25–M28) is done and the `0.5.0` promotion follows.
 **SemVer line:** `0.4.x`.
-**Test suite:** 596 passing, 4 skipped, 0 failures.
+**Test suite:** 611 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -638,6 +638,8 @@ Common-household items still absent after Phase 4. Verify every parameter agains
 **Goal:** 0.9% on Medicare wages + SE income above $200k single/HoH/QSS, $250k MFJ, $125k MFS (not inflation-indexed). Joins Schedule 2 → 1040 line 23 alongside SE tax and NIIT. Withholding of the surtax (W-2 Box 6 over 1.45%) is out of scope until Box 5/6 inputs exist — document.
 
 ### M28: State Dependent Exemptions
+
+**Status:** Complete on 2026-07-03. GA packs (→ 1.4.0) subtract $3,000 (2023) / $4,000 (2024/2025, HB 1021) per dependent from taxable income; the NY 2024 pack (→ 1.3.0) subtracts $1,000 per dependent (IT-201 line 36); the CA 2024 pack (→ 1.3.0) implements the whole Form 540 exemption-credit block — $149 personal (×2 for MFJ/QSS), blind, and senior units plus $461 per dependent — capped at tax (the R&TC §17054.1 high-AGI phaseout is unmodeled). 15 tests in `tests/test_state_dependents.py`.
 
 **Goal:** GA's $4,000-per-dependent exemption (HB 1021, noted in the GA pack comments), plus a review of CA/NY dependent handling (CA dependent exemption credit $461 for 2024; NY dependent exemption $1,000).
 
