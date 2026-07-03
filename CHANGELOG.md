@@ -10,6 +10,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-03
+
+The hardening arc is complete; per the roadmap the version line is promoted to `0.9.0` (beta). Three legs: a four-track deep review of the entire codebase with 18 verified defects fixed (engine trust boundaries, integrity-chain ordering, the encryption activation path, web-layer error handling, and tax-math caps), the NY tax table benefit recapture closing the review's one deferred tax finding, and a 25-test boundary battery that the engine passed unmodified.
+
 ### Added
 - **Edge-case battery (0.9.0 arc, leg 3).** `tests/test_edge_cases.py` (25 tests) probes the exact boundaries of the federal engine: every 2024 ordinary bracket edge for single/MFJ/HoH at and $1 above the edge, checked against an in-test reference implementation built from the Rev. Proc. constants; the MFS top-bracket edge; the QDCGT 0%/15%/20% stacking breakpoints ($47,025 and $518,900 straddles); phaseout thresholds landing exactly (CTC $50-unit ROUND_UP strictly above $200k, EIC completion at $49,084, NIIT and Additional Medicare at-threshold zeros); the Social Security provisional-income corners ($25k/$34k); the capital-loss clamp at and beyond −$3,000 (−$1,500 MFS); zero-income and cents-precision runs with form-packet consistency; QSS≡MFJ equivalence; and 2023/2025 cross-year spot checks. **The engine passed the entire battery unmodified** — the only corrections during development were to the test's own reference constants.
 
