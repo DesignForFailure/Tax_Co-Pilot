@@ -9,8 +9,8 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–28 complete; Phases 1–5 are done. Next: the deep codebase review and edge-case hardening toward `0.9.0`.
-**SemVer line:** `0.5.x`.
+**Status:** Beta — milestones 1–28 plus the 0.9.0 hardening arc (deep review, NY recapture, edge-case battery) complete. Next: the `1.0` readiness gaps (multi-state apportionment, additional state packs, Box 5/6 W-2 inputs, capital-loss carryover).
+**SemVer line:** `0.9.x`.
 **Test suite:** 658 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
@@ -651,7 +651,7 @@ Common-household items still absent after Phase 4. Verify every parameter agains
 - ~~Promote to `0.3.0` after Phase 2 (capability expansion) is complete.~~ Done 2026-07-02.
 - ~~Promote to `0.4.0` after Phase 4 (M20–M24) is complete.~~ Done 2026-07-03.
 - ~~Promote to `0.5.0` after closing the remaining common-household gaps (the "missing 10%": e.g. additional standard deduction for age 65+/blind, refundable ACTC, $500 credit for other dependents, Additional Medicare Tax, dependent exemptions in state packs).~~ Done 2026-07-03.
-- Promote to `0.9.0` after a deep review of the entire codebase plus testing and patching of well-known/common edge cases.
+- ~~Promote to `0.9.0` after a deep review of the entire codebase plus testing and patching of well-known/common edge cases.~~ Done 2026-07-03.
 - Promote to `1.0.0` after the codebase is packaged for easy installation on Linux and Windows.
 
 ---
