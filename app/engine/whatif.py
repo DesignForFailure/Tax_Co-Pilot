@@ -126,9 +126,11 @@ class WhatIfEngine:
         """Compare the EITC combat pay election against not electing.
 
         The rule packs already take the better of the two EIC amounts, so a
-        run with combat pay present IS the elected-when-beneficial outcome;
-        the no-election baseline is the same household with Box 12 Q zeroed
-        (combat pay feeds nothing else in the calculation).
+        run with combat pay present IS the elected-when-beneficial outcome.
+        The no-election EIC is read from the same run's trace (base tentative
+        x eligibility) rather than re-running with Box 12 Q zeroed — since
+        M26, combat pay also feeds the Form 8812 ACTC, where inclusion is
+        mandatory, so zeroing it would misstate the no-election scenario.
         """
         if all(tp.nontaxable_combat_pay == Decimal("0") for tp in base.taxpayers):
             raise ValueError(
@@ -137,12 +139,16 @@ class WhatIfEngine:
             )
 
         a_inp = deepcopy(base)
-        a_run = CalculationEngine(self.fed, a_inp).run()
+        engine = CalculationEngine(self.fed, a_inp)
+        a_run = engine.run()
 
-        b_inp = deepcopy(base)
-        for tp in b_inp.taxpayers:
-            tp.nontaxable_combat_pay = Decimal("0")
-        b_run = CalculationEngine(self.fed, b_inp).run()
+        yr = base.tax_year
+        a_eic = a_run.output.earned_income_credit
+        b_eic = (
+            engine.resolved.get(f"fed.{yr}.credits.eic.tentative", Decimal("0"))
+            * engine.resolved.get(f"fed.{yr}.credits.eic.eligible", Decimal("0"))
+        ).quantize(Decimal("1"))
+        eic_delta = a_eic - b_eic
 
         scenario_a = ScenarioRun(
             scenario_name="elect combat pay",
@@ -153,24 +159,24 @@ class WhatIfEngine:
         scenario_b = ScenarioRun(
             scenario_name="no election",
             filing_status=base.filing_status,
-            total_tax=b_run.output.federal_tax,
-            refund_or_owed=b_run.output.refund_or_owed,
+            total_tax=a_run.output.federal_tax,
+            refund_or_owed=a_run.output.refund_or_owed - eic_delta,
         )
 
         # EIC is refundable, so the election moves the refund, not the tax.
-        savings = a_run.output.refund_or_owed - b_run.output.refund_or_owed
+        savings = eic_delta
         recommendation = "elect combat pay" if savings > 0 else "no election"
 
         diffs = [
             {
                 "metric": "earned_income_credit",
-                "a": str(a_run.output.earned_income_credit),
-                "b": str(b_run.output.earned_income_credit),
+                "a": str(a_eic),
+                "b": str(b_eic),
             },
             {
                 "metric": "refund_or_owed",
                 "a": str(a_run.output.refund_or_owed),
-                "b": str(b_run.output.refund_or_owed),
+                "b": str(a_run.output.refund_or_owed - eic_delta),
             },
         ]
 

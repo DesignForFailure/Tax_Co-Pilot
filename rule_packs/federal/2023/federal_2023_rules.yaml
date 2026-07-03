@@ -848,15 +848,117 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
+  - id: "fed.2023.credits.odc.base"
+    description: "Credit for other dependents: $500 per dependent who is not a CTC qualifying child (IRC 24(h)(4); never refundable)"
+    form_line: "Form 8812 Line 7"
+    type: "formula"
+    expression: "dependents * credit"
+    inputs:
+      dependents: { ref: "input.other_dependents" }
+      credit: { literal: "500" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.credits.ctc.combined"
+    description: "CTC plus ODC after the shared AGI phaseout (Form 8812 Line 12)"
+    form_line: "Form 8812 Line 12"
+    type: "formula"
+    expression: "max(ctc + odc - phaseout, 0)"
+    inputs:
+      ctc: { ref: "fed.2023.credits.ctc.base" }
+      odc: { ref: "fed.2023.credits.odc.base" }
+      phaseout: { ref: "fed.2023.credits.ctc.phaseout" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.credits.other_nonrefundable"
+    description: "Nonrefundable credits other than CTC/ODC, applied first per the Form 8812 Credit Limit Worksheet"
+    form_line: "Form 8812 Credit Limit Worksheet"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "fed.2023.credits.edu.aotc_nonrefundable" }
+        - { ref: "fed.2023.credits.edu.llc" }
+        - { ref: "fed.2023.credits.care.final" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.credits.ctc.tax_limit"
+    description: "Tax available for the CTC/ODC after other nonrefundable credits (Form 8812 Line 13)"
+    form_line: "Form 8812 Line 13"
+    type: "formula"
+    expression: "max(tax - other_credits, 0)"
+    inputs:
+      tax: { ref: "fed.2023.tax.total_before_credits" }
+      other_credits: { ref: "fed.2023.credits.other_nonrefundable" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
   - id: "fed.2023.credits.ctc.final"
-    description: "Child tax credit after phaseout"
+    description: "Nonrefundable CTC plus ODC allowed against tax (Form 8812 Line 14)"
     form_line: "1040 Line 19"
     type: "formula"
-    expression: "max(base - phaseout, zero)"
+    expression: "min(combined, tax_limit)"
     inputs:
-      base: { ref: "fed.2023.credits.ctc.base" }
-      phaseout: { ref: "fed.2023.credits.ctc.phaseout" }
-      zero: { literal: "0" }
+      combined: { ref: "fed.2023.credits.ctc.combined" }
+      tax_limit: { ref: "fed.2023.credits.ctc.tax_limit" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.credits.actc.unused"
+    description: "CTC/ODC not usable against tax (Form 8812 Line 16a)"
+    form_line: "Form 8812 Line 16a"
+    type: "formula"
+    expression: "combined - allowed"
+    inputs:
+      combined: { ref: "fed.2023.credits.ctc.combined" }
+      allowed: { ref: "fed.2023.credits.ctc.final" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.credits.actc.cap"
+    description: "Refundable ACTC ceiling for 2023: $1600 per qualifying child (Form 8812 Line 16b; Rev. Proc. amount)"
+    form_line: "Form 8812 Line 16b"
+    type: "formula"
+    expression: "children * cap"
+    inputs:
+      children: { ref: "input.qualifying_children" }
+      cap: { literal: "1600" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.credits.actc.earned_income"
+    description: "Form 8812 earned income: the EIC-worksheet figure plus nontaxable combat pay (always included here, unlike the elective EIC treatment)"
+    form_line: "Form 8812 Line 18a"
+    type: "formula"
+    expression: "earned + combat_pay"
+    inputs:
+      earned: { ref: "fed.2023.credits.eic.earned_income" }
+      combat_pay: { ref: "input.military.combat_pay" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.credits.actc.phase_in"
+    description: "15% of earned income above $2,500 (Form 8812 Line 19; the 3-or-more-children Social Security tax alternative is unmodeled - no payroll-tax inputs)"
+    form_line: "Form 8812 Line 19"
+    type: "formula"
+    expression: "max((earned - floor) * rate, 0)"
+    inputs:
+      earned: { ref: "fed.2023.credits.actc.earned_income" }
+      floor: { literal: "2500" }
+      rate: { literal: "0.15" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2023.credits.actc.final"
+    description: "Additional child tax credit: the unused CTC/ODC, limited to the per-child ceiling and the 15% earned-income phase-in (refundable; reported with payments)"
+    form_line: "1040 Line 28"
+    type: "formula"
+    expression: "min(min(unused, cap), phase_in)"
+    inputs:
+      unused: { ref: "fed.2023.credits.actc.unused" }
+      cap: { ref: "fed.2023.credits.actc.cap" }
+      phase_in: { ref: "fed.2023.credits.actc.phase_in" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
@@ -1552,6 +1654,7 @@ rules:
         - { ref: "fed.2023.total_withholding" }
         - { ref: "fed.2023.estimated_payments" }
         - { ref: "fed.2023.credits.eic.final" }
+        - { ref: "fed.2023.credits.actc.final" }
         - { ref: "fed.2023.credits.edu.aotc_refundable" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2

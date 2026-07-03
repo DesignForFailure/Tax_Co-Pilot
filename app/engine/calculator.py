@@ -158,6 +158,9 @@ class CalculationEngine:
             net_investment_income_tax=self.resolved.get(
                 f"fed.{yr}.niit.final", Decimal("0")
             ),
+            additional_child_tax_credit=self.resolved.get(
+                f"fed.{yr}.credits.actc.final", Decimal("0")
+            ),
         )
 
         state_outputs = self._run_states()
@@ -311,6 +314,7 @@ class CalculationEngine:
         self.resolved["input.qualifying_children"] = Decimal(
             self.inputs.qualifying_children
         )
+        self.resolved["input.other_dependents"] = Decimal(self.inputs.other_dependents)
 
         # Education credits (Form 8863)
         self.resolved["input.education.aotc_tier1"] = self.inputs.aotc_expenses_tier1()

@@ -29,6 +29,7 @@ _FORM_LINE_MAP: dict[str, tuple[str, str]] = {
     "1040 Line 25d": ("form_1040", "line_25d"),
     "1040 Line 26": ("form_1040", "line_26"),
     "1040 Line 27": ("form_1040", "line_27"),
+    "1040 Line 28": ("form_1040", "line_28"),
     "1040 Line 29": ("form_1040", "line_29"),
     "1040 Line 33": ("form_1040", "line_33"),
     "Schedule 1 Line 3": ("schedule_1", "line_3"),
@@ -142,12 +143,12 @@ def _check_consistency(f: Form1040Lines, s: Schedule1Lines) -> list[str]:
             f"Line 15 (taxable={f.line_15}) exceeds Line 11 (AGI={f.line_11})"
         )
 
-    expected_payments = f.line_25d + f.line_26 + f.line_27 + f.line_29
+    expected_payments = f.line_25d + f.line_26 + f.line_27 + f.line_28 + f.line_29
     if f.line_33 != expected_payments:
         errors.append(
             f"Line 33 (total payments={f.line_33}) != "
             f"Line 25d ({f.line_25d}) + Line 26 ({f.line_26}) + "
-            f"Line 27 ({f.line_27}) + Line 29 ({f.line_29})"
+            f"Line 27 ({f.line_27}) + Line 28 ({f.line_28}) + Line 29 ({f.line_29})"
         )
 
     if f.line_22 > f.line_16:

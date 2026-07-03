@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–25 complete; Phase 5 (the "missing 10%", M25–M28) is underway toward `0.5.0`.
+**Status:** Late Alpha — milestones 1–26 complete; Phase 5 (the "missing 10%", M25–M28) continues toward `0.5.0`.
 **SemVer line:** `0.4.x`.
-**Test suite:** 571 passing, 4 skipped, 0 failures.
+**Test suite:** 585 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -626,6 +626,8 @@ Common-household items still absent after Phase 4. Verify every parameter agains
 **Goal:** IRC §63(f) additional standard deduction per age-65+/blind condition, with age/blindness flags on the taxpayer model.
 
 ### M26: Refundable ACTC + Credit for Other Dependents
+
+**Status:** Complete on 2026-07-03. The 2023/2024/2025 packs (v1.10.0) implement Schedule 8812: the $500 ODC inside the shared phaseout, the Credit Limit Worksheet (other nonrefundable credits apply first), and the refundable ACTC (per-child ceilings $1,600/$1,700/$1,700; 15% of earned income over $2,500; Form 8812 earned income includes combat pay mandatorily) on 1040 line 28. The what-if combat-pay comparison now isolates the EIC election from the trace. The 3+-children Social Security tax alternative is unmodeled (no payroll-tax inputs). 14 tests in `tests/test_schedule_8812.py`.
 
 **Goal:** Schedule 8812 in full: the refundable Additional Child Tax Credit (up to $1,600/$1,700/$1,700 per child for 2023/2024/2025, 15% of earned income over $2,500) flowing to 1040 line 28, and the $500 nonrefundable credit for other dependents (ODC). Requires modeling `other_dependents` alongside `qualifying_children`.
 

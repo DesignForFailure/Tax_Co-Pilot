@@ -430,6 +430,14 @@ def parse_tax_input_from_form(fd: FormData, available_years: Sequence[int]) -> T
         # without feedback.
         raise ValueError("Qualifying children must be a whole number of 0 or more")
 
+    raw_other_deps = str(fd.get("other_dependents", "0")).strip()
+    if not raw_other_deps:
+        other_dependents = 0
+    elif raw_other_deps.isdigit():
+        other_dependents = min(int(raw_other_deps), 20)
+    else:
+        raise ValueError("Other dependents must be a whole number of 0 or more")
+
     raw_care_persons = str(fd.get("care_persons", "0")).strip()
     if not raw_care_persons:
         care_persons = 0
@@ -447,6 +455,7 @@ def parse_tax_input_from_form(fd: FormData, available_years: Sequence[int]) -> T
         other_income=form_money(fd, "other_income"),
         itemized_deductions=itemized,
         qualifying_children=qualifying_children,
+        other_dependents=other_dependents,
         education_students=parse_education_students(fd),
         llc_expenses=form_money(fd, "llc_expenses"),
         dependent_care_expenses=form_money(fd, "care_expenses"),
