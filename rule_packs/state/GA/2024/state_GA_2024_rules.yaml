@@ -75,13 +75,35 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
-  - id: "ga.2024.tax"
-    description: "Georgia income tax (2024 flat rate 5.39%)"
+  - id: "ga.2024.tax.full"
+    description: "Georgia income tax (2024 flat rate 5.39%) before apportionment"
     type: "formula"
     expression: "taxable_income * rate"
     inputs:
       taxable_income: { ref: "ga.2024.taxable_income" }
       rate: { literal: "0.0539" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ga.2024.tax"
+    description: "GA tax after nonresident wage apportionment (ratio 1 for residents; nonresidents pay the as-if-resident tax times the GA-wage share, the standard ratio method)"
+    type: "formula"
+    expression: "full * ratio"
+    inputs:
+      full: { ref: "ga.2024.tax.full" }
+      ratio: { ref: "input.state.apportionment.GA" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ga.2024.credits.other_state"
+    description: "Resident credit for taxes paid to other states: the smaller of their net tax or this state's tax on the doubly-taxed wage share (zero for nonresidents; nonresident credits are not prorated - documented simplification)"
+    type: "formula"
+    expression: "min(other_tax, full * dbl_ratio) * is_resident"
+    inputs:
+      other_tax: { ref: "input.state.other_state_tax" }
+      full: { ref: "ga.2024.tax.full" }
+      dbl_ratio: { ref: "input.state.other_state_ratio" }
+      is_resident: { ref: "input.state.is_resident.GA" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
@@ -124,11 +146,13 @@ rules:
     rounding_precision: 0
 
   - id: "ga.2024.credits.total"
-    description: "Total Georgia nonrefundable credits"
-    type: "sum"
+    description: "Total Georgia nonrefundable credits (low income + other-state credit), capped at tax"
+    type: "formula"
+    expression: "min(low_income + other_state, tax)"
     inputs:
-      items:
-        - { ref: "ga.2024.credits.low_income" }
+      low_income: { ref: "ga.2024.credits.low_income" }
+      other_state: { ref: "ga.2024.credits.other_state" }
+      tax: { ref: "ga.2024.tax" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 

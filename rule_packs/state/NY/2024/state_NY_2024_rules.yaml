@@ -510,6 +510,38 @@ rules:
   # credit, and Yonkers nonresident earnings tax are unmodeled. W-2 Box 19
   # local withholding has no input path yet, so city tax always settles in
   # the state balance due.
+  - id: "ny.2024.tax"
+    description: "NY tax after nonresident wage apportionment (ratio 1 for residents; nonresidents pay the as-if-resident tax times the NY-wage share, the standard ratio method)"
+    type: "formula"
+    expression: "full * ratio"
+    inputs:
+      full: { ref: "ny.2024.tax.full" }
+      ratio: { ref: "input.state.apportionment.NY" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ny.2024.credits.other_state"
+    description: "Resident credit for taxes paid to other states: the smaller of their net tax or this state's tax on the doubly-taxed wage share (zero for nonresidents; nonresident credits are not prorated - documented simplification)"
+    type: "formula"
+    expression: "min(other_tax, full * dbl_ratio) * is_resident"
+    inputs:
+      other_tax: { ref: "input.state.other_state_tax" }
+      full: { ref: "ny.2024.tax.full" }
+      dbl_ratio: { ref: "input.state.other_state_ratio" }
+      is_resident: { ref: "input.state.is_resident.NY" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ny.2024.credits.total"
+    description: "Total New York nonrefundable credits (other-state resident credit), capped at tax"
+    type: "formula"
+    expression: "min(other_state, tax)"
+    inputs:
+      other_state: { ref: "ny.2024.credits.other_state" }
+      tax: { ref: "ny.2024.tax" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
   - id: "ny.2024.city_tax.nyc.base"
     description: "New York City resident income tax before the residency gate (2024 rate schedule, unchanged since 2017)"
     type: "bracket_table"
@@ -544,8 +576,8 @@ rules:
         - { lower: "45000", upper: "90000", rate: "0.03819" }
         - { lower: "90000", upper: null,    rate: "0.03876" }
 
-  - id: "ny.2024.tax"
-    description: "New York income tax: rate schedule plus the 601(d-1) tax table benefit recapture for NYAGI over $107,650"
+  - id: "ny.2024.tax.full"
+    description: "New York income tax before apportionment: rate schedule plus the 601(d-1) tax table benefit recapture for NYAGI over $107,650"
     type: "formula"
     expression: "schedule + recapture"
     inputs:
@@ -598,10 +630,11 @@ rules:
   - id: "ny.2024.refund_or_owed"
     description: "New York refund (positive) or amount owed (negative), including city-level tax"
     type: "formula"
-    expression: "withholding - tax - city_tax"
+    expression: "withholding - tax - city_tax + credits"
     inputs:
       withholding: { ref: "ny.2024.withholding" }
       tax: { ref: "ny.2024.tax" }
       city_tax: { ref: "ny.2024.city_tax" }
+      credits: { ref: "ny.2024.credits.total" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
