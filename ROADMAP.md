@@ -9,8 +9,8 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–24 complete; Phase 4 (M20–M24) is done and the `0.4.0` promotion follows.
-**SemVer line:** `0.3.x`.
+**Status:** Late Alpha — milestones 1–24 complete; Phase 4 (M20–M24) is done. Next: the "missing 10%" common-household gaps toward `0.5.0`.
+**SemVer line:** `0.4.x`.
 **Test suite:** 560 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
@@ -619,7 +619,7 @@ These milestones fix known calculation inaccuracies.
 
 - ~~Promote to `0.2.0` after Phase 1 (structural hardening) is complete.~~ Done 2026-07-02.
 - ~~Promote to `0.3.0` after Phase 2 (capability expansion) is complete.~~ Done 2026-07-02.
-- Promote to `0.4.0` after Phase 4 (M20–M24) is complete.
+- ~~Promote to `0.4.0` after Phase 4 (M20–M24) is complete.~~ Done 2026-07-03.
 - Promote to `0.5.0` after closing the remaining common-household gaps (the "missing 10%": e.g. additional standard deduction for age 65+/blind, refundable ACTC, $500 credit for other dependents, Additional Medicare Tax, dependent exemptions in state packs).
 - Promote to `0.9.0` after a deep review of the entire codebase plus testing and patching of well-known/common edge cases.
 - Promote to `1.0.0` after the codebase is packaged for easy installation on Linux and Windows.
