@@ -9,7 +9,7 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Beta — milestones 1–28 plus the 0.9.0 hardening arc (deep review, NY recapture, edge-case battery) complete. Next: the `1.0` readiness gaps — M29 Box 5/6 W-2 inputs (done 2026-07-03), M30 capital-loss carryover (done 2026-07-03), M31 multi-state apportionment, then M32 additional state packs (secondary).
+**Status:** Beta — milestones 1–28 plus the 0.9.0 hardening arc (deep review, NY recapture, edge-case battery) complete. Next: the `1.0` readiness gaps — M29 Box 5/6 W-2 inputs (done 2026-07-03), M30 capital-loss carryover (done 2026-07-03), M31 multi-state apportionment (done 2026-07-04), then M32 additional state packs (secondary).
 **SemVer line:** `0.9.x`.
 **Test suite:** 658 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).

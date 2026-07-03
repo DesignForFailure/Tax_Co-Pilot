@@ -211,7 +211,24 @@ class CalculationEngine:
         if not self.state_packs:
             return outs
 
-        # Resolve withholding for every state in state_packs.
+        # Resolve withholding and apportionment inputs for every state.
+        residence = (self.inputs.state_of_residence or "").strip().upper()
+        total_wages = self.inputs.total_wages()
+
+        def _state_wages(sc: str) -> Decimal:
+            # Box 16 when reported; a W-2 with a state code but no Box 16
+            # amount treats Box 1 as fully sourced to that state.
+            return sum(
+                (
+                    w.state_wages if w.state_wages > 0 else w.wages
+                    for tp in self.inputs.taxpayers
+                    for w in tp.w2s
+                    if (w.state or "").upper() == sc
+                ),
+                Decimal("0"),
+            )
+
+        nonresident_wages = Decimal("0")
         for state_code in sorted(self.state_packs):
             sc = state_code.upper()
             self.resolved[f"input.withholding.state.{sc}"] = sum(
@@ -223,8 +240,32 @@ class CalculationEngine:
                 ),
                 Decimal("0"),
             )
+            is_resident = residence in ("", sc)
+            self.resolved[f"input.state.is_resident.{sc}"] = (
+                Decimal("1") if is_resident else Decimal("0")
+            )
+            if is_resident or total_wages <= 0:
+                ratio = Decimal("1") if is_resident else Decimal("0")
+            else:
+                ratio = min(_state_wages(sc) / total_wages, Decimal("1"))
+                nonresident_wages += _state_wages(sc)
+            self.resolved[f"input.state.apportionment.{sc}"] = ratio.quantize(
+                Decimal("0.0001")
+            )
 
-        for state_code in sorted(self.state_packs):
+        # Aggregates for the residence state's other-state credit; zero while
+        # nonresident packs run, updated after they finish.
+        self.resolved["input.state.other_state_tax"] = Decimal("0")
+        self.resolved["input.state.other_state_ratio"] = Decimal("0")
+
+        # Nonresident states run first so the residence pack can reference
+        # their net tax through the aggregates above.
+        ordered = sorted(
+            self.state_packs,
+            key=lambda code: (code.upper() == residence, code),
+        )
+
+        for state_code in ordered:
             sp = self.state_packs[state_code]
             expected_prefix = f"{state_code.lower()}."
             if sp.id_prefix != expected_prefix:
@@ -236,6 +277,27 @@ class CalculationEngine:
                     f"{sp.jurisdiction!r} (prefix {sp.id_prefix!r}); expected "
                     f"prefix {expected_prefix!r}"
                 )
+            if residence and state_code.upper() == residence:
+                # All nonresident packs have run; expose their net tax and
+                # the doubly-taxed wage share to the residence pack's
+                # other-state credit rules.
+                other_tax = Decimal("0")
+                for other_code, other_pack in self.state_packs.items():
+                    if other_code.upper() == residence:
+                        continue
+                    lower = other_code.lower()
+                    oyr = other_pack.tax_year
+                    other_tax += max(
+                        self.resolved.get(f"{lower}.{oyr}.tax", Decimal("0"))
+                        - self.resolved.get(f"{lower}.{oyr}.credits.total", Decimal("0")),
+                        Decimal("0"),
+                    )
+                self.resolved["input.state.other_state_tax"] = other_tax
+                if total_wages > 0:
+                    self.resolved["input.state.other_state_ratio"] = min(
+                        nonresident_wages / total_wages, Decimal("1")
+                    ).quantize(Decimal("0.0001"))
+
             orig_pack = self.rp
             self.rp = sp
             try:

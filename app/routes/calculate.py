@@ -131,7 +131,7 @@ async def calculate_submit(request: Request) -> Response:
             for w2 in taxpayer.w2s
             if w2.state
         }
-        residence = str(fd.get("state_of_residence", "")).strip().upper()
+        residence = inputs.state_of_residence
         if residence:
             states_needed.add(residence)
 

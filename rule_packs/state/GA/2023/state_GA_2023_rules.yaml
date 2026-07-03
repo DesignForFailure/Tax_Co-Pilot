@@ -80,8 +80,8 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
-  - id: "ga.2023.tax"
-    description: "Georgia income tax (2023 graduated brackets, top rate 5.75%)"
+  - id: "ga.2023.tax.full"
+    description: "Georgia income tax (2023 graduated brackets, top rate 5.75%) before apportionment"
     type: "bracket_table"
     input: { ref: "ga.2023.taxable_income" }
     key: { ref: "input.filing_status" }
@@ -125,6 +125,28 @@ rules:
         - { lower: "7000", upper: "10000", rate: "0.05" }
         - { lower: "10000", upper: null, rate: "0.0575" }
 
+  - id: "ga.2023.tax"
+    description: "GA tax after nonresident wage apportionment (ratio 1 for residents; nonresidents pay the as-if-resident tax times the GA-wage share, the standard ratio method)"
+    type: "formula"
+    expression: "full * ratio"
+    inputs:
+      full: { ref: "ga.2023.tax.full" }
+      ratio: { ref: "input.state.apportionment.GA" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ga.2023.credits.other_state"
+    description: "Resident credit for taxes paid to other states: the smaller of their net tax or this state's tax on the doubly-taxed wage share (zero for nonresidents; nonresident credits are not prorated - documented simplification)"
+    type: "formula"
+    expression: "min(other_tax, full * dbl_ratio) * is_resident"
+    inputs:
+      other_tax: { ref: "input.state.other_state_tax" }
+      full: { ref: "ga.2023.tax.full" }
+      dbl_ratio: { ref: "input.state.other_state_ratio" }
+      is_resident: { ref: "input.state.is_resident.GA" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
   - id: "ga.2023.credits.low_income.filers"
     description: "Low income credit filer exemptions (self, plus spouse for MFJ)"
     type: "lookup"
@@ -164,11 +186,13 @@ rules:
     rounding_precision: 0
 
   - id: "ga.2023.credits.total"
-    description: "Total Georgia nonrefundable credits"
-    type: "sum"
+    description: "Total Georgia nonrefundable credits (low income + other-state credit), capped at tax"
+    type: "formula"
+    expression: "min(low_income + other_state, tax)"
     inputs:
-      items:
-        - { ref: "ga.2023.credits.low_income" }
+      low_income: { ref: "ga.2023.credits.low_income" }
+      other_state: { ref: "ga.2023.credits.other_state" }
+      tax: { ref: "ga.2023.tax" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 

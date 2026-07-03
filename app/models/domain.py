@@ -180,6 +180,11 @@ class TaxReturnInput(BaseModel):
     tax_year: int
     filing_status: FilingStatus
     taxpayers: list[Taxpayer] = Field(default_factory=list)
+    # Two-letter residence state. When set, W-2 states other than it run
+    # as nonresident (wage-apportioned) returns and the residence state
+    # grants a credit for taxes paid to them. Empty = every state runs
+    # as a full-year resident return (the pre-M31 behavior).
+    state_of_residence: str = ""
     other_income: Decimal = Decimal("0")
     # Prior-year capital loss carryovers, entered as positive amounts
     # (Schedule D lines 6 and 14).

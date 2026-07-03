@@ -460,6 +460,7 @@ def parse_tax_input_from_form(fd: FormData, available_years: Sequence[int]) -> T
         tax_year=tax_year,
         filing_status=filing_status,
         taxpayers=taxpayers,
+        state_of_residence=form_str(fd, "state_of_residence").upper(),
         adjustments=adjustments,
         estimated_tax_payments=form_money(fd, "estimated_payments"),
         other_income=form_money(fd, "other_income"),
