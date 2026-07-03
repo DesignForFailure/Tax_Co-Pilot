@@ -150,6 +150,11 @@ class Taxpayer(BaseModel):
     last_name: str = ""
     is_active_duty_military: bool = False
     domicile_state: str = ""
+    # Age/blindness checkboxes (M25): the IRS tests "born before January 2
+    # of {year+1}" and legal blindness on the last day of the year; the
+    # flags keep birth dates out of the data model.
+    is_65_or_older: bool = False
+    is_blind: bool = False
     # Military service (M24). Combat pay is W-2 Box 12 code Q — the employer
     # already excludes it from Box 1 wages, so the engine must never
     # re-subtract it; it feeds the EITC election and the officer-cap check.
@@ -289,6 +294,21 @@ class TaxReturnInput(BaseModel):
                 (n.nonemployee_compensation for n in tp.form_1099_necs), Decimal("0")
             )
         return total
+
+    def age_blind_boxes(self) -> Decimal:
+        """Count of checked age-65+/blind conditions (1040 Standard Deduction chart).
+
+        MFS filers may also check boxes for a non-filing spouse with no
+        income; that exception is unmodeled — only taxpayers on the return
+        are counted.
+        """
+        return Decimal(
+            sum(int(tp.is_65_or_older) + int(tp.is_blind) for tp in self.taxpayers)
+        )
+
+    def seniors_count(self) -> Decimal:
+        """Taxpayers on the return who are 65 or older."""
+        return Decimal(sum(1 for tp in self.taxpayers if tp.is_65_or_older))
 
     def total_combat_pay(self) -> Decimal:
         """Household W-2 Box 12 code Q total (already excluded from wages)."""

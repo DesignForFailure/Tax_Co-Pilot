@@ -345,6 +345,8 @@ def parse_taxpayer(fd: FormData, prefix: str, role: TaxpayerRole) -> Taxpayer:
         form_1099_divs=parse_1099divs(fd, f"{prefix}_1099div"),
         form_1099_bs=parse_1099bs(fd, f"{prefix}_1099b"),
         form_1099_necs=parse_1099necs(fd, f"{prefix}_1099nec"),
+        is_65_or_older=str(fd.get(f"{prefix}_65", "")) == "1",
+        is_blind=str(fd.get(f"{prefix}_blind", "")) == "1",
         nontaxable_combat_pay=form_money(fd, f"{prefix}_combat_pay"),
         is_commissioned_officer=str(fd.get(f"{prefix}_officer", "")) == "1",
         combat_zone_months=combat_months,
@@ -366,6 +368,8 @@ def taxpayer_has_form_data(taxpayer: Taxpayer) -> bool:
         or taxpayer.nontaxable_combat_pay != 0
         or taxpayer.active_duty_moving_expenses != 0
         or taxpayer.reservist_travel_expenses != 0
+        or taxpayer.is_65_or_older
+        or taxpayer.is_blind
     )
 
 

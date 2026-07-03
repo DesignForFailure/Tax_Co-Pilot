@@ -104,12 +104,13 @@ rules:
     rounding_precision: 0
 
   - id: "ga.2025.credits.low_income.exemptions"
-    description: "Low income credit exemption count: filers plus dependents (approximated by CTC qualifying children; the extra exemption for each taxpayer 65 or older is unmodeled - no birth dates in the domain model)"
+    description: "Low income credit exemption count: filers plus dependents (approximated by CTC qualifying children) plus one extra per taxpayer 65 or older (IT-511 worksheet line 3)"
     type: "formula"
-    expression: "filers + children"
+    expression: "filers + children + seniors"
     inputs:
       filers: { ref: "ga.2025.credits.low_income.filers" }
       children: { ref: "input.qualifying_children" }
+      seniors: { ref: "input.age_blind.seniors" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
