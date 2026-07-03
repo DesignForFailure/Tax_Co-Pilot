@@ -36,13 +36,13 @@ CSRF = "test-csrf-token"
 def test_2023_pack_loads_correct_year() -> None:
     assert FED_2023.tax_year == 2023
     assert FED_2023.jurisdiction == "federal"
-    assert len(FED_2023.rules) == 125
+    assert len(FED_2023.rules) == 130
 
 
 def test_2024_pack_loads_correct_year() -> None:
     assert FED_2024.tax_year == 2024
     assert FED_2024.jurisdiction == "federal"
-    assert len(FED_2024.rules) == 125
+    assert len(FED_2024.rules) == 130
 
 
 # ─── 2023 Federal golden tests ───────────────────────────────
@@ -279,6 +279,11 @@ def test_2023_trace_completeness() -> None:
         "fed.2023.credits.actc.earned_income",
         "fed.2023.credits.actc.phase_in",
         "fed.2023.credits.actc.final",
+        "fed.2023.addl_medicare.threshold",
+        "fed.2023.addl_medicare.wage_excess",
+        "fed.2023.addl_medicare.se_threshold",
+        "fed.2023.addl_medicare.se_excess",
+        "fed.2023.addl_medicare.final",
         "fed.2023.tax.brackets",
         "fed.2023.credits.ctc.base",
         "fed.2023.credits.ctc.threshold",

@@ -161,6 +161,9 @@ class CalculationEngine:
             additional_child_tax_credit=self.resolved.get(
                 f"fed.{yr}.credits.actc.final", Decimal("0")
             ),
+            additional_medicare_tax=self.resolved.get(
+                f"fed.{yr}.addl_medicare.final", Decimal("0")
+            ),
         )
 
         state_outputs = self._run_states()

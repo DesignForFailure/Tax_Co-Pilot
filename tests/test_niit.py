@@ -162,16 +162,19 @@ def test_niit_composes_with_se_tax_on_line_23() -> None:
     )
     se = e.resolved["fed.2024.se.total"]
     niit = e.resolved["fed.2024.niit.final"]
-    assert e.resolved["fed.2024.tax.other_taxes"] == se + niit
+    # This household also owes Additional Medicare Tax since M27.
+    medicare = e.resolved["fed.2024.addl_medicare.final"]
+    assert e.resolved["fed.2024.tax.other_taxes"] == se + niit + medicare
     pkt = map_return_run(run)
-    assert pkt.form_1040.line_23 == se + niit
+    assert pkt.form_1040.line_23 == se + niit + medicare
     assert pkt.consistency_errors == []
 
 
 def test_refund_settles_against_liability_including_niit() -> None:
     e, run = _run(FED_2024, FilingStatus.SINGLE, "250000", interest="30000")
     liability = e.resolved["fed.2024.tax.total_liability"]
-    assert liability == e.resolved["fed.2024.tax.after_credits"] + Decimal("1140")
+    # $1,140 NIIT plus the $450 Additional Medicare Tax added in M27.
+    assert liability == e.resolved["fed.2024.tax.after_credits"] + Decimal("1590")
     assert run.output.refund_or_owed == -liability
 
 

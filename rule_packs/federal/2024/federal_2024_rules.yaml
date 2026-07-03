@@ -119,6 +119,15 @@ constants:
     hoh: "1950"
     qss: "1550"
 
+  # IRC 3101(b)(2) Additional Medicare Tax thresholds - statutory,
+  # deliberately identical across years (not inflation-indexed).
+  additional_medicare_threshold:
+    single: "200000"
+    mfj: "250000"
+    mfs: "125000"
+    hoh: "200000"
+    qss: "250000"
+
 rules:
   - id: "fed.2024.gross_income.wages"
     description: "Total W-2 wages (Box 1)"
@@ -1490,14 +1499,72 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
+  # Additional Medicare Tax (M27, Form 8959). W-2 Box 1 wages stand in
+  # for Medicare wages (Box 5) - Box 5 has no input path yet, so pre-tax
+  # 401(k)-style deferrals that widen Box 5 are unmodeled. Employer
+  # surtax withholding (Form 8959 Part IV) likewise needs Box 6 inputs
+  # and is unmodeled; the liability settles in the refund line.
+  - id: "fed.2024.addl_medicare.threshold"
+    description: "Additional Medicare Tax threshold (IRC 3101(b)(2): $200k single/HoH, $250k MFJ/QSS, $125k MFS; statutory, not indexed)"
+    form_line: "Form 8959"
+    type: "lookup"
+    table: "constants.additional_medicare_threshold"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2024.addl_medicare.wage_excess"
+    description: "Medicare wages above the threshold (Form 8959 Line 7 base; Box 1 wages used as the Box 5 proxy)"
+    form_line: "Form 8959 Line 6"
+    type: "formula"
+    expression: "max(wages - threshold, 0)"
+    inputs:
+      wages: { ref: "fed.2024.gross_income.wages" }
+      threshold: { ref: "fed.2024.addl_medicare.threshold" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.addl_medicare.se_threshold"
+    description: "Threshold remaining for SE income: the filing-status threshold reduced (not below zero) by Medicare wages (Form 8959 Line 12)"
+    form_line: "Form 8959 Line 12"
+    type: "formula"
+    expression: "max(threshold - wages, 0)"
+    inputs:
+      threshold: { ref: "fed.2024.addl_medicare.threshold" }
+      wages: { ref: "fed.2024.gross_income.wages" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.addl_medicare.se_excess"
+    description: "SE net earnings (Schedule SE Line 6, zero below the $400 floor) above the remaining threshold (Form 8959 Line 13 base)"
+    form_line: "Form 8959 Line 13"
+    type: "formula"
+    expression: "max(se_earnings - se_threshold, 0)"
+    inputs:
+      se_earnings: { ref: "fed.2024.se.net_earnings" }
+      se_threshold: { ref: "fed.2024.addl_medicare.se_threshold" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2024.addl_medicare.final"
+    description: "Additional Medicare Tax: 0.9% of wage and SE income above the thresholds (RRTA compensation unmodeled)"
+    form_line: "Form 8959 Line 18"
+    type: "formula"
+    expression: "(wage_excess + se_excess) * rate"
+    inputs:
+      wage_excess: { ref: "fed.2024.addl_medicare.wage_excess" }
+      se_excess: { ref: "fed.2024.addl_medicare.se_excess" }
+      rate: { literal: "0.009" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
   - id: "fed.2024.tax.other_taxes"
-    description: "Other taxes from Schedule 2: self-employment tax + net investment income tax"
+    description: "Other taxes from Schedule 2: self-employment tax + net investment income tax + Additional Medicare Tax"
     form_line: "1040 Line 23"
     type: "sum"
     inputs:
       items:
         - { ref: "fed.2024.se.total" }
         - { ref: "fed.2024.niit.final" }
+        - { ref: "fed.2024.addl_medicare.final" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
