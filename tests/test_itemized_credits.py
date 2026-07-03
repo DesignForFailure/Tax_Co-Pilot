@@ -190,7 +190,9 @@ def test_charitable_agi_cap() -> None:
     run = CalculationEngine(FED, inp).run()
 
     char_trace = next(t for t in run.trace if t.rule_id == "fed.2024.itemized.charitable")
-    assert Decimal(char_trace.result["value"]) == Decimal("31000")  # min(40k, 30k) + 1k
+    # min(40k cash, 30k cap) + 1k noncash = 31k, then the combined 60%-of-AGI
+    # cap (deep-review fix) brings it back to 30k.
+    assert Decimal(char_trace.result["value"]) == Decimal("30000.00")
 
 
 # ─── Child Tax Credit tests ───────────────────────────────────

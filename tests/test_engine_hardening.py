@@ -213,9 +213,9 @@ def test_bare_string_forward_ref_does_not_duplicate_trace(tmp_path: Path) -> Non
     )
     pack = RulePack.load(pack_dir)
     engine = CalculationEngine(pack, _minimal_input())
-    run = engine.run()
+    engine.evaluate()
 
-    node_ids = [t.rule_id for t in run.trace]
+    node_ids = [t.rule_id for t in engine.traces]
     assert node_ids.count("fed.2024.b") == 1
     assert engine.resolved["fed.2024.a"] == Decimal("5.00")
 
@@ -241,7 +241,7 @@ def test_bare_string_cycle_raises_rule_pack_error(tmp_path: Path) -> None:
     pack = RulePack.load(pack_dir)
     engine = CalculationEngine(pack, _minimal_input())
     with pytest.raises(RulePackError, match="cycle detected at runtime"):
-        engine.run()
+        engine.evaluate()
 
 
 # ─── What-if guard ──────────────────────────────────────────────

@@ -71,9 +71,12 @@ def rule_packs_list(request: Request) -> HTMLResponse:
 async def rule_packs_create(request: Request) -> RedirectResponse:
     fd = await request.form()
     verify_csrf(request, str(fd.get("csrf_token", "")))
+    raw_year = form_str(fd, "year")
+    if not raw_year.isdigit():
+        raise ValueError("Year must be a whole number (e.g. 2024)")
     info = create_empty_pack(
         form_str(fd, "jurisdiction"),
-        int(form_str(fd, "year") or "0"),
+        int(raw_year),
         form_str(fd, "custom_name"),
     )
     bust_pack_cache(info.jurisdiction, info.year)

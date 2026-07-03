@@ -353,7 +353,7 @@ def test_immutable_run_has_snapshot_and_metadata() -> None:
     run = CalculationEngine(FED, inputs).run()
 
     assert run.input_snapshot.taxpayers[0].w2s[0].wages == Decimal("75000")
-    assert run.rule_pack_version == "1.11.0"
+    assert run.rule_pack_version == "1.12.0"
     assert len(run.rule_pack_checksum) == 64  # SHA-256 hex
 
 

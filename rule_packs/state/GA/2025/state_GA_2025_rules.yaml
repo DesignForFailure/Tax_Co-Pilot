@@ -20,9 +20,11 @@
 #   - Georgia Department of Revenue, dor.georgia.gov
 #     * Flat rate: 5.19% for TY 2025
 #     * Standard deduction: $12,000 (S/HOH/MFS/QSS), $24,000 (MFJ)
-#   - Georgia HB 1015 (2024): Eliminated personal exemptions for self/spouse,
-#     replaced with increased standard deduction. Dependent exemption $4,000.
-#   - Georgia HB 1437 (2022): Flat rate schedule (5.49 → 5.39 → 5.19 → ...)
+#   - Georgia SB 56 (2023): Eliminated personal exemptions for self/spouse,
+#     replaced with increased standard deduction. Dependent exemption $4,000
+#     per HB 1021 (2024).
+#   - Georgia HB 1437 (2022) started the flat-tax glide path; HB 1015 (2024)
+#     accelerated 2024 to 5.39%, and HB 111 (2025) set the 2025 rate at 5.19%.
 #   - GA DOR Important Tax Updates page (verified Feb 2026):
 #     "The Georgia income tax rate remains at a flat rate of 5.19%"
 #
@@ -36,7 +38,7 @@
 
 constants:
   # Source: GA DOR "Standard Deductions Increases" page + Form 500-ES (2025)
-  # Personal exemptions for self/spouse eliminated per HB 1015 (eff. TY 2024)
+  # Personal exemptions for self/spouse eliminated per SB 56 (eff. TY 2024)
   standard_deduction:
     single: "12000"
     mfj: "24000"
