@@ -87,9 +87,6 @@ constants:
       qss: "44000"
 
   adjustment_limits:
-    student_loan_interest_max: "2500"
-    educator_expenses_max: "300"
-    ira_limit: "7000"
     hsa_limit:
       single: "4150"
       mfj: "8300"
@@ -176,7 +173,7 @@ rules:
 
   - id: "fed.2024.gross_income.capital_loss_limit"
     description: "Capital loss deduction limit (IRC 1211(b): -$1,500 for MFS)"
-    form_line: "1040 Line 7"
+    form_line: "Schedule D Loss Limit"
     type: "lookup"
     table: "constants.capital_loss_limit"
     key: { ref: "input.filing_status" }
@@ -575,10 +572,10 @@ rules:
     rounding_precision: 2
 
   - id: "fed.2024.itemized.charitable"
-    description: "Charitable contributions (cash capped at 60% AGI, noncash at 30% AGI)"
+    description: "Charitable contributions: cash capped at 60% of AGI, noncash at 30%, combined at 60% (Pub 526 ordering rules between categories are simplified)"
     form_line: "Schedule A Line 14"
     type: "formula"
-    expression: "min(cash, agi_cap) + min(noncash, noncash_cap)"
+    expression: "min(min(cash, agi_cap) + min(noncash, noncash_cap), agi_cap)"
     inputs:
       cash: { ref: "input.itemized.charitable_cash" }
       noncash: { ref: "input.itemized.charitable_noncash" }
@@ -817,7 +814,7 @@ rules:
 
   - id: "fed.2024.credits.ctc.base"
     description: "Child tax credit base amount ($2,000 per qualifying child)"
-    form_line: "1040 Line 19"
+    form_line: "Form 8812 Line 5"
     type: "formula"
     expression: "children * credit"
     inputs:

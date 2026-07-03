@@ -73,7 +73,9 @@ def _input(filing_status: FilingStatus = FilingStatus.SINGLE, children: int = 0)
 
 def _evaluate(pack_dir: Path, inputs: TaxReturnInput) -> CalculationEngine:
     engine = CalculationEngine(RulePack.load(pack_dir), inputs)
-    engine.run()
+    # evaluate() exercises rule mechanics; run() would (rightly) reject
+    # these partial packs for lacking the headline output rules.
+    engine.evaluate()
     return engine
 
 
@@ -219,7 +221,7 @@ def test_unknown_key_value_produces_clear_error(tmp_path: Path) -> None:
         _input(FilingStatus.SINGLE, 7),
     )
     with pytest.raises(RulePackError, match="no entry for key '7' at dimension 1"):
-        engine.run()
+        engine.evaluate()
 
 
 def test_missing_filing_status_dimension_produces_clear_error(tmp_path: Path) -> None:
@@ -228,7 +230,7 @@ def test_missing_filing_status_dimension_produces_clear_error(tmp_path: Path) ->
         _input(FilingStatus.HOH, 1),
     )
     with pytest.raises(RulePackError, match="no entry for key 'hoh' at dimension 0"):
-        engine.run()
+        engine.evaluate()
 
 
 def test_three_dimensional_lookup(tmp_path: Path) -> None:

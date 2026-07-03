@@ -179,10 +179,19 @@ def _resolve_pack_file(pack_dir: Path, canonical_name: str, pattern_suffix: str)
 
 
 def _sha256_files(paths: Iterable[Path]) -> str:
-    """Compute a deterministic SHA-256 checksum over a set of files."""
+    """Compute a deterministic SHA-256 checksum over a set of files.
+
+    Each file's name and byte length frame its content so that shifting
+    bytes across file boundaries (or renaming files) cannot produce a
+    checksum collision between two different packs.
+    """
     h = hashlib.sha256()
     for p in sorted(paths, key=lambda x: x.name):
-        h.update(p.read_bytes())
+        data = p.read_bytes()
+        h.update(p.name.encode("utf-8"))
+        h.update(b"\x00")
+        h.update(len(data).to_bytes(8, "big"))
+        h.update(data)
     return h.hexdigest()
 
 
@@ -447,9 +456,26 @@ def _validate_formula_rule(rule: dict[str, Any]) -> None:
         if ch not in _ALLOWED_EXPR_CHARS:
             raise RulePackError(f"Rule {rid} (formula) has invalid character: {ch!r}")
 
+    if re.search(r"\b(?:min|max)\(\s*\)", expr):
+        raise RulePackError(f"Rule {rid} (formula) calls min()/max() with no arguments")
+
     idents = {i for i in _extract_identifiers(expr) if i}
     declared = set(inputs.keys())
     idents = {i for i in idents if i not in _ALLOWED_FUNCS}
+
+    # Input names must be plain identifiers: a name like "2000" would
+    # silently shadow the numeric literal 2000 in the expression while the
+    # trace still displays the literal, misrepresenting the actual math.
+    bad_names = sorted(
+        str(name)
+        for name in declared
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", str(name))
+    )
+    if bad_names:
+        raise RulePackError(
+            f"Rule {rid} (formula) has invalid input names {bad_names}; "
+            "input names must be identifiers not starting with a digit"
+        )
 
     unknown = sorted(i for i in idents if i not in declared)
     if unknown:

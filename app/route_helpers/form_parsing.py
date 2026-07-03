@@ -139,19 +139,23 @@ def parse_rule_form(fd: FormData) -> dict[str, Any]:
         rule["key"] = {"ref": form_str(fd, "bracket_key_ref")}
         tables: dict[str, list[dict[str, str | None]]] = {}
         for status in ("single", "mfj", "mfs", "hoh", "qss"):
+            # Removing a middle row in the editor leaves a gap in the row
+            # indices; scanning submitted keys (instead of counting up and
+            # stopping at the first gap) keeps the brackets after the gap.
+            row_indices: set[int] = set()
+            key_re = re.compile(rf"^bracket_{status}_(\d+)_lower$")
+            for key in fd:
+                match = key_re.fullmatch(key)
+                if match and int(match.group(1)) < MAX_INDEXED_ENTRIES:
+                    row_indices.add(int(match.group(1)))
             brackets: list[dict[str, str | None]] = []
-            row = 0
-            while True:
+            for row in sorted(row_indices):
                 lower = str(fd.get(f"bracket_{status}_{row}_lower", "") or "").strip()
-                if not lower and row > 0:
-                    break
                 if not lower:
-                    row += 1
                     continue
                 upper = str(fd.get(f"bracket_{status}_{row}_upper", "") or "").strip() or None
                 rate = str(fd.get(f"bracket_{status}_{row}_rate", "") or "").strip()
                 brackets.append({"lower": lower, "upper": upper, "rate": rate})
-                row += 1
             if brackets:
                 tables[status] = brackets
         if tables:

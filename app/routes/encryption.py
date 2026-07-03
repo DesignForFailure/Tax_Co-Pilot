@@ -12,6 +12,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
+from app.config import config as encryption_config
 from app.log import get_logger
 from app.route_helpers.csrf import get_csrf_token, verify_csrf
 from app.route_helpers.db_state import locked_database_response
@@ -27,6 +28,7 @@ from app.services.encryption import (
     DatabaseState,
     PasswordValidationError,
     detect_encryption_state,
+    migrate_to_encrypted,
     rotate_key,
     set_password_in_keyring,
     validate_password,
@@ -78,6 +80,35 @@ def unlock_submit(
                 url="/unlock?error=Python-layer+encryption+is+unsupported;+use+SQLCipher",
                 status_code=303,
             )
+        if db_state == DatabaseState.NONE and encryption_config.enabled:
+            # Bootstrap: no database exists yet; this password becomes the
+            # encryption password and the database is created encrypted.
+            set_cached_password(password)
+            set_password_in_keyring(password)
+            init_db()
+            logger.info("Encrypted database created via unlock bootstrap")
+            response = RedirectResponse(url="/dashboard", status_code=303)
+            response.set_cookie(
+                "csrf", secrets.token_urlsafe(32), httponly=True, samesite="strict"
+            )
+            return response
+        if db_state == DatabaseState.UNENCRYPTED and encryption_config.enabled:
+            # Existing plaintext database: migrate it to encrypted in place.
+            migrate_to_encrypted(
+                DB_PATH,
+                password,
+                provider_type=encryption_config.provider,
+                kdf_iterations=encryption_config.key_derivation_iterations,
+            )
+            set_cached_password(password)
+            set_password_in_keyring(password)
+            init_db()
+            logger.info("Plaintext database migrated to encrypted via unlock")
+            response = RedirectResponse(url="/dashboard", status_code=303)
+            response.set_cookie(
+                "csrf", secrets.token_urlsafe(32), httponly=True, samesite="strict"
+            )
+            return response
         if db_state != DatabaseState.ENCRYPTED_SQLCIPHER:
             return RedirectResponse(
                 url="/unlock?error=Database+is+not+encrypted",

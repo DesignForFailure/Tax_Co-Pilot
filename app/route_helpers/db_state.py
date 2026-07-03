@@ -20,7 +20,12 @@ from app.services.database import (
     list_return_runs,
     set_cached_password,
 )
-from app.services.encryption import DatabaseState, detect_encryption_state, get_password
+from app.services.encryption import (
+    DatabaseState,
+    detect_encryption_state,
+    get_password,
+    migrate_to_encrypted,
+)
 
 logger = get_logger(__name__)
 
@@ -70,8 +75,46 @@ def startup() -> None:
                 "Python-layer encrypted databases are unsupported at runtime. "
                 "Migrate to SQLCipher encryption."
             )
-        else:
-            init_db()
+        elif db_state == DatabaseState.NONE:
+            # Fresh install with encryption enabled: the database must be
+            # created encrypted, never silently plaintext. Without a password
+            # here, creation is deferred to the /unlock bootstrap flow.
+            password = get_password(source=encryption_config.password_source)
+            if password:
+                set_cached_password(password)
+                init_db()
+                logger.info(
+                    "Encrypted database created at startup (source=%s)",
+                    encryption_config.password_source,
+                )
+            else:
+                logger.warning(
+                    "Encryption enabled but no password available (source=%s); "
+                    "database creation deferred to the web unlock page",
+                    encryption_config.password_source,
+                )
+        else:  # DatabaseState.UNENCRYPTED
+            # Existing plaintext database with encryption enabled: migrate it
+            # now if a password is available (the promised migration path).
+            password = get_password(source=encryption_config.password_source)
+            if password:
+                migrate_to_encrypted(
+                    DB_PATH,
+                    password,
+                    provider_type=encryption_config.provider,
+                    kdf_iterations=encryption_config.key_derivation_iterations,
+                )
+                set_cached_password(password)
+                init_db()
+                logger.info("Plaintext database migrated to encrypted at startup")
+            else:
+                logger.warning(
+                    "Encryption enabled but the existing database is unencrypted "
+                    "and no password is available (source=%s); data remains "
+                    "PLAINTEXT until a password is provided via the unlock page",
+                    encryption_config.password_source,
+                )
+                init_db()
     else:
         init_db()
 
@@ -87,6 +130,12 @@ def database_locked() -> bool:
             "Python-layer encrypted databases are unsupported at runtime. "
             "Migrate to SQLCipher encryption."
         )
+
+    if db_state == DatabaseState.NONE:
+        # Encryption enabled but no database yet and no password came from
+        # env/keyring at startup: creation is deferred to /unlock so the
+        # database is never silently created plaintext.
+        return not get_cached_password()
 
     return db_state == DatabaseState.ENCRYPTED_SQLCIPHER and not get_cached_password()
 

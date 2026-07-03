@@ -559,7 +559,10 @@ def import_yaml(
     Validates via RulePack.load() before committing. Raises ValueError on failure.
     """
     _validate_custom_name(custom_name)
-    manifest: Any = yaml.safe_load(manifest_bytes)
+    try:
+        manifest: Any = yaml.safe_load(manifest_bytes)
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Manifest file is not valid YAML: {exc}") from exc
     if not isinstance(manifest, dict):
         raise ValueError("Manifest must be a YAML mapping")
 
@@ -601,7 +604,10 @@ def import_yaml(
 
     rule_count = 0
     try:
-        rd = yaml.safe_load(rules_bytes)
+        try:
+            rd = yaml.safe_load(rules_bytes)
+        except yaml.YAMLError as exc:
+            raise ValueError(f"Rules file is not valid YAML: {exc}") from exc
         rule_count = len(rd.get("rules", []) or []) if isinstance(rd, dict) else 0
     except Exception:
         logger.debug("Failed to count rules in imported pack", exc_info=True)

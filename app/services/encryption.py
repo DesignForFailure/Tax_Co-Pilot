@@ -232,7 +232,16 @@ def _detect_encryption_state(db_path: Path) -> DatabaseState:
         else:
             return DatabaseState.UNENCRYPTED
 
-    except (sqlite3.DatabaseError, sqlite3.OperationalError):
+    except (sqlite3.DatabaseError, sqlite3.OperationalError) as exc:
+        # A transient lock is not corruption: advising the user to delete
+        # a healthy database because a concurrent write held it briefly
+        # would be catastrophic advice.
+        message = str(exc).lower()
+        if "locked" in message or "busy" in message:
+            raise RuntimeError(
+                f"Database at {db_path} is busy (locked by another "
+                "connection). Retry in a moment."
+            ) from exc
         # Distinguish corrupted plaintext from encrypted:
         # SQLite files start with "SQLite format 3\x00"; encrypted files don't.
         try:

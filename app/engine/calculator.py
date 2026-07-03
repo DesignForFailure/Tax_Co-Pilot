@@ -109,15 +109,37 @@ class CalculationEngine:
         self._filing_status: str = inputs.filing_status.value
         self._evaluating: list[str] = []
 
-    def run(self) -> ReturnRun:
-        # 1) Normalize inputs into resolved values (engine inputs are also traceable).
-        self._resolve_inputs()
+    def evaluate(self) -> None:
+        """Resolve inputs and evaluate every rule, without sealing a run.
 
-        # 2) Evaluate rules in dependency-safe order.
+        Useful for exercising rule mechanics against partial packs; a full
+        return must go through run(), which enforces headline outputs.
+        """
+        self._resolve_inputs()
         for rule_id in self.rp.rule_order:
             self._evaluate_rule(self.rp.rules[rule_id])
 
+    def run(self) -> ReturnRun:
+        self.evaluate()
+
         yr = self.rp.tax_year
+
+        # Headline outputs must exist: silently defaulting them to $0 would
+        # seal a run reporting zero tax/refund whenever a custom pack renames
+        # or drops one of these rules (fail loudly, like _round does).
+        required = [
+            f"fed.{yr}.agi.total",
+            f"fed.{yr}.taxable_income",
+            f"fed.{yr}.tax.after_credits",
+            f"fed.{yr}.refund_or_owed",
+        ]
+        missing = [key for key in required if key not in self.resolved]
+        if missing:
+            raise RulePackError(
+                f"Rule pack v{self.rp.version} did not produce required "
+                f"output rules: {', '.join(missing)}"
+            )
+
         output = ReturnOutput(
             gross_income=self.resolved.get(f"fed.{yr}.gross_income.total", Decimal("0")),
             agi=self.resolved.get(f"fed.{yr}.agi.total", Decimal("0")),
@@ -715,6 +737,10 @@ class CalculationEngine:
                 if match_end == len(expr) - 1:
                     inner = expr[len(func) + 1 : -1]
                     args = self._split_args(inner)
+                    if not args:
+                        raise RulePackError(
+                            f"{func}() requires at least one argument"
+                        )
                     vals = [self._safe_eval(a.strip(), variables) for a in args]
                     return max(vals) if func == "max" else min(vals)
 
@@ -809,6 +835,10 @@ class CalculationEngine:
                 if match_end == len(expr) - 1:
                     inner = expr[len(func) + 1 : -1]
                     args = self._split_args(inner)
+                    if not args:
+                        raise RulePackError(
+                            f"{func}() requires at least one argument"
+                        )
                     vals = [self._safe_eval(a.strip(), variables) for a in args]
                     return max(vals) if func == "max" else min(vals)
 
