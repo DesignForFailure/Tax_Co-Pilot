@@ -320,6 +320,19 @@ class CalculationEngine:
         self.resolved["input.earned_income.primary"] = self.inputs.earned_income_primary()
         self.resolved["input.earned_income.spouse"] = self.inputs.earned_income_spouse()
 
+        # Military service inputs (M24)
+        self.resolved["input.military.combat_pay"] = self.inputs.total_combat_pay()
+        self.resolved["input.military.officer_combat_pay"] = self.inputs.officer_combat_pay()
+        self.resolved["input.military.officer_combat_months"] = (
+            self.inputs.officer_combat_months()
+        )
+        self.resolved["input.military.moving_expenses"] = (
+            self.inputs.total_military_moving_expenses()
+        )
+        self.resolved["input.military.reservist_travel"] = (
+            self.inputs.total_reservist_travel_expenses()
+        )
+
         # State residency / credit eligibility flags (M23), exposed as 0/1
         # so state rules can gate amounts with plain multiplication.
         self.resolved["input.state.nyc_resident"] = (

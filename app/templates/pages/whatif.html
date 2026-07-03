@@ -47,11 +47,10 @@
 
 <form method="POST" action="/whatif">
     <input type="hidden" name="csrf_token" value="{{ csrf }}">
-    <input type="hidden" name="filing_status" value="mfj">
 
     <div class="card section-anchor" id="whatif-filing">
         <h2>Filing Information</h2>
-        <div class="form-row">
+        <div class="form-row-3">
             <div>
                 <label>Tax Year</label>
                 <select name="tax_year">
@@ -59,6 +58,23 @@
                     <option value="{{ yr }}" {% if yr == (selected_year if selected_year is defined else 2024) %}selected{% endif %}>{{ yr }}</option>
                     {% endfor %}
                 </select>
+            </div>
+            <div>
+                <label>Scenario</label>
+                <select name="scenario">
+                    <option value="filing_status" {% if selected_scenario != "combat_pay_election" %}selected{% endif %}>MFJ vs MFS</option>
+                    <option value="combat_pay_election" {% if selected_scenario == "combat_pay_election" %}selected{% endif %}>EITC combat pay election</option>
+                </select>
+            </div>
+            <div>
+                <label>Filing Status (combat pay scenario)</label>
+                <select name="filing_status">
+                    <option value="mfj" selected>Married Filing Jointly</option>
+                    <option value="single">Single</option>
+                    <option value="hoh">Head of Household</option>
+                    <option value="qss">Qualifying Surviving Spouse</option>
+                </select>
+                <p class="field-hint">Ignored by the MFJ vs MFS comparison, which runs both statuses.</p>
             </div>
         </div>
     </div>
@@ -113,6 +129,19 @@
         </div>
         <div id="p_1099nec_container" class="dynamic-section"></div>
 
+        <div class="section-header">
+            <h3>Military Service</h3>
+        </div>
+        <div class="form-row-3">
+            <div><label>Combat Pay (W-2 Box 12 Q)</label><input type="text" name="p_combat_pay" placeholder="0"></div>
+            <div><label>Combat Zone Months</label><input type="text" name="p_combat_months" placeholder="0"></div>
+            <div><label><input type="checkbox" name="p_officer" value="1"> Commissioned officer</label></div>
+        </div>
+        <div class="form-row">
+            <div><label>PCS Moving Expenses (Form 3903)</label><input type="text" name="p_moving_expenses" placeholder="0"></div>
+            <div><label>Reservist Travel &gt;100mi (Form 2106)</label><input type="text" name="p_reservist_travel" placeholder="0"></div>
+        </div>
+
     </div>
 
     <div class="card section-anchor" id="whatif-spouse">
@@ -150,6 +179,19 @@
             <button type="button" class="btn btn-sm btn-outline" data-add-row="s_1099nec">+ Add 1099-NEC</button>
         </div>
         <div id="s_1099nec_container" class="dynamic-section"></div>
+
+        <div class="section-header">
+            <h3>Military Service</h3>
+        </div>
+        <div class="form-row-3">
+            <div><label>Combat Pay (W-2 Box 12 Q)</label><input type="text" name="s_combat_pay" placeholder="0"></div>
+            <div><label>Combat Zone Months</label><input type="text" name="s_combat_months" placeholder="0"></div>
+            <div><label><input type="checkbox" name="s_officer" value="1"> Commissioned officer</label></div>
+        </div>
+        <div class="form-row">
+            <div><label>PCS Moving Expenses (Form 3903)</label><input type="text" name="s_moving_expenses" placeholder="0"></div>
+            <div><label>Reservist Travel &gt;100mi (Form 2106)</label><input type="text" name="s_reservist_travel" placeholder="0"></div>
+        </div>
 
     </div>
 
@@ -240,11 +282,11 @@
     </div>
     <div class="summary-grid">
         <div class="summary-item">
-            <div class="label">MFJ — Federal Tax</div>
+            <div class="label">{{ comparison.scenario_a.scenario_name|upper }} — Federal Tax</div>
             <div class="value">${{ "{:,.0f}".format(comparison.scenario_a.total_tax) }}</div>
         </div>
         <div class="summary-item">
-            <div class="label">MFJ — Refund / Owed</div>
+            <div class="label">{{ comparison.scenario_a.scenario_name|upper }} — Refund / Owed</div>
             <div class="value {% if comparison.scenario_a.refund_or_owed >= 0 %}positive{% else %}negative{% endif %}">
                 {% if comparison.scenario_a.refund_or_owed >= 0 %}
                     +${{ "{:,.0f}".format(comparison.scenario_a.refund_or_owed) }}
@@ -254,11 +296,11 @@
             </div>
         </div>
         <div class="summary-item">
-            <div class="label">MFS — Federal Tax</div>
+            <div class="label">{{ comparison.scenario_b.scenario_name|upper }} — Federal Tax</div>
             <div class="value">${{ "{:,.0f}".format(comparison.scenario_b.total_tax) }}</div>
         </div>
         <div class="summary-item">
-            <div class="label">MFS — Refund / Owed</div>
+            <div class="label">{{ comparison.scenario_b.scenario_name|upper }} — Refund / Owed</div>
             <div class="value {% if comparison.scenario_b.refund_or_owed >= 0 %}positive{% else %}negative{% endif %}">
                 {% if comparison.scenario_b.refund_or_owed >= 0 %}
                     +${{ "{:,.0f}".format(comparison.scenario_b.refund_or_owed) }}
@@ -273,16 +315,16 @@
             <thead>
                 <tr>
                     <th>Metric</th>
-                    <th class="align-right">MFJ</th>
-                    <th class="align-right">MFS</th>
+                    <th class="align-right">{{ comparison.scenario_a.scenario_name|upper }}</th>
+                    <th class="align-right">{{ comparison.scenario_b.scenario_name|upper }}</th>
                 </tr>
             </thead>
             <tbody>
             {% for d in comparison.diffs %}
                 <tr>
                     <td>{{ d.metric }}</td>
-                    <td class="align-right">${{ "{:,.0f}".format(d.mfj|float) }}</td>
-                    <td class="align-right">${{ "{:,.0f}".format(d.mfs|float) }}</td>
+                    <td class="align-right">${{ "{:,.0f}".format(d.a|float) }}</td>
+                    <td class="align-right">${{ "{:,.0f}".format(d.b|float) }}</td>
                 </tr>
             {% endfor %}
             </tbody>
@@ -292,9 +334,9 @@
     <div class="notice notice-info u-mt-20">
         <h2>Recommendation: <span class="text-accent">{{ comparison.recommendation.upper() }}</span></h2>
         <p>
-            Filing as <strong>{{ comparison.recommendation.upper() }}</strong> saves
+            Choosing <strong>{{ comparison.recommendation.upper() }}</strong> improves the outcome by
             <strong class="positive">${{ "{:,.0f}".format(comparison.savings) }}</strong>
-            in federal tax compared to the other option.
+            compared to the other option.
         </p>
     </div>
 </section>

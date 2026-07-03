@@ -150,6 +150,14 @@ class Taxpayer(BaseModel):
     last_name: str = ""
     is_active_duty_military: bool = False
     domicile_state: str = ""
+    # Military service (M24). Combat pay is W-2 Box 12 code Q — the employer
+    # already excludes it from Box 1 wages, so the engine must never
+    # re-subtract it; it feeds the EITC election and the officer-cap check.
+    nontaxable_combat_pay: Decimal = Decimal("0")
+    is_commissioned_officer: bool = False
+    combat_zone_months: int = Field(default=0, ge=0, le=12)
+    active_duty_moving_expenses: Decimal = Decimal("0")
+    reservist_travel_expenses: Decimal = Decimal("0")
     w2s: list[W2Data] = Field(default_factory=list)
     form_1099_ints: list[Form1099INTData] = Field(default_factory=list)
     form_1099_divs: list[Form1099DIVData] = Field(default_factory=list)
@@ -281,6 +289,31 @@ class TaxReturnInput(BaseModel):
                 (n.nonemployee_compensation for n in tp.form_1099_necs), Decimal("0")
             )
         return total
+
+    def total_combat_pay(self) -> Decimal:
+        """Household W-2 Box 12 code Q total (already excluded from wages)."""
+        return sum((tp.nontaxable_combat_pay for tp in self.taxpayers), Decimal("0"))
+
+    def officer_combat_pay(self) -> Decimal:
+        """Combat pay reported by commissioned officers, whose exclusion is capped."""
+        return sum(
+            (tp.nontaxable_combat_pay for tp in self.taxpayers if tp.is_commissioned_officer),
+            Decimal("0"),
+        )
+
+    def officer_combat_months(self) -> Decimal:
+        """Qualifying combat-zone months across commissioned officers."""
+        return Decimal(
+            sum(tp.combat_zone_months for tp in self.taxpayers if tp.is_commissioned_officer)
+        )
+
+    def total_military_moving_expenses(self) -> Decimal:
+        """Unreimbursed PCS moving expenses (Form 3903, IRC 217(g))."""
+        return sum((tp.active_duty_moving_expenses for tp in self.taxpayers), Decimal("0"))
+
+    def total_reservist_travel_expenses(self) -> Decimal:
+        """Overnight reserve-duty travel over 100 miles (IRC 62(a)(2)(E))."""
+        return sum((tp.reservist_travel_expenses for tp in self.taxpayers), Decimal("0"))
 
     def aotc_expenses_tier1(self) -> Decimal:
         """Sum of per-student AOTC expenses capped at $2,000 (Form 8863 Part III line 28).

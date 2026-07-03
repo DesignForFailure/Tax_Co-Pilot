@@ -210,10 +210,16 @@ async def whatif_submit(request: Request) -> Response:
         "available_years": available_years,
         "selected_year": selected_year,
     }
+    scenario = str(fd.get("scenario", "filing_status") or "filing_status")
+    context["selected_scenario"] = scenario
     status_code = 200
     try:
         inputs = parse_tax_input_from_form(fd, available_years)
-        context["comparison"] = WhatIfEngine(get_federal_pack(inputs.tax_year)).compare_filing_status(inputs)
+        engine = WhatIfEngine(get_federal_pack(inputs.tax_year))
+        if scenario == "combat_pay_election":
+            context["comparison"] = engine.compare_combat_pay_election(inputs)
+        else:
+            context["comparison"] = engine.compare_filing_status(inputs)
         context["selected_year"] = inputs.tax_year
     except ValueError as exc:
         context["error"] = str(exc)
