@@ -162,19 +162,24 @@ def test_children_capped_at_three_for_parameters() -> None:
 
 
 def test_eic_is_refundable_via_payments() -> None:
-    """CTC zeroes the income tax; the EIC still pays out as a refund."""
+    """CTC zeroes the income tax; the EIC still pays out as a refund.
+
+    Since M26 the unused CTC also refunds as ACTC ($1,700 for this
+    household), so payments are EIC $4,213 + ACTC $1,700.
+    """
     e, run = _run(FED_2024, FilingStatus.SINGLE, "15000", children=1)
     assert e.resolved["fed.2024.tax.after_credits"] == Decimal("0")
-    assert e.resolved["fed.2024.total_payments"] == Decimal("4213.00")
-    assert run.output.refund_or_owed == Decimal("4213")
+    assert e.resolved["fed.2024.total_payments"] == Decimal("5913.00")
+    assert run.output.refund_or_owed == Decimal("5913")
 
 
 def test_form_mapper_line_27_and_consistency() -> None:
     _, run = _run(FED_2024, FilingStatus.SINGLE, "15000", children=1)
     pkt = map_return_run(run)
     assert pkt.form_1040.line_27 == Decimal("4213")
-    assert pkt.form_1040.line_33 == Decimal("4213.00")
-    assert pkt.form_1040.line_34 == Decimal("4213.00")
+    assert pkt.form_1040.line_28 == Decimal("1700")
+    assert pkt.form_1040.line_33 == Decimal("5913.00")
+    assert pkt.form_1040.line_34 == Decimal("5913.00")
     assert pkt.consistency_errors == []
 
 

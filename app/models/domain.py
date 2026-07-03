@@ -185,6 +185,7 @@ class TaxReturnInput(BaseModel):
     estimated_tax_payments: Decimal = Decimal("0")
     itemized_deductions: ItemizedDeductionData = Field(default_factory=ItemizedDeductionData)
     qualifying_children: int = 0
+    other_dependents: int = 0
     education_students: list[EducationExpenseData] = Field(default_factory=list)
     llc_expenses: Decimal = Decimal("0")
     dependent_care_expenses: Decimal = Decimal("0")
@@ -407,6 +408,7 @@ class ReturnOutput(BaseModel):
     education_credits: Decimal = Decimal("0")
     dependent_care_credit: Decimal = Decimal("0")
     net_investment_income_tax: Decimal = Decimal("0")
+    additional_child_tax_credit: Decimal = Decimal("0")
 
 
 class StateReturnOutput(BaseModel):
