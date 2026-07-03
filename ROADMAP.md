@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–24 complete; Phase 4 (M20–M24) is done. Next: the "missing 10%" common-household gaps toward `0.5.0`.
+**Status:** Late Alpha — milestones 1–25 complete; Phase 5 (the "missing 10%", M25–M28) is underway toward `0.5.0`.
 **SemVer line:** `0.4.x`.
-**Test suite:** 560 passing, 4 skipped, 0 failures.
+**Test suite:** 571 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -612,6 +612,30 @@ These milestones fix known calculation inaccuracies.
 - With M19 in place, the EITC combat-pay election picks whichever treatment yields the larger credit.
 - Golden test vectors sourced from IRS Pub 3 examples.
 - `ruff check . && mypy . && pytest` clean.
+
+---
+
+## Phase 5 — The Missing 10% (toward 0.5.0)
+
+Common-household items still absent after Phase 4. Verify every parameter against the year's Rev. Proc. / form instructions before shipping.
+
+### M25: Additional Standard Deduction (Age 65+ / Blind)
+
+**Status:** Complete on 2026-07-03. The 2023/2024/2025 packs (v1.9.0) implement IRC §63(f): per checked condition, $1,850/$1,950/$2,000 unmarried and $1,500/$1,550/$1,600 married, via new per-taxpayer `is_65_or_older`/`is_blind` flags (no birth dates stored). `deductions.standard_total` feeds the itemized-vs-standard comparison and `ReturnOutput.standard_deduction`. The GA low income credit now counts the extra exemption per taxpayer 65+ (GA packs v1.3.0), closing the M23 limitation. 11 tests in `tests/test_additional_standard_deduction.py`. MFS boxes for a non-filing spouse remain unmodeled (documented).
+
+**Goal:** IRC §63(f) additional standard deduction per age-65+/blind condition, with age/blindness flags on the taxpayer model.
+
+### M26: Refundable ACTC + Credit for Other Dependents
+
+**Goal:** Schedule 8812 in full: the refundable Additional Child Tax Credit (up to $1,600/$1,700/$1,700 per child for 2023/2024/2025, 15% of earned income over $2,500) flowing to 1040 line 28, and the $500 nonrefundable credit for other dependents (ODC). Requires modeling `other_dependents` alongside `qualifying_children`.
+
+### M27: Additional Medicare Tax (Form 8959)
+
+**Goal:** 0.9% on Medicare wages + SE income above $200k single/HoH/QSS, $250k MFJ, $125k MFS (not inflation-indexed). Joins Schedule 2 → 1040 line 23 alongside SE tax and NIIT. Withholding of the surtax (W-2 Box 6 over 1.45%) is out of scope until Box 5/6 inputs exist — document.
+
+### M28: State Dependent Exemptions
+
+**Goal:** GA's $4,000-per-dependent exemption (HB 1021, noted in the GA pack comments), plus a review of CA/NY dependent handling (CA dependent exemption credit $461 for 2024; NY dependent exemption $1,000).
 
 ---
 

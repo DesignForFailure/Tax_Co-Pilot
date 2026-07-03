@@ -112,6 +112,13 @@ constants:
     hoh: "200000"
     qss: "400000"
 
+  additional_standard_deduction:
+    single: "1950"
+    mfj: "1550"
+    mfs: "1550"
+    hoh: "1950"
+    qss: "1550"
+
 rules:
   - id: "fed.2024.gross_income.wages"
     description: "Total W-2 wages (Box 1)"
@@ -455,6 +462,35 @@ rules:
     table: "constants.standard_deduction"
     key: { ref: "input.filing_status" }
 
+  - id: "fed.2024.deductions.additional_rate"
+    description: "Additional standard deduction per age-65+/blind condition (IRC 63(f), Rev. Proc. amounts for 2024: $1950 unmarried, $1550 married)"
+    form_line: "1040 Standard Deduction Chart"
+    type: "lookup"
+    table: "constants.additional_standard_deduction"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2024.deductions.additional_standard"
+    description: "Additional standard deduction: rate times the number of checked age-65+/blind boxes (up to 4 on a joint return)"
+    form_line: "1040 Standard Deduction Chart"
+    type: "formula"
+    expression: "rate * boxes"
+    inputs:
+      rate: { ref: "fed.2024.deductions.additional_rate" }
+      boxes: { ref: "input.age_blind.boxes" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2024.deductions.standard_total"
+    description: "Standard deduction including age-65+/blind additions"
+    form_line: "Standard Deduction Worksheet"
+    type: "formula"
+    expression: "base + additional"
+    inputs:
+      base: { ref: "fed.2024.standard_deduction" }
+      additional: { ref: "fed.2024.deductions.additional_standard" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
   - id: "fed.2024.itemized.salt_cap"
     description: "SALT deduction cap by filing status"
     form_line: "Schedule A"
@@ -561,7 +597,7 @@ rules:
     type: "formula"
     expression: "max(standard, itemized)"
     inputs:
-      standard: { ref: "fed.2024.standard_deduction" }
+      standard: { ref: "fed.2024.deductions.standard_total" }
       itemized: { ref: "fed.2024.itemized.total" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2

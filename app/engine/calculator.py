@@ -121,7 +121,12 @@ class CalculationEngine:
         output = ReturnOutput(
             gross_income=self.resolved.get(f"fed.{yr}.gross_income.total", Decimal("0")),
             agi=self.resolved.get(f"fed.{yr}.agi.total", Decimal("0")),
-            standard_deduction=self.resolved.get(f"fed.{yr}.standard_deduction", Decimal("0")),
+            standard_deduction=self.resolved.get(
+                # Prefer the M25 total (base + age/blind additions); older
+                # custom packs may only define the base lookup.
+                f"fed.{yr}.deductions.standard_total",
+                self.resolved.get(f"fed.{yr}.standard_deduction", Decimal("0")),
+            ),
             taxable_income=self.resolved.get(f"fed.{yr}.taxable_income", Decimal("0")),
             federal_tax=self.resolved.get(f"fed.{yr}.tax.after_credits", Decimal("0")),
             total_withholding=self.resolved.get(f"fed.{yr}.total_withholding", Decimal("0")),
@@ -319,6 +324,10 @@ class CalculationEngine:
         )
         self.resolved["input.earned_income.primary"] = self.inputs.earned_income_primary()
         self.resolved["input.earned_income.spouse"] = self.inputs.earned_income_spouse()
+
+        # Age / blindness checkboxes (M25)
+        self.resolved["input.age_blind.boxes"] = self.inputs.age_blind_boxes()
+        self.resolved["input.age_blind.seniors"] = self.inputs.seniors_count()
 
         # Military service inputs (M24)
         self.resolved["input.military.combat_pay"] = self.inputs.total_combat_pay()
