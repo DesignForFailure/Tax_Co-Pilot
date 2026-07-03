@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–21 complete; Phase 4 continues with M22–M24.
+**Status:** Late Alpha — milestones 1–22 complete; Phase 4 continues with M23–M24.
 **SemVer line:** `0.3.x`.
-**Test suite:** 502 passing, 4 skipped, 0 failures.
+**Test suite:** 514 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -558,6 +558,8 @@ These milestones fix known calculation inaccuracies.
 - Percentage scales with AGI.
 
 ### M22: Net Investment Income Tax (NIIT)
+
+**Status:** Complete on 2026-07-03. The 2023/2024/2025 packs (v1.7.0) implement Form 8960 / IRC §1411: 3.8% of the smaller of net investment income (interest + dividends + capital gains after the Schedule D loss limitation, floored at zero) or the MAGI excess over the statutory thresholds ($200k single/HoH, $250k MFJ/QSS, $125k MFS — not inflation-indexed; AGI used as MAGI). A new `fed.YYYY.tax.other_taxes` rule (Schedule 2 → 1040 Line 23) aggregates SE tax + NIIT into `tax.total_liability`. 12 golden vectors in `tests/test_niit.py`.
 
 **Goal:** Add the 3.8% NIIT on investment income above $200k single / $250k MFJ.
 

@@ -150,6 +150,9 @@ class CalculationEngine:
             dependent_care_credit=self.resolved.get(
                 f"fed.{yr}.credits.care.final", Decimal("0")
             ),
+            net_investment_income_tax=self.resolved.get(
+                f"fed.{yr}.niit.final", Decimal("0")
+            ),
         )
 
         state_outputs = self._run_states()
