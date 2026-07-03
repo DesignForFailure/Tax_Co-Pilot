@@ -409,6 +409,7 @@ Tax_Co-Pilot/
     ├── test_additional_standard_deduction.py
     ├── test_calculate_name_validation.py
     ├── test_calculator_resolve_ref.py
+    ├── test_capital_loss_carryover.py
     ├── test_chain_integrity.py
     ├── test_data_mgmt.py
     ├── test_deep_review_fixes.py

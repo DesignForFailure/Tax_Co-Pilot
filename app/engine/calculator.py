@@ -186,6 +186,9 @@ class CalculationEngine:
             additional_medicare_tax=self.resolved.get(
                 f"fed.{yr}.addl_medicare.final", Decimal("0")
             ),
+            capital_loss_carryover_next=self.resolved.get(
+                f"fed.{yr}.carryover.next_total", Decimal("0")
+            ),
         )
 
         state_outputs = self._run_states()
@@ -293,6 +296,8 @@ class CalculationEngine:
         self.resolved["input.1099b.long_term_gain"] = (
             self.inputs.total_long_term_capital_gains()
         )
+        self.resolved["input.carryover.short_term"] = self.inputs.short_term_loss_carryover
+        self.resolved["input.carryover.long_term"] = self.inputs.long_term_loss_carryover
         self.resolved["input.1099b.short_term_gain"] = (
             self.inputs.total_short_term_capital_gains()
         )

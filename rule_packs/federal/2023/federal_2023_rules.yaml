@@ -154,11 +154,13 @@ rules:
     rounding_precision: 2
 
   - id: "fed.2023.gross_income.capital_gains"
-    description: "Net capital gains (1099-B proceeds - basis)"
+    description: "Net capital gain or loss including prior-year carryovers (Schedule D Line 16)"
     form_line: "Schedule D"
-    type: "sum"
+    type: "formula"
+    expression: "st + lt"
     inputs:
-      items: { ref: "input.1099b.net_gain" }
+      st: { ref: "fed.2023.income.short_term_net" }
+      lt: { ref: "fed.2023.income.long_term_net" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
@@ -670,8 +672,8 @@ rules:
         - { lower: "693750", upper: null, rate: "0.37" }
 
   - id: "fed.2023.income.long_term_gains"
-    description: "Net long-term capital gain or loss (1099-B long-term lots)"
-    form_line: "Schedule D Line 15"
+    description: "Current-year net long-term capital gain or loss (1099-B long-term lots)"
+    form_line: "Schedule D Lines 8-10"
     type: "sum"
     inputs:
       items: { ref: "input.1099b.long_term_gain" }
@@ -679,11 +681,80 @@ rules:
     rounding_precision: 2
 
   - id: "fed.2023.income.short_term_gains"
-    description: "Net short-term capital gain or loss (1099-B short-term lots)"
-    form_line: "Schedule D Line 7"
+    description: "Current-year net short-term capital gain or loss (1099-B short-term lots)"
+    form_line: "Schedule D Lines 1-3"
     type: "sum"
     inputs:
       items: { ref: "input.1099b.short_term_gain" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.income.short_term_net"
+    description: "Short-term total after the prior-year carryover (Schedule D Line 7 = lines 1-3 minus line 6)"
+    form_line: "Schedule D Line 7"
+    type: "formula"
+    expression: "current - carryover"
+    inputs:
+      current: { ref: "fed.2023.income.short_term_gains" }
+      carryover: { ref: "input.carryover.short_term" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.income.long_term_net"
+    description: "Long-term total after the prior-year carryover (Schedule D Line 15 = lines 8-10 minus line 14)"
+    form_line: "Schedule D Line 15"
+    type: "formula"
+    expression: "current - carryover"
+    inputs:
+      current: { ref: "fed.2023.income.long_term_gains" }
+      carryover: { ref: "input.carryover.long_term" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.carryover.used"
+    description: "Capital loss absorbed this year, up to the IRC 1211(b) limit (assumes the full limit is used; the Carryover Worksheet's negative-taxable-income adjustment is unmodeled)"
+    form_line: "Capital Loss Carryover Worksheet"
+    type: "formula"
+    expression: "min(max(0 - st - lt, 0), 0 - neg_limit)"
+    inputs:
+      st: { ref: "fed.2023.income.short_term_net" }
+      lt: { ref: "fed.2023.income.long_term_net" }
+      neg_limit: { ref: "fed.2023.gross_income.capital_loss_limit" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.carryover.next_short"
+    description: "Short-term loss carrying to next year: the ST loss (after LT-gain netting) beyond what the limit absorbed - ST losses are used first"
+    form_line: "Capital Loss Carryover Worksheet"
+    type: "formula"
+    expression: "max(0 - st - max(lt, 0) - used, 0)"
+    inputs:
+      st: { ref: "fed.2023.income.short_term_net" }
+      lt: { ref: "fed.2023.income.long_term_net" }
+      used: { ref: "fed.2023.carryover.used" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.carryover.next_total"
+    description: "Total capital loss carrying to next year (informational; enter next year as Schedule D lines 6/14)"
+    form_line: "Capital Loss Carryover Worksheet"
+    type: "formula"
+    expression: "max(0 - st - lt - used, 0)"
+    inputs:
+      st: { ref: "fed.2023.income.short_term_net" }
+      lt: { ref: "fed.2023.income.long_term_net" }
+      used: { ref: "fed.2023.carryover.used" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.carryover.next_long"
+    description: "Long-term loss carrying to next year (total minus the short-term portion)"
+    form_line: "Capital Loss Carryover Worksheet"
+    type: "formula"
+    expression: "total - short"
+    inputs:
+      total: { ref: "fed.2023.carryover.next_total" }
+      short: { ref: "fed.2023.carryover.next_short" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
@@ -693,8 +764,8 @@ rules:
     type: "formula"
     expression: "max(min(lt, lt + st), 0)"
     inputs:
-      lt: { ref: "fed.2023.income.long_term_gains" }
-      st: { ref: "fed.2023.income.short_term_gains" }
+      lt: { ref: "fed.2023.income.long_term_net" }
+      st: { ref: "fed.2023.income.short_term_net" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 

@@ -463,6 +463,8 @@ def parse_tax_input_from_form(fd: FormData, available_years: Sequence[int]) -> T
         adjustments=adjustments,
         estimated_tax_payments=form_money(fd, "estimated_payments"),
         other_income=form_money(fd, "other_income"),
+        short_term_loss_carryover=form_money(fd, "st_loss_carryover"),
+        long_term_loss_carryover=form_money(fd, "lt_loss_carryover"),
         itemized_deductions=itemized,
         qualifying_children=qualifying_children,
         other_dependents=other_dependents,
