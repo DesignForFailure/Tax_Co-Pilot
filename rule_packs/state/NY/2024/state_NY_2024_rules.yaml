@@ -23,6 +23,57 @@ constants:
     hoh: "11200"
     qss: "16050"
 
+  # Tax Law 601(d-1) tax table benefit recapture (IT-201 Tax Computation
+  # worksheets, NYAGI > $107,650). Each phase flattens toward a target
+  # rate; targets/caps/thresholds derive from the rate schedule itself:
+  # phase 1 flattens the sub-6% brackets (5.5% target for MFJ/QSS whose
+  # 6% band starts above $107,650), phase 2 is MFJ/QSS's 6% increment
+  # (targets/caps equal phase 1 for the other statuses, zeroing it), and
+  # phase 3 is the 6.85% increment. The 9.65%/10.3%/10.9% recapture
+  # ranges (taxable income above the caps below) are unmodeled.
+  recapture_target1:
+    single: "0.06"
+    mfj: "0.055"
+    mfs: "0.06"
+    hoh: "0.06"
+    qss: "0.055"
+  recapture_cap1:
+    single: "215400"
+    mfj: "161550"
+    mfs: "215400"
+    hoh: "269300"
+    qss: "161550"
+  recapture_target2:
+    single: "0.06"
+    mfj: "0.06"
+    mfs: "0.06"
+    hoh: "0.06"
+    qss: "0.06"
+  recapture_cap2:
+    single: "215400"
+    mfj: "323200"
+    mfs: "215400"
+    hoh: "269300"
+    qss: "323200"
+  recapture_thr2:
+    single: "215400"
+    mfj: "161550"
+    mfs: "215400"
+    hoh: "269300"
+    qss: "161550"
+  recapture_cap3:
+    single: "1077550"
+    mfj: "2155350"
+    mfs: "1077550"
+    hoh: "1616450"
+    qss: "2155350"
+  recapture_thr3:
+    single: "215400"
+    mfj: "323200"
+    mfs: "215400"
+    hoh: "269300"
+    qss: "323200"
+
 rules:
 
   - id: "ny.2024.agi"
@@ -61,13 +112,346 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
-  - id: "ny.2024.tax"
-    description: "New York income tax (2024 progressive brackets)"
+  - id: "ny.2024.recapture.target1"
+    description: "Tax table benefit recapture parameter: target1"
+    type: "lookup"
+    table: "constants.recapture_target1"
+    key: { ref: "input.filing_status" }
+
+  - id: "ny.2024.recapture.cap1"
+    description: "Tax table benefit recapture parameter: cap1"
+    type: "lookup"
+    table: "constants.recapture_cap1"
+    key: { ref: "input.filing_status" }
+
+  - id: "ny.2024.recapture.target2"
+    description: "Tax table benefit recapture parameter: target2"
+    type: "lookup"
+    table: "constants.recapture_target2"
+    key: { ref: "input.filing_status" }
+
+  - id: "ny.2024.recapture.cap2"
+    description: "Tax table benefit recapture parameter: cap2"
+    type: "lookup"
+    table: "constants.recapture_cap2"
+    key: { ref: "input.filing_status" }
+
+  - id: "ny.2024.recapture.thr2"
+    description: "Tax table benefit recapture parameter: thr2"
+    type: "lookup"
+    table: "constants.recapture_thr2"
+    key: { ref: "input.filing_status" }
+
+  - id: "ny.2024.recapture.cap3"
+    description: "Tax table benefit recapture parameter: cap3"
+    type: "lookup"
+    table: "constants.recapture_cap3"
+    key: { ref: "input.filing_status" }
+
+  - id: "ny.2024.recapture.thr3"
+    description: "Tax table benefit recapture parameter: thr3"
+    type: "lookup"
+    table: "constants.recapture_thr3"
+    key: { ref: "input.filing_status" }
+
+  - id: "ny.2024.recapture.ti_cap1"
+    description: "Taxable income capped at the phase-1 range top (freezes the benefit constant above the cap)"
+    type: "formula"
+    expression: "min(ti, cap)"
+    inputs:
+      ti: { ref: "ny.2024.taxable_income" }
+      cap: { ref: "ny.2024.recapture.cap1" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "ny.2024.recapture.tax_at_cap1"
+    description: "Rate-schedule tax at the phase-1 capped income (same 2024 tables as ny.2024.tax.schedule)"
+    type: "bracket_table"
+    input: { ref: "ny.2024.recapture.ti_cap1" }
+    key: { ref: "input.filing_status" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+    tables:
+      single:
+        - { lower: "0",        upper: "8500",      rate: "0.04" }
+        - { lower: "8500",     upper: "11700",     rate: "0.045" }
+        - { lower: "11700",    upper: "13900",     rate: "0.0525" }
+        - { lower: "13900",    upper: "80650",     rate: "0.055" }
+        - { lower: "80650",    upper: "215400",    rate: "0.06" }
+        - { lower: "215400",   upper: "1077550",   rate: "0.0685" }
+        - { lower: "1077550",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+      mfj:
+        - { lower: "0",        upper: "17150",     rate: "0.04" }
+        - { lower: "17150",    upper: "23600",     rate: "0.045" }
+        - { lower: "23600",    upper: "27900",     rate: "0.0525" }
+        - { lower: "27900",    upper: "161550",    rate: "0.055" }
+        - { lower: "161550",   upper: "323200",    rate: "0.06" }
+        - { lower: "323200",   upper: "2155350",   rate: "0.0685" }
+        - { lower: "2155350",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+      mfs:
+        - { lower: "0",        upper: "8500",      rate: "0.04" }
+        - { lower: "8500",     upper: "11700",     rate: "0.045" }
+        - { lower: "11700",    upper: "13900",     rate: "0.0525" }
+        - { lower: "13900",    upper: "80650",     rate: "0.055" }
+        - { lower: "80650",    upper: "215400",    rate: "0.06" }
+        - { lower: "215400",   upper: "1077550",   rate: "0.0685" }
+        - { lower: "1077550",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+      # IT-201: HoH has its own schedule.
+      hoh:
+        - { lower: "0",        upper: "12800",     rate: "0.04" }
+        - { lower: "12800",    upper: "17650",     rate: "0.045" }
+        - { lower: "17650",    upper: "20900",     rate: "0.0525" }
+        - { lower: "20900",    upper: "107650",    rate: "0.055" }
+        - { lower: "107650",   upper: "269300",    rate: "0.06" }
+        - { lower: "269300",   upper: "1616450",   rate: "0.0685" }
+        - { lower: "1616450",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+      qss:
+        - { lower: "0",        upper: "17150",     rate: "0.04" }
+        - { lower: "17150",    upper: "23600",     rate: "0.045" }
+        - { lower: "23600",    upper: "27900",     rate: "0.0525" }
+        - { lower: "27900",    upper: "161550",    rate: "0.055" }
+        - { lower: "161550",   upper: "323200",    rate: "0.06" }
+        - { lower: "323200",   upper: "2155350",   rate: "0.0685" }
+        - { lower: "2155350",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+
+  - id: "ny.2024.recapture.benefit1"
+    description: "Tax table benefit vs the phase-1 flat target rate (constant once taxable income exceeds the range floor)"
+    type: "formula"
+    expression: "max(target * ti_cap - schedule_tax, 0)"
+    inputs:
+      target: { ref: "ny.2024.recapture.target1" }
+      ti_cap: { ref: "ny.2024.recapture.ti_cap1" }
+      schedule_tax: { ref: "ny.2024.recapture.tax_at_cap1" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "ny.2024.recapture.ti_cap2"
+    description: "Taxable income capped at the phase-2 range top (freezes the benefit constant above the cap)"
+    type: "formula"
+    expression: "min(ti, cap)"
+    inputs:
+      ti: { ref: "ny.2024.taxable_income" }
+      cap: { ref: "ny.2024.recapture.cap2" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "ny.2024.recapture.tax_at_cap2"
+    description: "Rate-schedule tax at the phase-2 capped income (same 2024 tables as ny.2024.tax.schedule)"
+    type: "bracket_table"
+    input: { ref: "ny.2024.recapture.ti_cap2" }
+    key: { ref: "input.filing_status" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+    tables:
+      single:
+        - { lower: "0",        upper: "8500",      rate: "0.04" }
+        - { lower: "8500",     upper: "11700",     rate: "0.045" }
+        - { lower: "11700",    upper: "13900",     rate: "0.0525" }
+        - { lower: "13900",    upper: "80650",     rate: "0.055" }
+        - { lower: "80650",    upper: "215400",    rate: "0.06" }
+        - { lower: "215400",   upper: "1077550",   rate: "0.0685" }
+        - { lower: "1077550",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+      mfj:
+        - { lower: "0",        upper: "17150",     rate: "0.04" }
+        - { lower: "17150",    upper: "23600",     rate: "0.045" }
+        - { lower: "23600",    upper: "27900",     rate: "0.0525" }
+        - { lower: "27900",    upper: "161550",    rate: "0.055" }
+        - { lower: "161550",   upper: "323200",    rate: "0.06" }
+        - { lower: "323200",   upper: "2155350",   rate: "0.0685" }
+        - { lower: "2155350",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+      mfs:
+        - { lower: "0",        upper: "8500",      rate: "0.04" }
+        - { lower: "8500",     upper: "11700",     rate: "0.045" }
+        - { lower: "11700",    upper: "13900",     rate: "0.0525" }
+        - { lower: "13900",    upper: "80650",     rate: "0.055" }
+        - { lower: "80650",    upper: "215400",    rate: "0.06" }
+        - { lower: "215400",   upper: "1077550",   rate: "0.0685" }
+        - { lower: "1077550",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+      # IT-201: HoH has its own schedule.
+      hoh:
+        - { lower: "0",        upper: "12800",     rate: "0.04" }
+        - { lower: "12800",    upper: "17650",     rate: "0.045" }
+        - { lower: "17650",    upper: "20900",     rate: "0.0525" }
+        - { lower: "20900",    upper: "107650",    rate: "0.055" }
+        - { lower: "107650",   upper: "269300",    rate: "0.06" }
+        - { lower: "269300",   upper: "1616450",   rate: "0.0685" }
+        - { lower: "1616450",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+      qss:
+        - { lower: "0",        upper: "17150",     rate: "0.04" }
+        - { lower: "17150",    upper: "23600",     rate: "0.045" }
+        - { lower: "23600",    upper: "27900",     rate: "0.0525" }
+        - { lower: "27900",    upper: "161550",    rate: "0.055" }
+        - { lower: "161550",   upper: "323200",    rate: "0.06" }
+        - { lower: "323200",   upper: "2155350",   rate: "0.0685" }
+        - { lower: "2155350",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+
+  - id: "ny.2024.recapture.benefit2"
+    description: "Tax table benefit vs the phase-2 flat target rate (constant once taxable income exceeds the range floor)"
+    type: "formula"
+    expression: "max(target * ti_cap - schedule_tax, 0)"
+    inputs:
+      target: { ref: "ny.2024.recapture.target2" }
+      ti_cap: { ref: "ny.2024.recapture.ti_cap2" }
+      schedule_tax: { ref: "ny.2024.recapture.tax_at_cap2" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "ny.2024.recapture.ti_cap3"
+    description: "Taxable income capped at the phase-3 range top (freezes the benefit constant above the cap)"
+    type: "formula"
+    expression: "min(ti, cap)"
+    inputs:
+      ti: { ref: "ny.2024.taxable_income" }
+      cap: { ref: "ny.2024.recapture.cap3" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "ny.2024.recapture.tax_at_cap3"
+    description: "Rate-schedule tax at the phase-3 capped income (same 2024 tables as ny.2024.tax.schedule)"
+    type: "bracket_table"
+    input: { ref: "ny.2024.recapture.ti_cap3" }
+    key: { ref: "input.filing_status" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+    tables:
+      single:
+        - { lower: "0",        upper: "8500",      rate: "0.04" }
+        - { lower: "8500",     upper: "11700",     rate: "0.045" }
+        - { lower: "11700",    upper: "13900",     rate: "0.0525" }
+        - { lower: "13900",    upper: "80650",     rate: "0.055" }
+        - { lower: "80650",    upper: "215400",    rate: "0.06" }
+        - { lower: "215400",   upper: "1077550",   rate: "0.0685" }
+        - { lower: "1077550",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+      mfj:
+        - { lower: "0",        upper: "17150",     rate: "0.04" }
+        - { lower: "17150",    upper: "23600",     rate: "0.045" }
+        - { lower: "23600",    upper: "27900",     rate: "0.0525" }
+        - { lower: "27900",    upper: "161550",    rate: "0.055" }
+        - { lower: "161550",   upper: "323200",    rate: "0.06" }
+        - { lower: "323200",   upper: "2155350",   rate: "0.0685" }
+        - { lower: "2155350",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+      mfs:
+        - { lower: "0",        upper: "8500",      rate: "0.04" }
+        - { lower: "8500",     upper: "11700",     rate: "0.045" }
+        - { lower: "11700",    upper: "13900",     rate: "0.0525" }
+        - { lower: "13900",    upper: "80650",     rate: "0.055" }
+        - { lower: "80650",    upper: "215400",    rate: "0.06" }
+        - { lower: "215400",   upper: "1077550",   rate: "0.0685" }
+        - { lower: "1077550",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+      # IT-201: HoH has its own schedule.
+      hoh:
+        - { lower: "0",        upper: "12800",     rate: "0.04" }
+        - { lower: "12800",    upper: "17650",     rate: "0.045" }
+        - { lower: "17650",    upper: "20900",     rate: "0.0525" }
+        - { lower: "20900",    upper: "107650",    rate: "0.055" }
+        - { lower: "107650",   upper: "269300",    rate: "0.06" }
+        - { lower: "269300",   upper: "1616450",   rate: "0.0685" }
+        - { lower: "1616450",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+      qss:
+        - { lower: "0",        upper: "17150",     rate: "0.04" }
+        - { lower: "17150",    upper: "23600",     rate: "0.045" }
+        - { lower: "23600",    upper: "27900",     rate: "0.0525" }
+        - { lower: "27900",    upper: "161550",    rate: "0.055" }
+        - { lower: "161550",   upper: "323200",    rate: "0.06" }
+        - { lower: "323200",   upper: "2155350",   rate: "0.0685" }
+        - { lower: "2155350",  upper: "5000000",   rate: "0.0965" }
+        - { lower: "5000000",  upper: "25000000",  rate: "0.103" }
+        - { lower: "25000000", upper: null,        rate: "0.109" }
+
+  - id: "ny.2024.recapture.benefit3"
+    description: "Tax table benefit vs the phase-3 flat target rate (constant once taxable income exceeds the range floor)"
+    type: "formula"
+    expression: "max(target * ti_cap - schedule_tax, 0)"
+    inputs:
+      target: { literal: "0.0685" }
+      ti_cap: { ref: "ny.2024.recapture.ti_cap3" }
+      schedule_tax: { ref: "ny.2024.recapture.tax_at_cap3" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "ny.2024.recapture.phase1"
+    description: "Phase-1 fraction: AGI excess over the range threshold, over $50,000, capped at 1 (rounded to 4 decimals per the IT-201 worksheets)"
+    type: "formula"
+    expression: "min(max(agi - threshold, 0) / span, 1)"
+    inputs:
+      agi: { ref: "ny.2024.agi" }
+      threshold: { literal: "107650" }
+      span: { literal: "50000" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 4
+
+  - id: "ny.2024.recapture.phase2"
+    description: "Phase-2 fraction: AGI excess over the range threshold, over $50,000, capped at 1 (rounded to 4 decimals per the IT-201 worksheets)"
+    type: "formula"
+    expression: "min(max(agi - threshold, 0) / span, 1)"
+    inputs:
+      agi: { ref: "ny.2024.agi" }
+      threshold: { ref: "ny.2024.recapture.thr2" }
+      span: { literal: "50000" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 4
+
+  - id: "ny.2024.recapture.phase3"
+    description: "Phase-3 fraction: AGI excess over the range threshold, over $50,000, capped at 1 (rounded to 4 decimals per the IT-201 worksheets)"
+    type: "formula"
+    expression: "min(max(agi - threshold, 0) / span, 1)"
+    inputs:
+      agi: { ref: "ny.2024.agi" }
+      threshold: { ref: "ny.2024.recapture.thr3" }
+      span: { literal: "50000" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 4
+
+  - id: "ny.2024.recapture.total"
+    description: "Tax Law 601(d-1) supplemental tax: each phase's incremental benefit times its phase-in fraction (may differ from the published worksheets by under $1 where the statute rounds its constants to whole dollars)"
+    form_line: "IT-201 Line 39 worksheets"
+    type: "formula"
+    expression: "phase1 * benefit1 + phase2 * max(benefit2 - benefit1, 0) + phase3 * max(benefit3 - benefit2, 0)"
+    inputs:
+      phase1: { ref: "ny.2024.recapture.phase1" }
+      benefit1: { ref: "ny.2024.recapture.benefit1" }
+      phase2: { ref: "ny.2024.recapture.phase2" }
+      benefit2: { ref: "ny.2024.recapture.benefit2" }
+      phase3: { ref: "ny.2024.recapture.phase3" }
+      benefit3: { ref: "ny.2024.recapture.benefit3" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "ny.2024.tax.schedule"
+    description: "New York rate-schedule tax before the tax table benefit recapture (2024 progressive brackets)"
     type: "bracket_table"
     input: { ref: "ny.2024.taxable_income" }
     key: { ref: "input.filing_status" }
     rounding: "ROUND_HALF_UP"
-    rounding_precision: 0
+    rounding_precision: 2
     tables:
       single:
         - { lower: "0",        upper: "8500",      rate: "0.04" }
@@ -159,6 +543,16 @@ rules:
         - { lower: "21600", upper: "45000", rate: "0.03762" }
         - { lower: "45000", upper: "90000", rate: "0.03819" }
         - { lower: "90000", upper: null,    rate: "0.03876" }
+
+  - id: "ny.2024.tax"
+    description: "New York income tax: rate schedule plus the 601(d-1) tax table benefit recapture for NYAGI over $107,650"
+    type: "formula"
+    expression: "schedule + recapture"
+    inputs:
+      schedule: { ref: "ny.2024.tax.schedule" }
+      recapture: { ref: "ny.2024.recapture.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
 
   - id: "ny.2024.city_tax.nyc"
     description: "New York City resident tax (zero unless a full-year NYC resident)"

@@ -11,7 +11,7 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 **Status:** Late Alpha — milestones 1–28 complete; Phases 1–5 are done. Next: the deep codebase review and edge-case hardening toward `0.9.0`.
 **SemVer line:** `0.5.x`.
-**Test suite:** 623 passing, 4 skipped, 0 failures.
+**Test suite:** 633 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
