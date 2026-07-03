@@ -66,11 +66,32 @@ The engine extracts state results by **convention**. Each state pack must define
 | `{st}.2024.agi`            | State adjusted gross income              |
 | `{st}.2024.standard_deduction` | Standard deduction (if applicable)  |
 | `{st}.2024.taxable_income` | State taxable income                     |
-| `{st}.2024.tax`            | Computed state income tax                |
+| `{st}.2024.tax.full`       | State income tax before apportionment    |
+| `{st}.2024.tax`            | Tax after nonresident wage apportionment |
+| `{st}.2024.credits.other_state` | Resident credit for taxes paid to other states |
+| `{st}.2024.credits.total`  | Total nonrefundable credits              |
 | `{st}.2024.withholding`    | Total state tax withheld from W-2s       |
 | `{st}.2024.refund_or_owed` | Refund (positive) or balance due (negative) |
 
-The engine looks for `{st}.2024.tax`, `{st}.2024.withholding`, and `{st}.2024.refund_or_owed` to populate the `StateOutput` object. Intermediate rules like `agi` and `taxable_income` appear in the audit trace.
+The engine looks for `{st}.2024.tax`, `{st}.2024.credits.total`, `{st}.2024.withholding`, and `{st}.2024.refund_or_owed` to populate the `StateReturnOutput` object. Intermediate rules like `agi` and `taxable_income` appear in the audit trace.
+
+### Multi-State Support (required since M31)
+
+Every income-tax pack must carry the apportionment tail so it composes
+with multi-state W-2 returns. The engine provides these inputs to every
+state run:
+
+| Engine input                     | Value |
+|----------------------------------|-------|
+| `input.state.is_resident.{ST}`   | 1 for the residence state (or when no residence is set), else 0 |
+| `input.state.apportionment.{ST}` | 1 for residents; the state-wage share (Box 16, Box 1 fallback) for nonresidents |
+| `input.state.other_state_tax`    | Aggregate net tax of the nonresident states (populated only for the residence pack's run) |
+| `input.state.other_state_ratio`  | Doubly-taxed wage share (populated only for the residence pack's run) |
+
+Pattern (see any shipped pack or the template): `{st}.2024.tax = tax.full × apportionment`,
+and `credits.other_state = min(other_state_tax, tax.full × other_state_ratio) × is_resident`,
+folded into `credits.total` capped at tax. Nonresident packs run first; the
+residence pack runs last so the aggregates are available to it.
 
 ## 5. Cross-Pack Federal AGI Reference
 

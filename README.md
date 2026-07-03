@@ -20,7 +20,7 @@ $$$$$$$$╱______   __    __       ╱$$$$$$  │  ______          $$$$$$$  │$
 [![CI](https://github.com/DesignForFailure/Tax_Co-Pilot/actions/workflows/ci.yml/badge.svg)](https://github.com/DesignForFailure/Tax_Co-Pilot/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB.svg)](https://python.org)
-[![Status: Alpha](https://img.shields.io/badge/Status-Alpha-orange.svg)](#project-status)
+[![Status: Beta](https://img.shields.io/badge/Status-Beta-blue.svg)](#project-status)
 
 An engineering-focused system for modeling tax rules, storing tax-relevant data, and deterministically calculating outcomes using transparent, verifiable logic.
 
@@ -153,22 +153,25 @@ pytest -q
 
 ## Project Status
 
-Tax Co-Pilot is currently **alpha / MVP**.
+Tax Co-Pilot is currently **beta** (0.9.x).
 
 ### Current Scope
 
-- Tax years 2023 and 2024 with federal 1040-style calculations
-- W-2, 1099-INT, 1099-DIV, 1099-B income support
+- Tax years 2023, 2024, and 2025 with federal 1040-style calculations
+- W-2 (incl. Medicare wages Box 5/6), 1099-INT, 1099-DIV, 1099-B, 1099-NEC, and SSA-1099 income support
+- Preferential LTCG/qualified-dividend rates, self-employment tax, Social Security taxability, and capital-loss carryover
+- Credits and surtaxes: EITC (with the combat pay election), CTC + refundable ACTC + ODC, education credits, dependent care, NIIT, Additional Medicare Tax (Form 8959 incl. Part IV withholding), age-65+/blind deductions, military provisions
 - Withholding and estimated payments
 - Two-person filing (MFJ / MFS / Single / HoH / QSS)
-- 12 state packs (GA, CA, NY + 9 no-income-tax states)
-- What-if scenario comparison engine
+- 15 state packs: GA, CA, NY, PA, IL, NC (with dependent exemptions, state credits, NYC/Yonkers city tax, and the NY recapture) plus 9 no-income-tax stubs
+- Multi-state W-2 returns: nonresident wage apportionment and the resident credit for taxes paid to other states
+- What-if scenario comparison engine (filing-status and combat-pay-election scenarios)
 - Local web UI with landing page, light/dark theme support, and full calculation trace
-- JSON and HTML audit export
+- JSON and HTML audit export, IRS form-line mapping, encrypted-at-rest storage (SQLCipher)
 
 ### Versioning
 
-This project follows [Semantic Versioning](https://semver.org/) for application releases. During alpha, application releases use numeric `0.y.z` versions while lifecycle labels such as `Alpha` remain separate status markers. Rule pack manifests use their own independent SemVer line, while editor variant IDs such as `custom_v1` are workspace labels that sit alongside the manifest version. For backward compatibility, legacy custom packs with shorthand manifest versions such as `1` continue to load as `1.0.0` and are rewritten to canonical SemVer when edited, cloned, or re-imported. The SQLite schema uses its own integer generation via `PRAGMA user_version`, independent of both application and rule-pack versions. A stable application compatibility promise begins at `1.0.0`.
+This project follows [Semantic Versioning](https://semver.org/) for application releases. Before `1.0.0`, application releases use numeric `0.y.z` versions while lifecycle labels such as `Beta` remain separate status markers. Rule pack manifests use their own independent SemVer line, while editor variant IDs such as `custom_v1` are workspace labels that sit alongside the manifest version. For backward compatibility, legacy custom packs with shorthand manifest versions such as `1` continue to load as `1.0.0` and are rewritten to canonical SemVer when edited, cloned, or re-imported. The SQLite schema uses its own integer generation via `PRAGMA user_version`, independent of both application and rule-pack versions. A stable application compatibility promise begins at `1.0.0`.
 
 ---
 

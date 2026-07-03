@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # 01 Style Guide (Strict)
 
 ## Mandatory Header Pattern (Python)
@@ -9,7 +9,7 @@ For new Python modules, use this top-of-file order:
 
 Example:
 ```python
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Module purpose and boundaries."""
 
 from __future__ import annotations

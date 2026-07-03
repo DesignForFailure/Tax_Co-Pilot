@@ -30,15 +30,25 @@
 #   template.2024.agi              — State adjusted gross income
 #   template.2024.standard_deduction — Standard deduction
 #   template.2024.taxable_income   — State taxable income
-#   template.2024.tax              — Computed state income tax
+#   template.2024.tax.full         — State tax before apportionment
+#   template.2024.tax              — Tax after nonresident wage apportionment
+#   template.2024.credits.other_state — Resident credit for taxes paid to other states
+#   template.2024.credits.total    — Total nonrefundable credits (read by StateReturnOutput)
 #   template.2024.withholding      — Total state tax withheld from W-2s
 #   template.2024.refund_or_owed   — Refund (positive) or balance due (negative)
 #
-# FOUR RULE TYPES:
+# MULTI-STATE INPUTS (provided by the engine for every state):
+#   input.state.is_resident.{ST}    — 1 for the residence state (or when none is set), else 0
+#   input.state.apportionment.{ST}  — 1 for residents; the state-wage share for nonresidents
+#   input.state.other_state_tax     — nonresident states' aggregate net tax (residence run only)
+#   input.state.other_state_ratio   — doubly-taxed wage share (residence run only)
+#
+# FIVE RULE TYPES:
 #   formula       — Arithmetic expression over named inputs
 #   lookup        — Pick a value from a constants table keyed by filing status
 #   sum           — Add up a list of values (e.g., withholding from multiple W-2s)
 #   bracket_table — Progressive tax brackets keyed by filing status
+#   matrix_lookup — Multi-dimensional constant lookup keyed by several inputs
 #
 # See rule_packs/state/GA/2024/ for a complete real-world example.
 # See rule_packs/state/TX/2024/ for a no-income-tax stub.
@@ -131,8 +141,8 @@ rules:
   # Delete the option you don't need.
 
   # ── OPTION A: Flat-rate tax (formula) ──
-  - id: "template.2024.tax"
-    description: "{ST} income tax (flat rate)"
+  - id: "template.2024.tax.full"
+    description: "{ST} income tax before apportionment (flat rate)"
     type: "formula"
     expression: "taxable_income * rate"
     inputs:
@@ -149,8 +159,8 @@ rules:
   # applies each bracket's rate only to income within that bracket's
   # range (lower to upper). Set upper to null for the top bracket.
   #
-  # - id: "template.2024.tax"
-  #   description: "{ST} income tax (progressive brackets)"
+  # - id: "template.2024.tax.full"
+  #   description: "{ST} income tax before apportionment (progressive brackets)"
   #   type: "bracket_table"
   #   input: { ref: "template.2024.taxable_income" }
   #   key: { ref: "input.filing_status" }
@@ -173,6 +183,46 @@ rules:
   #       - { lower: "0",      upper: "15000",  rate: "0.02" }
   #       - { lower: "15000",  upper: "60000",  rate: "0.04" }
   #       - { lower: "60000",  upper: null,     rate: "0.06" }
+
+
+  # ────────────────────────────────────────────────────────────────────
+  # 4b. Multi-state apportionment and the other-state credit
+  # ────────────────────────────────────────────────────────────────────
+  # Required so this state composes with multi-state W-2 returns:
+  # nonresidents pay the as-if-resident tax times their wage share, and
+  # residents get a credit for taxes paid to other states.
+
+  - id: "template.2024.tax"
+    description: "{ST} tax after nonresident wage apportionment (ratio 1 for residents)"
+    type: "formula"
+    expression: "full * ratio"
+    inputs:
+      full: { ref: "template.2024.tax.full" }
+      ratio: { ref: "input.state.apportionment.TEMPLATE" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "template.2024.credits.other_state"
+    description: "Resident credit for taxes paid to other states (zero for nonresidents)"
+    type: "formula"
+    expression: "min(other_tax, full * dbl_ratio) * is_resident"
+    inputs:
+      other_tax: { ref: "input.state.other_state_tax" }
+      full: { ref: "template.2024.tax.full" }
+      dbl_ratio: { ref: "input.state.other_state_ratio" }
+      is_resident: { ref: "input.state.is_resident.TEMPLATE" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "template.2024.credits.total"
+    description: "Total {ST} nonrefundable credits, capped at tax"
+    type: "formula"
+    expression: "min(other_state, tax)"
+    inputs:
+      other_state: { ref: "template.2024.credits.other_state" }
+      tax: { ref: "template.2024.tax" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
 
 
   # ────────────────────────────────────────────────────────────────────
@@ -200,9 +250,10 @@ rules:
   - id: "template.2024.refund_or_owed"
     description: "{ST} refund (positive) or amount owed (negative)"
     type: "formula"
-    expression: "withholding - tax"
+    expression: "withholding - tax + credits"
     inputs:
       withholding: { ref: "template.2024.withholding" }
       tax: { ref: "template.2024.tax" }
+      credits: { ref: "template.2024.credits.total" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
