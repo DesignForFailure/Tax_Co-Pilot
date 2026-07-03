@@ -327,6 +327,15 @@ def parse_taxpayer(fd: FormData, prefix: str, role: TaxpayerRole) -> Taxpayer:
         if not last_name:
             raise ValueError("last name is required")
 
+    raw_months = str(fd.get(f"{prefix}_combat_months", "0") or "0").strip()
+    if not raw_months:
+        combat_months = 0
+    elif raw_months.isdigit() and int(raw_months) <= 12:
+        combat_months = int(raw_months)
+    else:
+        # Part-months count as full months (IRC 112), so only 0-12 make sense.
+        raise ValueError("Combat zone months must be a whole number from 0 to 12")
+
     return Taxpayer(
         role=role,
         first_name=first_name,
@@ -336,6 +345,11 @@ def parse_taxpayer(fd: FormData, prefix: str, role: TaxpayerRole) -> Taxpayer:
         form_1099_divs=parse_1099divs(fd, f"{prefix}_1099div"),
         form_1099_bs=parse_1099bs(fd, f"{prefix}_1099b"),
         form_1099_necs=parse_1099necs(fd, f"{prefix}_1099nec"),
+        nontaxable_combat_pay=form_money(fd, f"{prefix}_combat_pay"),
+        is_commissioned_officer=str(fd.get(f"{prefix}_officer", "")) == "1",
+        combat_zone_months=combat_months,
+        active_duty_moving_expenses=form_money(fd, f"{prefix}_moving_expenses"),
+        reservist_travel_expenses=form_money(fd, f"{prefix}_reservist_travel"),
     )
 
 
@@ -349,6 +363,9 @@ def taxpayer_has_form_data(taxpayer: Taxpayer) -> bool:
         or taxpayer.form_1099_divs
         or taxpayer.form_1099_bs
         or taxpayer.form_1099_necs
+        or taxpayer.nontaxable_combat_pay != 0
+        or taxpayer.active_duty_moving_expenses != 0
+        or taxpayer.reservist_travel_expenses != 0
     )
 
 

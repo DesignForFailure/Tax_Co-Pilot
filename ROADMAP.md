@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–23 complete; Phase 4 concludes with M24.
+**Status:** Late Alpha — milestones 1–24 complete; Phase 4 (M20–M24) is done and the `0.4.0` promotion follows.
 **SemVer line:** `0.3.x`.
-**Test suite:** 543 passing, 4 skipped, 0 failures.
+**Test suite:** 560 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -576,6 +576,8 @@ These milestones fix known calculation inaccuracies.
 - GA: Low-income credit
 
 ### M24: Military-Specific Tax Calculations
+
+**Status:** Complete on 2026-07-03. The 2023/2024/2025 packs (v1.8.0) implement the IRC §112 combat pay exclusion (informational trace — Box 12 Q is already absent from Box 1 and never re-subtracted), the officer monthly cap with warning trace ($10,011.00 / $10,519.80 / $10,983.00 = highest enlisted basic pay + $225 IDP, verified against Pub 3 and DoD pay tables — the sketch's 2024 figure of $9,736.50 below was wrong), Form 3903 moving expenses and reservist travel as Schedule 1 adjustments, and the EITC combat pay election as a parallel elected chain with `credits.eic.final` taking the better result. What-if gains a scenario selector with `compare_combat_pay_election`. 17 tests in `tests/test_military.py`.
 
 **Goal:** Model the federal tax treatment of U.S. armed forces members: the combat zone pay exclusion and the military-only deductions that survive TCJA. Verify every parameter against IRS Publication 3 (Armed Forces' Tax Guide) for the target tax year.
 

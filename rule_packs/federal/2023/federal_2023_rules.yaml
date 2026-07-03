@@ -363,6 +363,63 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
+  # Military service (M24). Combat pay arrives via W-2 Box 12 code Q and is
+  # already excluded from Box 1 wages by the employer; the engine records it
+  # in the trace without re-subtracting it. Out of scope (documented):
+  # IRC 7508 deadline extensions, veterans' disability compensation, and
+  # state military pay exemptions / SCRA residency rules.
+  - id: "fed.2023.military.combat_pay_exclusion"
+    description: "Combat zone pay excluded from federal wages (IRC 112; W-2 Box 12 code Q). Informational: the amount is already absent from Box 1 wages and is never re-subtracted"
+    form_line: "W-2 Box 12 Q"
+    type: "formula"
+    expression: "combat_pay"
+    inputs:
+      combat_pay: { ref: "input.military.combat_pay" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.military.officer_cap"
+    description: "Commissioned officer exclusion ceiling: monthly cap times qualifying months (IRC 112(b) for 2023: $9,786.00 highest enlisted basic pay plus $225 hostile fire/imminent danger pay = 10011.00/month)"
+    form_line: "Pub 3 officer limit"
+    type: "formula"
+    expression: "monthly_cap * months"
+    inputs:
+      monthly_cap: { literal: "10011.00" }
+      months: { ref: "input.military.officer_combat_months" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.military.officer_excess"
+    description: "Warning trace: amount by which a commissioned officer's reported Box 12 Q exceeds the IRC 112(b) ceiling. Any excess is taxable and should already appear in Box 1 wages - verify the W-2 when nonzero"
+    form_line: "Pub 3 officer limit"
+    type: "formula"
+    expression: "max(officer_pay - cap, 0)"
+    inputs:
+      officer_pay: { ref: "input.military.officer_combat_pay" }
+      cap: { ref: "fed.2023.military.officer_cap" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.adjustments.military_moving"
+    description: "Active-duty PCS moving expenses (Form 3903; military moves remain deductible post-TCJA per IRC 217(g))"
+    form_line: "Schedule 1 Line 14"
+    type: "formula"
+    expression: "amount"
+    inputs:
+      amount: { ref: "input.military.moving_expenses" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.adjustments.reservist_travel"
+    description: "Reservist overnight travel more than 100 miles from home (above-the-line, IRC 62(a)(2)(E))"
+    form_line: "Schedule 1 Line 12"
+    type: "formula"
+    expression: "amount"
+    inputs:
+      amount: { ref: "input.military.reservist_travel" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
   - id: "fed.2023.adjustments.total"
     description: "Total above-the-line adjustments"
     form_line: "Schedule 1 Line 26"
@@ -374,6 +431,8 @@ rules:
         - { ref: "fed.2023.adjustments.hsa" }
         - { ref: "fed.2023.adjustments.ira" }
         - { ref: "fed.2023.adjustments.se_tax" }
+        - { ref: "fed.2023.adjustments.military_moving" }
+        - { ref: "fed.2023.adjustments.reservist_travel" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
@@ -973,6 +1032,53 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
+  - id: "fed.2023.credits.eic.earned_income_elected"
+    description: "EIC earned income under the combat pay election: nontaxable combat pay (W-2 Box 12 Q) added to earned income, all-or-nothing per IRC 32(c)(2)(B)(vi)"
+    form_line: "EIC Worksheet (combat pay election)"
+    type: "formula"
+    expression: "earned + combat_pay"
+    inputs:
+      earned: { ref: "fed.2023.credits.eic.earned_income" }
+      combat_pay: { ref: "input.military.combat_pay" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.credits.eic.phase_in_elected"
+    description: "EIC phase-in amount under the combat pay election"
+    form_line: "EIC Worksheet (combat pay election)"
+    type: "formula"
+    expression: "min(earned * rate, max_credit)"
+    inputs:
+      earned: { ref: "fed.2023.credits.eic.earned_income_elected" }
+      rate: { ref: "fed.2023.credits.eic.phase_in_rate" }
+      max_credit: { ref: "fed.2023.credits.eic.max_credit" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.credits.eic.phase_out_elected"
+    description: "EIC phaseout under the combat pay election (elected earned income also enters the greater-of comparison with AGI)"
+    form_line: "EIC Worksheet (combat pay election)"
+    type: "formula"
+    expression: "max((max(agi, earned) - start) * rate, 0)"
+    inputs:
+      agi: { ref: "fed.2023.agi.total" }
+      earned: { ref: "fed.2023.credits.eic.earned_income_elected" }
+      start: { ref: "fed.2023.credits.eic.phase_out_start" }
+      rate: { ref: "fed.2023.credits.eic.phase_out_rate" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2023.credits.eic.tentative_elected"
+    description: "Tentative EIC under the combat pay election, before the investment income test"
+    form_line: "EIC Worksheet (combat pay election)"
+    type: "formula"
+    expression: "max(phase_in - phase_out, 0)"
+    inputs:
+      phase_in: { ref: "fed.2023.credits.eic.phase_in_elected" }
+      phase_out: { ref: "fed.2023.credits.eic.phase_out_elected" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
   - id: "fed.2023.credits.eic.investment_income"
     description: "Investment income for the EIC limit: taxable + tax-exempt interest, dividends, and net capital gain (not below zero)"
     form_line: "Pub 596 Worksheet 1"
@@ -1000,12 +1106,13 @@ rules:
     rounding_precision: 2
 
   - id: "fed.2023.credits.eic.final"
-    description: "Earned income credit (refundable; reported with payments)"
+    description: "Earned income credit (refundable; reported with payments). Takes the better of the base credit or the combat pay election (IRC 32(c)(2)(B)(vi)); the trace records both tentative amounts"
     form_line: "1040 Line 27"
     type: "formula"
-    expression: "tentative * eligible"
+    expression: "max(tentative, tentative_elected) * eligible"
     inputs:
       tentative: { ref: "fed.2023.credits.eic.tentative" }
+      tentative_elected: { ref: "fed.2023.credits.eic.tentative_elected" }
       eligible: { ref: "fed.2023.credits.eic.eligible" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0

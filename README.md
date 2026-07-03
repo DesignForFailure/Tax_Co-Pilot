@@ -427,6 +427,7 @@ Tax_Co-Pilot/
     ├── test_logging.py
     ├── test_ltcg_rates.py
     ├── test_matrix_lookup.py
+    ├── test_military.py
     ├── test_milestone12_structure.py
     ├── test_milestone14_csp.py
     ├── test_milestone15_pagination.py
