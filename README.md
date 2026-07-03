@@ -366,6 +366,14 @@ Tax_Co-Pilot/
 │       │   └── 2025/
 │       │       ├── state_GA_2025_manifest.yaml
 │       │       └── state_GA_2025_rules.yaml
+│       ├── IL/
+│       │   └── 2024/
+│       │       ├── state_IL_2024_manifest.yaml
+│       │       └── state_IL_2024_rules.yaml
+│       ├── NC/
+│       │   └── 2024/
+│       │       ├── state_NC_2024_manifest.yaml
+│       │       └── state_NC_2024_rules.yaml
 │       ├── NH/
 │       │   └── 2024/
 │       │       ├── state_NH_2024_manifest.yaml
@@ -378,6 +386,10 @@ Tax_Co-Pilot/
 │       │   └── 2024/
 │       │       ├── state_NY_2024_manifest.yaml
 │       │       └── state_NY_2024_rules.yaml
+│       ├── PA/
+│       │   └── 2024/
+│       │       ├── state_PA_2024_manifest.yaml
+│       │       └── state_PA_2024_rules.yaml
 │       ├── SD/
 │       │   └── 2024/
 │       │       ├── state_SD_2024_manifest.yaml
@@ -454,6 +466,7 @@ Tax_Co-Pilot/
     ├── test_state_credits.py
     ├── test_state_dependents.py
     ├── test_state_expansion.py
+    ├── test_state_pa_il_nc.py
     └── test_web_hardening.py
 ```
 

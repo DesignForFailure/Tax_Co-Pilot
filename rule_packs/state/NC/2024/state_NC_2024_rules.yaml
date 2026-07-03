@@ -1,0 +1,126 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Tax_Co-Pilot - Local-first personal tax software system
+# Copyright (C) 2026  Tax_Co-Pilot Contributors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# North Carolina D-400 (2024): flat 4.5% (the statutory glide path:
+# 4.75% in 2023, 4.5% in 2024, 4.25% in 2025) on federal AGI minus
+# federally taxed Social Security (NC never taxes it) and the NC
+# standard deduction ($12,750 single/MFS, $25,500 MFJ/QSS, $19,125
+# HoH - unchanged since 2022).
+# Unmodeled (documented): the NC child deduction (income-tiered) and
+# NC itemized deductions (standard deduction only, like the GA pack).
+
+constants:
+  standard_deduction:
+    single: "12750"
+    mfj: "25500"
+    mfs: "12750"
+    hoh: "19125"
+    qss: "25500"
+
+rules:
+
+  - id: "nc.2024.agi"
+    description: "North Carolina AGI: federal AGI minus federally taxed Social Security (D-400 Schedule S deduction)"
+    form_line: "D-400 Line 6"
+    type: "formula"
+    expression: "fed_agi - taxable_ss"
+    inputs:
+      fed_agi: { ref: "fed.2024.agi.total" }
+      taxable_ss: { ref: "fed.2024.gross_income.social_security" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "nc.2024.standard_deduction"
+    description: "North Carolina standard deduction"
+    form_line: "D-400 Line 11"
+    type: "lookup"
+    table: "constants.standard_deduction"
+    key: { ref: "input.filing_status" }
+
+  - id: "nc.2024.taxable_income"
+    description: "North Carolina taxable income = max(NC AGI - standard deduction, 0)"
+    form_line: "D-400 Line 14"
+    type: "formula"
+    expression: "max(agi - deduction, 0)"
+    inputs:
+      agi: { ref: "nc.2024.agi" }
+      deduction: { ref: "nc.2024.standard_deduction" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "nc.2024.tax.full"
+    description: "North Carolina income tax before apportionment (2024 flat rate 4.5%)"
+    form_line: "D-400 Line 15"
+    type: "formula"
+    expression: "taxable * rate"
+    inputs:
+      taxable: { ref: "nc.2024.taxable_income" }
+      rate: { literal: "0.045" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "nc.2024.tax"
+    description: "NC tax after nonresident wage apportionment (ratio 1 for residents; nonresidents pay the as-if-resident tax times the NC-wage share)"
+    type: "formula"
+    expression: "full * ratio"
+    inputs:
+      full: { ref: "nc.2024.tax.full" }
+      ratio: { ref: "input.state.apportionment.NC" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "nc.2024.credits.other_state"
+    description: "Resident credit for taxes paid to other states: the smaller of their net tax or this state's tax on the doubly-taxed wage share (zero for nonresidents)"
+    type: "formula"
+    expression: "min(other_tax, full * dbl_ratio) * is_resident"
+    inputs:
+      other_tax: { ref: "input.state.other_state_tax" }
+      full: { ref: "nc.2024.tax.full" }
+      dbl_ratio: { ref: "input.state.other_state_ratio" }
+      is_resident: { ref: "input.state.is_resident.NC" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "nc.2024.credits.total"
+    description: "Total NC nonrefundable credits (other-state resident credit), capped at tax"
+    type: "formula"
+    expression: "min(other_state, tax)"
+    inputs:
+      other_state: { ref: "nc.2024.credits.other_state" }
+      tax: { ref: "nc.2024.tax" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "nc.2024.withholding"
+    description: "Total NC tax withheld (W-2 Box 17)"
+    type: "sum"
+    inputs:
+      items: { ref: "input.withholding.state.NC" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "nc.2024.refund_or_owed"
+    description: "NC refund (positive) or amount owed (negative), after nonrefundable credits"
+    form_line: "D-400 Line 34"
+    type: "formula"
+    expression: "withholding - tax + credits"
+    inputs:
+      withholding: { ref: "nc.2024.withholding" }
+      tax: { ref: "nc.2024.tax" }
+      credits: { ref: "nc.2024.credits.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
