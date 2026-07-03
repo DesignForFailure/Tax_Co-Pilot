@@ -316,6 +316,12 @@ def test_trace_contains_all_rules() -> None:
         "fed.2024.addl_medicare.final",
         "fed.2024.addl_medicare.regular_withholding",
         "fed.2024.addl_medicare.withholding",
+        "fed.2024.income.short_term_net",
+        "fed.2024.income.long_term_net",
+        "fed.2024.carryover.used",
+        "fed.2024.carryover.next_short",
+        "fed.2024.carryover.next_total",
+        "fed.2024.carryover.next_long",
         "fed.2024.tax.brackets",
         "fed.2024.credits.ctc.base",
         "fed.2024.credits.ctc.threshold",
@@ -355,7 +361,7 @@ def test_immutable_run_has_snapshot_and_metadata() -> None:
     run = CalculationEngine(FED, inputs).run()
 
     assert run.input_snapshot.taxpayers[0].w2s[0].wages == Decimal("75000")
-    assert run.rule_pack_version == "1.13.0"
+    assert run.rule_pack_version == "1.14.0"
     assert len(run.rule_pack_checksum) == 64  # SHA-256 hex
 
 

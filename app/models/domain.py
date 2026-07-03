@@ -181,6 +181,10 @@ class TaxReturnInput(BaseModel):
     filing_status: FilingStatus
     taxpayers: list[Taxpayer] = Field(default_factory=list)
     other_income: Decimal = Decimal("0")
+    # Prior-year capital loss carryovers, entered as positive amounts
+    # (Schedule D lines 6 and 14).
+    short_term_loss_carryover: Decimal = Decimal("0")
+    long_term_loss_carryover: Decimal = Decimal("0")
     adjustments: AdjustmentsData = Field(default_factory=AdjustmentsData)
     estimated_tax_payments: Decimal = Decimal("0")
     itemized_deductions: ItemizedDeductionData = Field(default_factory=ItemizedDeductionData)
@@ -438,6 +442,7 @@ class ReturnOutput(BaseModel):
     net_investment_income_tax: Decimal = Decimal("0")
     additional_child_tax_credit: Decimal = Decimal("0")
     additional_medicare_tax: Decimal = Decimal("0")
+    capital_loss_carryover_next: Decimal = Decimal("0")
 
 
 class StateReturnOutput(BaseModel):
