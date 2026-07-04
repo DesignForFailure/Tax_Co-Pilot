@@ -5,6 +5,10 @@
    so no inline script is needed. */
 (function () {
     var typeSelect = document.getElementById('rule_type');
+    // Filing statuses used in generated field names. Values read from the
+    // DOM are looked up here first so only these constant strings are ever
+    // concatenated into markup.
+    var STATUSES = ['single', 'mfj', 'mfs', 'hoh', 'qss'];
 
     function switchType(type) {
         document.querySelectorAll('.type-section').forEach(function (section) {
@@ -48,7 +52,10 @@
         container.setAttribute('data-next-index', String(idx + 1));
     }
 
-    function addBracketRow(status) {
+    function addBracketRow(rawStatus) {
+        var statusIdx = STATUSES.indexOf(rawStatus);
+        if (statusIdx === -1) return;
+        var status = STATUSES[statusIdx];
         var table = document.getElementById('bracket-table-' + status);
         if (!table) return;
         var idx = parseInt(table.getAttribute('data-next-index') || '1', 10);
@@ -62,9 +69,12 @@
         table.setAttribute('data-next-index', String(idx + 1));
     }
 
-    function copyBracketsFromSingle(status) {
+    function copyBracketsFromSingle(rawStatus) {
         // Replace the target status's rows with SINGLE's current values —
         // a starting point for the common "same shape, tweaked bounds" case.
+        var statusIdx = STATUSES.indexOf(rawStatus);
+        if (statusIdx === -1) return;
+        var status = STATUSES[statusIdx];
         var source = document.getElementById('bracket-table-single');
         var target = document.getElementById('bracket-table-' + status);
         if (!source || !target || status === 'single') return;
@@ -101,7 +111,9 @@
         var colInputs = table.querySelectorAll('thead input[name^="matrix_col_"]');
         var html = '<td><input type="text" name="matrix_row_' + rowIdx + '_key" placeholder="row key"></td>';
         colInputs.forEach(function (input) {
-            var colIdx = input.name.replace('matrix_col_', '');
+            // parseInt so only a number is ever concatenated into markup.
+            var colIdx = parseInt(input.name.replace('matrix_col_', ''), 10);
+            if (isNaN(colIdx)) return;
             html += '<td><input type="text" name="matrix_cell_' + rowIdx + '_' + colIdx + '" inputmode="decimal"></td>';
         });
         html += '<td class="align-right"><button type="button" class="btn btn-sm btn-danger" data-remove-closest="tr">Remove</button></td>';
@@ -123,8 +135,9 @@
         var actionsTh = headRow.querySelector('th.align-right');
         headRow.insertBefore(th, actionsTh);
         table.querySelectorAll('tbody tr').forEach(function (tr) {
-            var rowIdx = tr.getAttribute('data-row-index');
-            if (rowIdx === null) return;
+            // parseInt so only a number is ever concatenated into markup.
+            var rowIdx = parseInt(tr.getAttribute('data-row-index') || '', 10);
+            if (isNaN(rowIdx)) return;
             var td = document.createElement('td');
             td.innerHTML = '<input type="text" name="matrix_cell_' + rowIdx + '_' + colIdx + '" inputmode="decimal">';
             var actionsTd = tr.querySelector('td.align-right');

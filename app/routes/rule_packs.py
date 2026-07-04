@@ -515,6 +515,20 @@ async def rule_save_submit(
         return response
 
 
+def _pack_redirect(jurisdiction: str, year: int, variant: str) -> RedirectResponse:
+    """303 back to the pack detail page.
+
+    The segments were already validated by the service call that preceded
+    every use (raising before any redirect), so this cannot fire for real
+    traffic; the explicit local-path check is the containment barrier
+    static URL-redirection analysis recognizes.
+    """
+    target = f"/rule-packs/{jurisdiction}/{year}/{variant}"
+    if not target.startswith("/rule-packs/") or target.startswith("//") or "\\" in target:
+        raise ValueError("Unsafe redirect target")
+    return RedirectResponse(url=target, status_code=303)
+
+
 def _constant_editor_response(
     request: Request,
     detail: dict[str, Any],
@@ -580,10 +594,7 @@ async def constant_add_submit(
             error=str(exc),
         )
     bust_pack_cache(jurisdiction, year)
-    return RedirectResponse(
-        url=f"/rule-packs/{jurisdiction}/{year}/{variant}",
-        status_code=303,
-    )
+    return _pack_redirect(jurisdiction, year, variant)
 
 
 @router.get(
@@ -631,10 +642,7 @@ async def constant_save_submit(
             error=str(exc),
         )
     bust_pack_cache(jurisdiction, year)
-    return RedirectResponse(
-        url=f"/rule-packs/{jurisdiction}/{year}/{variant}",
-        status_code=303,
-    )
+    return _pack_redirect(jurisdiction, year, variant)
 
 
 @router.post("/rule-packs/{jurisdiction}/{year}/{variant}/constants/{name}/delete")
@@ -647,8 +655,5 @@ async def constant_delete_submit(
     # propagates to the global handler as a 400, matching rule deletion.
     delete_constant(jurisdiction, year, variant, name)
     bust_pack_cache(jurisdiction, year)
-    return RedirectResponse(
-        url=f"/rule-packs/{jurisdiction}/{year}/{variant}",
-        status_code=303,
-    )
+    return _pack_redirect(jurisdiction, year, variant)
 
