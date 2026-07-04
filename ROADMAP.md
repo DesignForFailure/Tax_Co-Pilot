@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Stable — milestones 1–33, the 0.9.0 hardening arc, and the pre-1.0 housekeeping sweep are complete; released as `1.0.0` on 2026-07-04. Future work (more states, new tax years, part-year residency, pension/retirement inputs) proceeds under the 1.x compatibility promise.
+**Status:** Stable — milestones 1–32, the 0.9.0 hardening arc, and the pre-1.0 housekeeping sweep were released as `1.0.0` on 2026-07-04; M33 (authoring for non-coders) is complete and unreleased. Future work (more states, new tax years, part-year residency, pension/retirement inputs) proceeds under the 1.x compatibility promise.
 **SemVer line:** `1.0.x`.
-**Test suite:** 747 passing, 4 skipped, 0 failures.
+**Test suite:** 763 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -657,7 +657,7 @@ Common-household items still absent after Phase 4. Verify every parameter agains
 2. **Paste-to-import**: the import page accepts the combined `# === MANIFEST === / # === RULES ===` document (AI-chat prose and code fences stripped structurally), validated by `RulePack.load()` with rollback; rejected pastes are preserved with a copy-the-error-back-to-your-AI hint.
 3. **GUI completeness**: constants editor (previously constants were uneditable anywhere, making lookup-based logic impossible to author), a `matrix_lookup` grid editor replacing the form parser's hard rejection, reference autocomplete on every ref field, and bracket-table ergonomics (copy-from-single, rate-format hints).
 
-Verified by 49 new tests, including an end-to-end test that authors a pack purely from form-encoded data and calculates a return with it.
+Verified by 67 new tests, including an end-to-end test that authors a pack purely from form-encoded data and calculates a return with it. An adversarial multi-agent review pass on the milestone surfaced and fixed eleven further defects (see CHANGELOG), including a pre-existing editor 500 on every list-shaped sum rule.
 
 ---
 

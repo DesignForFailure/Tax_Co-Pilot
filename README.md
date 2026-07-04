@@ -215,6 +215,8 @@ Tax_Co-Pilot/
 │   ├── 03_testing_rules.md
 │   ├── 04_doc_updater.md
 │   └── 05_session_log.md
+├── .claude/
+│   └── settings.json
 ├── .editorconfig
 ├── .github/
 │   ├── ISSUE_TEMPLATE/

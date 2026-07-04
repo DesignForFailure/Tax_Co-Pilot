@@ -576,12 +576,19 @@ def _validate_constant_value(name: str, value: Any, *, _depth: int = 0) -> None:
             _validate_constant_value(name, child, _depth=_depth + 1)
         else:
             try:
-                Decimal(str(child))
+                amount = Decimal(str(child))
             except InvalidOperation as exc:
                 raise ValueError(
                     f"Constant {name!r} value for key {key!r} must be a decimal "
                     f"number, got {child!r}"
                 ) from exc
+            # NaN/Infinity construct fine but would silently corrupt every
+            # calculation that touches them (NaN comparisons are False).
+            if not amount.is_finite():
+                raise ValueError(
+                    f"Constant {name!r} value for key {key!r} must be a finite "
+                    f"number, got {child!r}"
+                )
 
 
 def save_constant(
@@ -605,6 +612,10 @@ def save_constant(
             "Constant name must use lowercase letters, digits, and underscores, "
             "starting with a letter"
         )
+    if name == "add":
+        # /constants/add is the create-form route; a constant named "add"
+        # would render an edit link that opens the blank add form instead.
+        raise ValueError("The constant name 'add' is reserved by the editor")
     _validate_constant_value(name, value)
 
     pack_dir = _pack_path(jurisdiction, year, variant, base_dir=base_dir)
@@ -647,10 +658,14 @@ def delete_constant(
     if not isinstance(constants, dict) or name not in constants:
         raise ValueError(f"Constant {name!r} not found in pack")
 
-    prefix = f"constants.{name}"
     for rule in rules_yaml.get("rules", []) or []:
         table = rule.get("table") if isinstance(rule, dict) else None
-        if isinstance(table, str) and (table == prefix or table.startswith(prefix + ".")):
+        if not isinstance(table, str):
+            continue
+        # get_constant strips an optional "constants." head, so bare table
+        # paths reference constants too — normalize before comparing.
+        table_path = table.removeprefix("constants.")
+        if table_path == name or table_path.startswith(name + "."):
             raise ValueError(
                 f"Constant {name!r} is referenced by rule {rule.get('id')!r} — "
                 "edit or delete that rule first"
@@ -666,15 +681,16 @@ def delete_constant(
 def _strip_chat_wrapping(text: str) -> str:
     """Reduce an AI chat answer to the pack document inside it.
 
-    Prefer the fenced code block that contains both sentinels — that drops
-    surrounding prose entirely, including trailing "let me know" lines that
-    would otherwise corrupt the rules YAML. Fall back to joining all fenced
-    blocks (sentinels split across blocks), then to just dropping stray
-    fence lines from a paste with no usable fences.
+    Prefer the LAST fenced code block that contains both sentinels — AI
+    replies often quote the broken version before the corrected one, and
+    the fence drops surrounding prose entirely (including trailing "let me
+    know" lines that would otherwise corrupt the rules YAML). Fall back to
+    joining all fenced blocks (sentinels split across blocks), then to
+    just dropping stray fence lines from a paste with no usable fences.
     """
     segments = re.split(r"^[ \t]*```[^\n]*$", text, flags=re.MULTILINE)
     fenced_blocks = segments[1::2]
-    for block in fenced_blocks:
+    for block in reversed(fenced_blocks):
         if _MANIFEST_SENTINEL in block and _RULES_SENTINEL in block:
             return block
     if any(_MANIFEST_SENTINEL in block for block in fenced_blocks):

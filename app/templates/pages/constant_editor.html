@@ -2,6 +2,7 @@
 {% extends "layouts/base.html" %}
 {% block title %}{% if is_new %}Add Constant{% else %}Edit Constant{% endif %}{% endblock %}
 {% block content %}
+{% set readonly = not pack.is_custom %}
 
 <section class="page-header">
     <div>
@@ -27,6 +28,27 @@
 </div>
 {% endif %}
 
+{% if readonly %}
+<section class="card card-accent">
+    <h2>Standard Pack Protection</h2>
+    <p class="text-dim text-sm">Clone this pack as a custom variant before editing constants.</p>
+</section>
+{% endif %}
+
+{% if not editable %}
+<section class="card">
+    <div class="notice notice-error">
+        <p class="text-dim text-sm">
+            This constant is not keyed by filing status, so the grid editor cannot represent it — saving here
+            would destroy its keys. Export the pack YAML, edit it directly, and re-import it instead.
+        </p>
+    </div>
+    <div class="action-row">
+        <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}" class="btn btn-outline">Back to Pack</a>
+        <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/export" class="btn btn-sm btn-outline">Export YAML</a>
+    </div>
+</section>
+{% else %}
 <form method="POST" action="{% if is_new %}/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/constants/add{% else %}/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/constants/{{ constant_name }}{% endif %}">
     <input type="hidden" name="csrf_token" value="{{ csrf }}">
 
@@ -40,7 +62,7 @@
         <div class="form-row">
             <div>
                 <label>Name</label>
-                <input type="text" name="constant_name" value="{{ constant_name }}" {% if not is_new %}readonly{% else %}required{% endif %} placeholder="e.g. standard_deduction">
+                <input type="text" name="constant_name" value="{{ constant_name }}" {% if not is_new or readonly %}readonly{% else %}required{% endif %} placeholder="e.g. standard_deduction">
                 <p class="field-hint">Lowercase letters, digits, and underscores, starting with a letter.</p>
             </div>
         </div>
@@ -56,7 +78,9 @@
                     empty when there is only one row.
                 </p>
             </div>
+            {% if not readonly %}
             <button type="button" class="btn btn-sm btn-outline" data-add-constant-row>Add Group Row</button>
+            {% endif %}
         </div>
         <div class="table-wrap">
             <table class="data-table" id="constant-rows" data-next-index="{{ groups | length if groups else 1 }}">
@@ -75,20 +99,28 @@
                     {% if groups %}
                         {% for group in groups %}
                         <tr>
-                            <td><input type="text" name="const_group_{{ loop.index0 }}_name" value="{{ group.name }}" placeholder="e.g. lower"></td>
+                            <td><input type="text" name="const_group_{{ loop.index0 }}_name" value="{{ group.name }}" {% if readonly %}readonly{% endif %} placeholder="e.g. lower"></td>
                             {% for status in ['single', 'mfj', 'mfs', 'hoh', 'qss'] %}
-                            <td><input type="text" name="const_group_{{ loop.index0 }}_{{ status }}" value="{{ group.cells.get(status, '') }}" inputmode="decimal"></td>
+                            <td><input type="text" name="const_group_{{ loop.index0 }}_{{ status }}" value="{{ group.cells.get(status, '') }}" inputmode="decimal" {% if readonly %}readonly{% endif %}></td>
                             {% endfor %}
-                            <td class="align-right"><button type="button" class="btn btn-sm btn-danger" data-remove-closest="tr">Remove</button></td>
+                            <td class="align-right">
+                                {% if not readonly %}
+                                <button type="button" class="btn btn-sm btn-danger" data-remove-closest="tr">Remove</button>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td><input type="text" name="const_group_0_name" value="" placeholder="leave empty for a simple table"></td>
+                            <td><input type="text" name="const_group_0_name" value="" {% if readonly %}readonly{% endif %} placeholder="leave empty for a simple table"></td>
                             {% for status in ['single', 'mfj', 'mfs', 'hoh', 'qss'] %}
-                            <td><input type="text" name="const_group_0_{{ status }}" value="" inputmode="decimal"></td>
+                            <td><input type="text" name="const_group_0_{{ status }}" value="" inputmode="decimal" {% if readonly %}readonly{% endif %}></td>
                             {% endfor %}
-                            <td class="align-right"><button type="button" class="btn btn-sm btn-danger" data-remove-closest="tr">Remove</button></td>
+                            <td class="align-right">
+                                {% if not readonly %}
+                                <button type="button" class="btn btn-sm btn-danger" data-remove-closest="tr">Remove</button>
+                                {% endif %}
+                            </td>
                         </tr>
                     {% endif %}
                 </tbody>
@@ -101,10 +133,15 @@
     </section>
 
     <div class="action-row">
+        {% if not readonly %}
         <button type="submit" class="btn">Save Constant</button>
         <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}" class="btn btn-outline">Cancel</a>
+        {% else %}
+        <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}" class="btn btn-outline">Back to Pack</a>
+        {% endif %}
     </div>
 </form>
+{% endif %}
 
 {% endblock %}
 

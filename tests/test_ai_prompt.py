@@ -101,6 +101,31 @@ def test_prompt_for_state_without_a_shipped_pack_still_builds() -> None:
     assert "fed.2024.agi.total" in prompt
 
 
+def test_prompt_documents_all_three_rounding_modes() -> None:
+    # Hiding ROUND_UP/ROUND_DOWN made AIs emit HALF_UP for "or fraction
+    # thereof" step rules — validated packs with silently wrong math.
+    prompt = build_authoring_prompt("federal", 2024, "CTC-style phaseout.")
+    assert "ROUND_HALF_UP" in prompt
+    assert "ROUND_UP" in prompt
+    assert "ROUND_DOWN" in prompt
+    assert "fraction thereof" in prompt
+
+
+def test_prompt_states_formula_inputs_must_be_non_empty() -> None:
+    # The loader rejects formula rules without inputs even for constant
+    # expressions; the no-tax-stub advice must show the literal pattern.
+    prompt = build_authoring_prompt("FL", 2024, "No income tax stub.")
+    assert "NON-EMPTY" in prompt
+    assert 'zero: { literal: "0" }' in prompt
+
+
+def test_prompt_for_usa_alias_includes_the_federal_catalog() -> None:
+    # "usa" must load the federal pack, not a nonexistent state/USA dir.
+    prompt = build_authoring_prompt("usa", 2024, "Simple flat tax.")
+    assert "fed.2024.taxable_income" in prompt
+    assert "constants.standard_deduction" in prompt
+
+
 def test_prompt_rejects_bad_inputs() -> None:
     with pytest.raises(ValueError, match="two-letter"):
         build_authoring_prompt("notastate", 2024, "x")

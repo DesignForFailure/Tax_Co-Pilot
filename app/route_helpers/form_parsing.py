@@ -110,8 +110,33 @@ def parse_rule_form(fd: FormData) -> dict[str, Any]:
         rule["form_line"] = form_line
 
     if rule_type == "sum":
-        items_ref = form_str(fd, "sum_items_ref")
-        rule["inputs"] = {"items": {"ref": items_ref}}
+        item_re = re.compile(r"^sum_item_(\d+)$")
+        item_indices: set[int] = set()
+        for key in fd:
+            item_match = item_re.fullmatch(key)
+            if item_match:
+                if int(item_match.group(1)) >= MAX_INDEXED_ENTRIES:
+                    # Raising beats silently dropping rows: a dropped item
+                    # would save a sum that quietly omits income.
+                    raise ValueError(f"Too many sum items (max {MAX_INDEXED_ENTRIES})")
+                item_indices.add(int(item_match.group(1)))
+        item_refs: list[str] = []
+        for idx in sorted(item_indices):
+            item_value = str(fd.get(f"sum_item_{idx}", "") or "").strip()
+            if item_value:
+                item_refs.append(item_value)
+        if item_refs:
+            # One item keeps the single-ref shape shipped packs use for
+            # collections; several become the list-of-refs shape.
+            items: Any = (
+                {"ref": item_refs[0]}
+                if len(item_refs) == 1
+                else [{"ref": ref} for ref in item_refs]
+            )
+        else:
+            # Single-field fallback for older forms and clients.
+            items = {"ref": form_str(fd, "sum_items_ref")}
+        rule["inputs"] = {"items": items}
 
     elif rule_type == "formula":
         rule["expression"] = form_str(fd, "expression")
@@ -168,11 +193,15 @@ def parse_rule_form(fd: FormData) -> dict[str, Any]:
         ]
         # Like the bracket rows: scan submitted indices rather than counting
         # up, so deleting a middle row/column in the editor keeps the rest.
+        # Out-of-range indices raise instead of being dropped — a silently
+        # truncated table would save a corrupted matrix.
         col_re = re.compile(r"^matrix_col_(\d+)$")
         col_indices: set[int] = set()
         for key in fd:
             col_match = col_re.fullmatch(key)
-            if col_match and int(col_match.group(1)) < MAX_INDEXED_ENTRIES:
+            if col_match:
+                if int(col_match.group(1)) >= MAX_INDEXED_ENTRIES:
+                    raise ValueError(f"Too many matrix columns (max {MAX_INDEXED_ENTRIES})")
                 col_indices.add(int(col_match.group(1)))
         columns: list[tuple[int, str]] = []
         for col in sorted(col_indices):
@@ -184,7 +213,9 @@ def parse_rule_form(fd: FormData) -> dict[str, Any]:
         matrix_row_indices: set[int] = set()
         for key in fd:
             row_match = row_re.fullmatch(key)
-            if row_match and int(row_match.group(1)) < MAX_INDEXED_ENTRIES:
+            if row_match:
+                if int(row_match.group(1)) >= MAX_INDEXED_ENTRIES:
+                    raise ValueError(f"Too many matrix rows (max {MAX_INDEXED_ENTRIES})")
                 matrix_row_indices.add(int(row_match.group(1)))
 
         table: dict[str, dict[str, str]] = {}
@@ -204,26 +235,62 @@ def parse_rule_form(fd: FormData) -> dict[str, Any]:
     return rule
 
 
+def _ref_string(spec: Any) -> str | None:
+    """The ref path of a bare-string or {ref: ...} value spec, else None.
+
+    An empty {ref: ""} is kept (it is what an unfilled editor field
+    submits, and error re-renders must echo it back); a blank bare
+    string is not a ref.
+    """
+    if isinstance(spec, str) and spec.strip():
+        return spec.strip()
+    if isinstance(spec, dict) and isinstance(spec.get("ref"), str):
+        return str(spec["ref"])
+    return None
+
+
+def sum_items_from_rule(rule: Mapping[str, Any]) -> list[str] | None:
+    """Item refs of a sum rule as the editor's row list.
+
+    Returns None when the items cannot round-trip through ref-only rows
+    (literal or numeric items) so the template falls back to a
+    "use YAML export/import" notice instead of mangling them on save.
+    """
+    inputs = rule.get("inputs")
+    items = inputs.get("items") if isinstance(inputs, dict) else None
+    if items is None:
+        return None
+    specs = items if isinstance(items, list) else [items]
+    if len(specs) > MAX_INDEXED_ENTRIES:
+        return None
+    refs: list[str] = []
+    for spec in specs:
+        ref = _ref_string(spec)
+        if ref is None:
+            return None
+        refs.append(ref)
+    return refs
+
+
 def matrix_view_from_rule(rule: Mapping[str, Any]) -> dict[str, Any] | None:
     """Project a two-key matrix_lookup rule into the grid the editor renders.
 
     Returns None when the rule cannot round-trip through the grid (more
-    than two keys, or a non-mapping table) so the template can fall back
-    to a "use YAML export/import" notice instead of mangling it on save.
+    than two keys, a non-mapping table, or more rows/columns than the
+    form parser accepts) so the template can fall back to a "use YAML
+    export/import" notice instead of mangling it on save.
     """
     keys = rule.get("keys")
     if not isinstance(keys, list) or len(keys) != 2:
         return None
     key_refs: list[str] = []
     for spec in keys:
-        if isinstance(spec, str) and spec.strip():
-            key_refs.append(spec.strip())
-        elif isinstance(spec, dict) and isinstance(spec.get("ref"), str):
-            key_refs.append(spec["ref"])
-        else:
+        ref = _ref_string(spec)
+        if ref is None:
             return None
+        key_refs.append(ref)
     raw_table = rule.get("table")
-    if not isinstance(raw_table, dict):
+    if not isinstance(raw_table, dict) or len(raw_table) > MAX_INDEXED_ENTRIES:
         return None
     columns: list[str] = []
     for row_value in raw_table.values():
@@ -232,6 +299,8 @@ def matrix_view_from_rule(rule: Mapping[str, Any]) -> dict[str, Any] | None:
         for col in row_value:
             if str(col) not in columns:
                 columns.append(str(col))
+    if len(columns) > MAX_INDEXED_ENTRIES:
+        return None
     rows = [
         {
             "key": str(row_key),
@@ -259,7 +328,9 @@ def parse_constant_form(fd: FormData) -> tuple[str, dict[str, Any]]:
     row_indices: set[int] = set()
     for key in fd:
         match = row_re.fullmatch(key)
-        if match and int(match.group(1)) < MAX_INDEXED_ENTRIES:
+        if match:
+            if int(match.group(1)) >= MAX_INDEXED_ENTRIES:
+                raise ValueError(f"Too many rows (max {MAX_INDEXED_ENTRIES})")
             row_indices.add(int(match.group(1)))
 
     groups: list[tuple[str, dict[str, str]]] = []
@@ -295,18 +366,68 @@ def parse_constant_form(fd: FormData) -> tuple[str, dict[str, Any]]:
     return name, value
 
 
-def constant_view_groups(value: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """Rows for the constants editor form.
+def _constant_cells_view(cells: Mapping[Any, Any]) -> dict[str, str] | None:
+    """Filing-status cells for one editor row; None if not representable."""
+    view: dict[str, str] = {}
+    for key, cell in cells.items():
+        if not isinstance(key, str) or key not in CONSTANT_STATUSES or isinstance(cell, dict):
+            return None
+        view[key] = str(cell)
+    return view
+
+
+def constant_view_groups(value: Mapping[str, Any]) -> list[dict[str, Any]] | None:
+    """Rows for the constants editor form (the inverse of parse_constant_form).
 
     A flat constant renders as one unnamed row; a grouped constant as one
-    named row per sub-table (the inverse of parse_constant_form).
+    named row per sub-table. Returns None when the constant cannot
+    round-trip through the filing-status grid (keys outside the five
+    statuses, mixed flat/nested values, or too many groups) — saving such
+    a shape through the form would silently destroy it.
     """
-    if value and all(isinstance(child, dict) for child in value.values()):
-        return [
-            {"name": str(group), "cells": {str(k): str(v) for k, v in cells.items()}}
-            for group, cells in value.items()
-        ]
-    return [{"name": "", "cells": {str(k): str(v) for k, v in value.items()}}]
+    if not value:
+        return []
+    if len(value) > MAX_INDEXED_ENTRIES:
+        return None
+    children_are_mappings = [isinstance(child, dict) for child in value.values()]
+    if all(children_are_mappings):
+        groups: list[dict[str, Any]] = []
+        for group, cells in value.items():
+            cells_view = _constant_cells_view(cells)
+            if cells_view is None:
+                return None
+            groups.append({"name": str(group), "cells": cells_view})
+        return groups
+    if any(children_are_mappings):
+        return None
+    cells_view = _constant_cells_view(value)
+    if cells_view is None:
+        return None
+    return [{"name": "", "cells": cells_view}]
+
+
+def constant_groups_from_form(fd: FormData) -> list[dict[str, Any]]:
+    """Lenient echo of submitted constant rows for error re-renders.
+
+    No validation — a rejected save must hand the user back exactly what
+    they typed instead of a blanked or disk-reverted grid.
+    """
+    row_re = re.compile(r"^const_group_(\d+)_name$")
+    row_indices: set[int] = set()
+    for key in fd:
+        match = row_re.fullmatch(key)
+        if match and int(match.group(1)) < MAX_INDEXED_ENTRIES:
+            row_indices.add(int(match.group(1)))
+    groups: list[dict[str, Any]] = []
+    for idx in sorted(row_indices):
+        name = str(fd.get(f"const_group_{idx}_name", "") or "").strip()
+        cells = {
+            status: str(fd.get(f"const_group_{idx}_{status}", "") or "").strip()
+            for status in CONSTANT_STATUSES
+        }
+        if name or any(cells.values()):
+            groups.append({"name": name, "cells": cells})
+    return groups
 
 
 def collect_indices(fd: FormData, prefix: str) -> list[int]:

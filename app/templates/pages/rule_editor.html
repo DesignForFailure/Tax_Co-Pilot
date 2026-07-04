@@ -101,10 +101,40 @@
     </section>
 
     <section class="card type-section" id="section-sum" {% if rtype != 'sum' %}hidden{% endif %}>
-        <h2>Sum Inputs</h2>
-        <p class="text-dim text-sm mb-4">Use this rule type when the result is the total of a referenced collection.</p>
-        <label>Items Reference</label>
-        <input type="text" name="sum_items_ref" list="ref-options" value="{% if rtype == 'sum' and r.get('inputs') %}{{ r['inputs'].get('items', {}).get('ref', '') }}{% endif %}" {% if readonly %}readonly{% endif %} placeholder="e.g. input.w2.wages">
+        <div class="section-header">
+            <div>
+                <h2>Sum Inputs</h2>
+                <p class="text-dim text-sm">
+                    Adds one or more referenced values. A single reference that covers a whole collection
+                    (like <code>input.w2.wages</code>) is already summed across all its entries.
+                </p>
+            </div>
+            {% if not readonly and sum_editable %}
+            <button type="button" class="btn btn-sm btn-outline" data-add-sum-item>Add Item</button>
+            {% endif %}
+        </div>
+        {% if not sum_editable %}
+        <div class="notice notice-error">
+            <p class="text-dim text-sm">
+                This sum uses item shapes the grid cannot represent (for example literal values). Export the
+                pack YAML, edit it directly, and re-import it instead.
+            </p>
+        </div>
+        {% else %}
+        <div id="sum-items" data-next-index="{{ sum_view | length }}">
+            {% for ref in sum_view %}
+            <div class="form-grid-4 sum-item-row">
+                <div>
+                    <label>Item Reference</label>
+                    <input type="text" name="sum_item_{{ loop.index0 }}" list="ref-options" value="{{ ref }}" {% if readonly %}readonly{% endif %} placeholder="e.g. input.w2.wages">
+                </div>
+                {% if not readonly %}
+                <button type="button" class="btn btn-sm btn-danger" data-remove-closest=".sum-item-row">Remove</button>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
     </section>
 
     <section class="card type-section" id="section-formula" {% if rtype != 'formula' %}hidden{% endif %}>
@@ -291,7 +321,7 @@
         <p class="field-hint">
             An unknown key value fails the calculation, so clamp open-ended counts with an upstream formula rule
             (e.g. <code>min(children, 3)</code>). To remove a column, clear its header; to remove a row, use its
-            Remove button or clear its key.
+            Remove button or clear its key. Rows with no values entered are not saved.
         </p>
         <div class="table-wrap">
             <table class="data-table" id="matrix-table"

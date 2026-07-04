@@ -13,11 +13,13 @@ from starlette.datastructures import UploadFile
 from app.engine.rule_loader import RulePackError
 from app.route_helpers.csrf import get_csrf_token, verify_csrf
 from app.route_helpers.form_parsing import (
+    constant_groups_from_form,
     constant_view_groups,
     form_str,
     matrix_view_from_rule,
     parse_constant_form,
     parse_rule_form,
+    sum_items_from_rule,
 )
 from app.route_helpers.pack_cache import available_years, bust_pack_cache, get_federal_pack
 from app.services.ai_prompt import build_authoring_prompt
@@ -98,6 +100,10 @@ def _editor_context(
     is_matrix = rule is not None and rule.get("type") == "matrix_lookup"
     if is_matrix and rule is not None:
         matrix_view = matrix_view_from_rule(rule)
+    sum_view: list[str] | None = [""]
+    is_sum = rule is not None and rule.get("type") == "sum"
+    if is_sum and rule is not None:
+        sum_view = sum_items_from_rule(rule)
     context: dict[str, Any] = {
         "csrf": get_csrf_token(request),
         "pack": detail,
@@ -106,9 +112,12 @@ def _editor_context(
         "id_prefix": id_prefix,
         "catalog": _ref_catalog(detail, str(detail["jurisdiction"]), int(detail["year"])),
         "matrix_view": matrix_view or _default_matrix_view(),
-        # A matrix with more than two dimensions cannot round-trip through
-        # the grid; the template swaps the section for a YAML-import notice.
+        # Shapes that cannot round-trip through the form (a matrix with
+        # more than two dimensions, sum items with literals) swap their
+        # section for a YAML-export notice instead of mangling the rule.
         "matrix_editable": (not is_matrix) or matrix_view is not None,
+        "sum_view": sum_view or [""],
+        "sum_editable": (not is_sum) or sum_view is not None,
     }
     if error is not None:
         context["error"] = error
@@ -514,6 +523,7 @@ def _constant_editor_response(
     groups: list[dict[str, Any]],
     is_new: bool,
     error: str | None = None,
+    editable: bool = True,
 ) -> HTMLResponse:
     csrf = get_csrf_token(request)
     response = _templates(request).TemplateResponse(
@@ -526,6 +536,9 @@ def _constant_editor_response(
             "groups": groups,
             "is_new": is_new,
             "error": error,
+            # False when the constant's shape cannot round-trip through the
+            # filing-status grid — the template shows a YAML-export notice.
+            "editable": editable,
         },
         status_code=400 if error else 200,
     )
@@ -558,7 +571,13 @@ async def constant_add_submit(
         detail = load_pack_detail(jurisdiction, year, variant)
         raw_name = str(fd.get("constant_name", "") or "").strip()[:100]
         return _constant_editor_response(
-            request, detail, constant_name=raw_name, groups=[], is_new=True, error=str(exc)
+            request,
+            detail,
+            constant_name=raw_name,
+            # Echo what was typed so a rejected save is editable in place.
+            groups=constant_groups_from_form(fd),
+            is_new=True,
+            error=str(exc),
         )
     bust_pack_cache(jurisdiction, year)
     return RedirectResponse(
@@ -578,12 +597,14 @@ def constant_edit_form(
     value = (detail.get("constants") or {}).get(name)
     if not isinstance(value, dict):
         return HTMLResponse(content="Constant not found", status_code=404)
+    groups = constant_view_groups(value)
     return _constant_editor_response(
         request,
         detail,
         constant_name=name,
-        groups=constant_view_groups(value),
+        groups=groups or [],
         is_new=False,
+        editable=groups is not None,
     )
 
 
@@ -600,10 +621,14 @@ async def constant_save_submit(
         save_constant(jurisdiction, year, variant, name, value)
     except ValueError as exc:
         detail = load_pack_detail(jurisdiction, year, variant)
-        existing = (detail.get("constants") or {}).get(name)
-        groups = constant_view_groups(existing) if isinstance(existing, dict) else []
         return _constant_editor_response(
-            request, detail, constant_name=name, groups=groups, is_new=False, error=str(exc)
+            request,
+            detail,
+            constant_name=name,
+            # Echo what was typed so a rejected save is editable in place.
+            groups=constant_groups_from_form(fd),
+            is_new=False,
+            error=str(exc),
         )
     bust_pack_cache(jurisdiction, year)
     return RedirectResponse(

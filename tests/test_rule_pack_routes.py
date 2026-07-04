@@ -189,6 +189,55 @@ def test_save_rule_via_post() -> None:
     assert saved["inputs"] == {"x": {"ref": "input.w2.wages"}}
 
 
+def test_list_shaped_sum_rule_renders() -> None:
+    # gross_income.total's items is a LIST of refs; this view 500'd with
+    # jinja2 UndefinedError before the sum section grew item rows.
+    c = _client()
+    r = c.get("/rule-packs/federal/2024/standard/rules/fed.2024.gross_income.total")
+    assert r.status_code == 200
+    assert "fed.2024.gross_income.wages" in r.text  # first item row echoed
+
+
+def test_multi_item_sum_saves_as_list_and_round_trips() -> None:
+    c = _client()
+    variant = _clone(c, "for_list_sum")
+    r = c.post(
+        f"/rule-packs/federal/2024/{variant}/rules/add",
+        data={
+            "csrf_token": CSRF,
+            "rule_id": "fed.2024.my_total",
+            "rule_type": "sum",
+            "description": "Two-part total",
+            "sum_item_0": "fed.2024.gross_income.wages",
+            "sum_item_1": "fed.2024.gross_income.interest",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    saved = _read_rule(variant, "fed.2024.my_total")
+    assert saved["inputs"] == {
+        "items": [
+            {"ref": "fed.2024.gross_income.wages"},
+            {"ref": "fed.2024.gross_income.interest"},
+        ]
+    }
+    # A single item keeps the single-ref shape shipped packs use.
+    r = c.post(
+        f"/rule-packs/federal/2024/{variant}/rules/fed.2024.my_total",
+        data={
+            "csrf_token": CSRF,
+            "rule_id": "fed.2024.my_total",
+            "rule_type": "sum",
+            "description": "One-part total",
+            "sum_item_0": "input.w2.wages",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    saved = _read_rule(variant, "fed.2024.my_total")
+    assert saved["inputs"] == {"items": {"ref": "input.w2.wages"}}
+
+
 def test_save_formula_with_literal_input_via_post() -> None:
     c = _client()
     variant = _clone(c, "for_literal")

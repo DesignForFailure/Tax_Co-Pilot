@@ -388,7 +388,9 @@ Every rule that produces a numeric result should declare a rounding mode and pre
 
 | Field                | Value             | Meaning                                      |
 |----------------------|-------------------|----------------------------------------------|
-| `rounding`           | `"ROUND_HALF_UP"` | Standard round-half-up (the only supported mode) |
+| `rounding`           | `"ROUND_HALF_UP"` | Standard round-half-up (the default and most common) |
+| `rounding`           | `"ROUND_UP"`      | Away from zero — for step counts like "per $1,000 or fraction thereof" (e.g. CTC phaseout units) |
+| `rounding`           | `"ROUND_DOWN"`    | Truncate toward zero — for floor semantics (e.g. 0/1 eligibility gates) |
 | `rounding_precision` | `0`               | Round to whole dollars                       |
 | `rounding_precision` | `2`               | Round to cents                               |
 

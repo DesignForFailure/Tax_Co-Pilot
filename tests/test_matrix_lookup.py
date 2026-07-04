@@ -311,6 +311,34 @@ def test_web_editor_parses_matrix_lookup_grid() -> None:
     }
 
 
+def test_matrix_view_refuses_grids_larger_than_the_form_cap() -> None:
+    # A 60-row matrix is legal YAML but the form parser only accepts 50
+    # row indices — rendering it editable would truncate it on save.
+    from app.route_helpers.form_parsing import matrix_view_from_rule
+
+    big = {
+        "keys": ["input.filing_status", {"ref": "fed.2024.n"}],
+        "table": {f"k{i}": {"0": "1"} for i in range(60)},
+    }
+    assert matrix_view_from_rule(big) is None
+
+
+def test_web_editor_matrix_rejects_out_of_range_indices() -> None:
+    fd = FormData(
+        [
+            ("rule_id", "fed.2024.credits.eic.max_credit"),
+            ("rule_type", "matrix_lookup"),
+            ("matrix_key_0", "input.filing_status"),
+            ("matrix_key_1", "fed.2024.credits.eic.num_children"),
+            ("matrix_col_0", "0"),
+            ("matrix_row_99_key", "single"),
+            ("matrix_cell_99_0", "632"),
+        ]
+    )
+    with pytest.raises(ValueError, match="Too many matrix rows"):
+        parse_rule_form(fd)
+
+
 def test_web_editor_matrix_grid_keeps_rows_after_a_gap() -> None:
     # Deleting a middle row in the editor leaves an index gap; rows after
     # the gap must survive, mirroring the bracket-row behavior.

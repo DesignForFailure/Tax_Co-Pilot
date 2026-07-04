@@ -36,6 +36,18 @@
         container.setAttribute('data-next-index', String(idx + 1));
     }
 
+    function addSumItem() {
+        var container = document.getElementById('sum-items');
+        if (!container) return;
+        var idx = parseInt(container.getAttribute('data-next-index') || '1', 10);
+        var html = '<div class="form-grid-4 sum-item-row">'
+            + '<div><label>Item Reference</label><input type="text" name="sum_item_' + idx + '" list="ref-options" placeholder="e.g. input.w2.wages"></div>'
+            + '<button type="button" class="btn btn-sm btn-danger" data-remove-closest=".sum-item-row">Remove</button>'
+            + '</div>';
+        container.insertAdjacentHTML('beforeend', html);
+        container.setAttribute('data-next-index', String(idx + 1));
+    }
+
     function addBracketRow(status) {
         var table = document.getElementById('bracket-table-' + status);
         if (!table) return;
@@ -132,6 +144,10 @@
         }
         if (e.target.closest('[data-add-formula-input]')) {
             addFormulaInput();
+            return;
+        }
+        if (e.target.closest('[data-add-sum-item]')) {
+            addSumItem();
             return;
         }
         var bracketBtn = e.target.closest('[data-add-bracket-row]');

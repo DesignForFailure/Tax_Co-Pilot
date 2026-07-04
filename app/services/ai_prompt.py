@@ -73,6 +73,9 @@ numbers. Every rule should carry a human-readable `description`.
 
 - Every identifier in `expression` MUST be declared as a key under
   `inputs` (bound to `{{ ref: "..." }}` or `{{ literal: "0.04" }}`).
+- `inputs` must be NON-EMPTY on every formula rule — even a rule that
+  returns a constant needs one declared input, e.g.
+  `expression: "zero"` with `inputs: {{ zero: {{ literal: "0" }} }}`.
 - Allowed expression characters (exact set): letters, digits, underscore,
   `+ - * / ( ) , .` and space. Nothing else — no `%`, no comparison
   operators, no quotes.
@@ -170,9 +173,15 @@ numbers. Every rule should carry a human-readable `description`.
 
 ## Rounding
 
-- `formula`, `sum`, and `bracket_table` rules should declare
-  `rounding: "ROUND_HALF_UP"` plus `rounding_precision` (`2` for
-  intermediates in cents, `0` for whole-dollar form-line outputs).
+- `formula`, `sum`, and `bracket_table` rules should declare `rounding`
+  plus `rounding_precision` (`2` for intermediates in cents, `0` for
+  whole-dollar form-line outputs).
+- Exactly three modes exist: `"ROUND_HALF_UP"` (ordinary rounding — the
+  default and the right choice for most rules), `"ROUND_UP"` (away from
+  zero — required for step counts like "reduced $50 per $1,000 *or
+  fraction thereof*"), and `"ROUND_DOWN"` (truncate toward zero). Any
+  other mode is rejected; picking HALF_UP where the law says "or
+  fraction thereof" silently understates the phaseout.
 - `lookup` and `matrix_lookup` do no arithmetic and take no rounding.
 
 ## References
@@ -214,7 +223,9 @@ The engine extracts state results by convention. An income-tax pack needs:
   per your state's form; refund positive)
 
 For a no-income-tax state, a minimal stub suffices: `agi` and `tax` as
-formula rules returning literal `"0"`, `withholding` summing
+formula rules returning zero (`expression: "zero"` with
+`inputs: {{ zero: {{ literal: "0" }} }}` — remember formula rules must
+declare at least one input), `withholding` summing
 `input.withholding.state.{state}`, and `refund_or_owed` as
 `withholding - tax`.
 """
@@ -236,6 +247,9 @@ _SELF_CHECK = """\
    table keys are quoted strings.
 7. Every lookup `table:` path exists under `constants:`.
 8. No rule references `input.filing_status` as a formula/sum input.
+9. Every formula rule declares a non-empty `inputs` mapping, and every
+   `rounding` value is exactly ROUND_HALF_UP, ROUND_UP, or ROUND_DOWN —
+   with ROUND_UP wherever the law says "or fraction thereof".
 
 ## Output format (exact)
 
@@ -364,6 +378,9 @@ def build_authoring_prompt(
         if prefix == "fed."
         else _STATE_REQUIRED.format(prefix=prefix, year=year, state=state)
     )
+    # Aliases like "us"/"usa" must load the federal pack, not a
+    # nonexistent state/USA directory — use the canonical value.
+    catalog_jurisdiction = "federal" if prefix == "fed." else jurisdiction_value
 
     header = (
         "You are drafting a rule pack for Tax Co-Pilot, a local-first tax "
@@ -388,7 +405,7 @@ def build_authoring_prompt(
                 prefix=prefix,
             ),
             required,
-            _catalog_section(jurisdiction, year, prefix, base_dir=base_dir),
+            _catalog_section(catalog_jurisdiction, year, prefix, base_dir=base_dir),
             _SELF_CHECK.format(prefix=prefix, year=year),
         ]
     )

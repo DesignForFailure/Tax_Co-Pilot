@@ -27,21 +27,24 @@ expression builder; editing standard packs (they stay read-only).
 
 ## Design
 
-### A1. Input reference catalog — `app/engine/input_catalog.py`
+### A1. Input reference catalog — `known_input_refs()` + `app/services/ref_catalog.py`
 
 The `input.*` namespace exists only as assignments inside
-`CalculationEngine._resolve_inputs()`. New module derives the catalog at
-runtime by normalizing a synthetic empty `TaxReturnInput` (no hardcoded list
-to drift), plus:
+`CalculationEngine._resolve_inputs()`. A public `known_input_refs()` in
+`app/engine/calculator.py` derives the base catalog at runtime by
+normalizing a synthetic empty `TaxReturnInput` (no hardcoded list to
+drift; the private method stays private to its own module).
+`app/services/ref_catalog.py` layers on top:
 
 - `input.filing_status` special-cased (key-only; not a Decimal ref),
 - parameterized state patterns (`input.withholding.state.{ST}`,
   `input.state.is_resident.{ST}`, `input.state.apportionment.{ST}`,
-  `input.state.other_state_tax`, `input.state.other_state_ratio`).
+  `input.state.other_state_tax`, `input.state.other_state_ratio`),
+- `constants.*` dotted table paths for a pack's constants.
 
-Consumed by both the prompt builder and the reference picker. Engine layer is
-appropriate: no I/O, no persistence. A test asserts the derived catalog is
-non-empty and every entry starts with `input.`.
+Consumed by both the prompt builder and the reference picker. Engine layer
+is appropriate for the derivation: no I/O, no persistence. A test asserts
+the derived catalog is non-empty and every entry starts with `input.`.
 
 ### A2. Prompt builder — `app/services/ai_prompt.py`
 

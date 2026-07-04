@@ -75,6 +75,19 @@ def test_split_tolerates_chat_prose_and_fences() -> None:
     assert _yaml.safe_load(rules)["rules"][0]["id"] == "fed.2024.pasted_rule"
 
 
+def test_split_prefers_the_last_complete_fenced_block() -> None:
+    # Error-recovery replies often quote the broken pack before the fixed
+    # one; importing the FIRST block would silently install the stale
+    # version.
+    stale = _COMBINED.replace('"1.0.0"', '"9.9.9"')
+    chat = (
+        "The original was:\n```yaml\n" + stale + "```\n"
+        "Here is the corrected version:\n```yaml\n" + _COMBINED + "```\n"
+    )
+    manifest, _ = split_combined_yaml(chat)
+    assert _yaml.safe_load(manifest)["version"] == "1.0.0"
+
+
 def test_split_joins_sentinels_across_two_fenced_blocks() -> None:
     chat = (
         "Manifest:\n```yaml\n# === MANIFEST ===\n" + _MANIFEST + "```\n"
