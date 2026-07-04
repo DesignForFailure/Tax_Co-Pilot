@@ -178,7 +178,10 @@ def collect_indices(fd: FormData, prefix: str) -> list[int]:
     indices: set[int] = set()
     prefix_under = prefix + "_"
     for key in fd:
-        if key.startswith(prefix_under):
+        # Bound the length before the regex runs: IDX_RE's lazy prefix group
+        # can backtrack superlinearly, and form-field *names* are attacker-
+        # controlled and otherwise unbounded (MAX_TEXT only caps values).
+        if key.startswith(prefix_under) and len(key) <= 128:
             match = IDX_RE.fullmatch(key)
             if match and match.group(1) == prefix:
                 idx = int(match.group(2))

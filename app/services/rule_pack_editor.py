@@ -98,7 +98,15 @@ def _pack_path(
 
     if variant != "standard":
         pack_dir = pack_dir / variant
-    return pack_dir
+
+    # Defense in depth: even though every segment is regex-validated above,
+    # confirm the resolved path stays inside the pack root before any caller
+    # opens or writes it. Also satisfies static path-traversal analysis.
+    resolved = pack_dir.resolve()
+    base_resolved = base.resolve()
+    if resolved != base_resolved and base_resolved not in resolved.parents:
+        raise ValueError(f"Resolved pack path escapes the pack root: {pack_dir}")
+    return resolved
 
 
 @dataclass

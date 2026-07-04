@@ -97,6 +97,32 @@ def test_pack_path_state_standard(tmp_packs: Path) -> None:
     assert p == tmp_packs / "state" / "CA" / "2024"
 
 
+def test_pack_path_returns_a_resolved_contained_path(tmp_packs: Path) -> None:
+    """The path is resolved and provably inside the pack root (the
+    defense-in-depth containment guard)."""
+    p = _pack_path("federal", 2024, "custom_v1", base_dir=tmp_packs)
+    assert p.is_absolute()
+    assert tmp_packs.resolve() in p.parents
+
+
+def test_pack_path_containment_guard_blocks_escape(tmp_packs: Path) -> None:
+    """If the pack root itself is a symlink whose target sits elsewhere, a
+    variant that resolves outside the root is rejected rather than opened."""
+    outside = tmp_packs.parent / "outside"
+    outside.mkdir()
+    # A base whose 'federal/2024' is symlinked out of the tree.
+    (tmp_packs / "federal").mkdir(exist_ok=True)
+    link = tmp_packs / "federal" / "2024"
+    if link.exists():
+        for child in link.iterdir():
+            child.unlink()
+        link.rmdir()
+    link.symlink_to(outside, target_is_directory=True)
+    # standard resolves to `outside`, which is not under the pack root.
+    with pytest.raises(ValueError, match="escapes the pack root"):
+        _pack_path("federal", 2024, "standard", base_dir=tmp_packs)
+
+
 def test_list_all_packs_discovers_standard(tmp_packs: Path) -> None:
     packs = list_all_packs(base_dir=tmp_packs)
     assert len(packs) == 1
