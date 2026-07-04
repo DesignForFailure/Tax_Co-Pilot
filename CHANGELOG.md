@@ -10,7 +10,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+- **Windows installation and launch support.** New `run.bat` launcher mirroring `run.sh` (double-clickable from File Explorer or runnable from Command Prompt / PowerShell). `README.md` and `README.txt` now document Windows install and run steps, including the `py` launcher, the optional-only nature of the SQLCipher build dependencies (default install needs no C compiler on Windows; encryption falls back to Python Fernet), and the README repository tree includes `run.bat`.
 
 ## [0.2.0] - 2026-07-02
 
