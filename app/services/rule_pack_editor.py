@@ -102,10 +102,9 @@ def _pack_path(
     # Defense in depth: even though every segment is regex-validated above,
     # confirm the resolved path stays inside the pack root before any caller
     # opens or writes it. Also satisfies static path-traversal analysis.
-    resolved = pack_dir.resolve()
-    if not resolved.is_relative_to(base.resolve()):
+    if not pack_dir.resolve().is_relative_to(base.resolve()):
         raise ValueError(f"Resolved pack path escapes the pack root: {pack_dir}")
-    return resolved
+    return pack_dir
 
 
 @dataclass

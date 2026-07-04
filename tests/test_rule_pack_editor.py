@@ -97,12 +97,12 @@ def test_pack_path_state_standard(tmp_packs: Path) -> None:
     assert p == tmp_packs / "state" / "CA" / "2024"
 
 
-def test_pack_path_returns_a_resolved_contained_path(tmp_packs: Path) -> None:
-    """The path is resolved and provably inside the pack root (the
-    defense-in-depth containment guard)."""
+def test_pack_path_returns_a_contained_path(tmp_packs: Path) -> None:
+    """The returned path is absolute and provably inside the pack root
+    (the defense-in-depth containment guard passed)."""
     p = _pack_path("federal", 2024, "custom_v1", base_dir=tmp_packs)
     assert p.is_absolute()
-    assert tmp_packs.resolve() in p.parents
+    assert tmp_packs.resolve() in p.resolve().parents
 
 
 def test_pack_path_containment_guard_blocks_escape(tmp_packs: Path) -> None:
