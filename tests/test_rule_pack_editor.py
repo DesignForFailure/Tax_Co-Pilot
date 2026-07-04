@@ -97,6 +97,16 @@ def test_pack_path_state_standard(tmp_packs: Path) -> None:
     assert p == tmp_packs / "state" / "CA" / "2024"
 
 
+def test_pack_path_stays_within_the_pack_root(tmp_packs: Path) -> None:
+    """Validated segments compose only into paths under the pack root; the
+    traversal characters that could escape are rejected upstream."""
+    p = _pack_path("federal", 2024, "custom_v1", base_dir=tmp_packs)
+    assert tmp_packs.resolve() in p.resolve().parents
+    for bad in ("..", "fed/eral", "fed\\eral"):
+        with pytest.raises(ValueError):
+            _pack_path(bad, 2024, "standard", base_dir=tmp_packs)
+
+
 def test_list_all_packs_discovers_standard(tmp_packs: Path) -> None:
     packs = list_all_packs(base_dir=tmp_packs)
     assert len(packs) == 1

@@ -7,6 +7,10 @@ on:
     branches:
       - main
 
+# Least privilege: the quality job only reads the checkout.
+permissions:
+  contents: read
+
 env:
   ENABLE_TEST_ARTIFACTS: "true"
   ENABLE_COVERAGE: "true"

@@ -221,8 +221,10 @@ def rule_pack_export(
 ) -> Response:
     try:
         manifest_bytes, rules_bytes = export_yaml(jurisdiction, year, variant)
-    except ValueError as exc:
-        return PlainTextResponse(str(exc), status_code=404)
+    except ValueError:
+        return PlainTextResponse(
+            f"Rule pack not found: {jurisdiction}/{year}/{variant}", status_code=404
+        )
     filename = f"{jurisdiction}_{year}_{variant}.yaml"
     return Response(
         content=b"# === MANIFEST ===\n" + manifest_bytes + b"\n# === RULES ===\n" + rules_bytes,

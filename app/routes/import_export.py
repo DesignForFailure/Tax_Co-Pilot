@@ -201,7 +201,10 @@ async def import_returns(request: Request) -> Response:
     try:
         entries = json.loads(content)
     except json.JSONDecodeError as exc:
-        return PlainTextResponse(f"Invalid JSON: {exc}", status_code=400)
+        logger.warning("Import rejected: invalid JSON: %s", exc)
+        return PlainTextResponse(
+            "Invalid JSON: the uploaded file is not well-formed.", status_code=400
+        )
     if not isinstance(entries, list):
         return HTMLResponse("Expected a JSON array", status_code=400)
     if len(entries) > MAX_IMPORT_ENTRIES:
@@ -345,15 +348,16 @@ async def restore_database(request: Request) -> Response:
 
     try:
         init_db()
-    except Exception as exc:
+    except Exception:
         logger.exception("Restore failed; original database preserved")
         if backup_copy and backup_copy.exists():
             for suffix in ("-wal", "-shm"):
                 Path(str(DB_PATH) + suffix).unlink(missing_ok=True)
             os.replace(backup_copy, DB_PATH)
         return PlainTextResponse(
-            f"Restore failed — original database has been preserved. Error: {exc}. "
-            "If the backup is encrypted, ensure the same password is active.",
+            "Restore failed — the original database has been preserved. "
+            "If the backup is encrypted, ensure the same password is active. "
+            "See the server log for details.",
             status_code=400,
         )
     if backup_copy and backup_copy.exists():
