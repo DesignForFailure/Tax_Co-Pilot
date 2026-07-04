@@ -1,0 +1,349 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""Constants editor: service CRUD, form parsing, and routes."""
+
+from __future__ import annotations
+
+import shutil
+from collections.abc import Generator
+from pathlib import Path
+from typing import Any
+
+import pytest
+import yaml
+from starlette.datastructures import FormData
+from starlette.testclient import TestClient
+
+from app.route_helpers.form_parsing import constant_view_groups, parse_constant_form
+from app.services.database import init_db
+from app.services.rule_pack_editor import (
+    clone_pack,
+    delete_constant,
+    load_pack_detail,
+    save_constant,
+)
+from main import app
+
+CSRF = "test-csrf-token"
+
+_STATUS_VALUES = {"single": "100", "mfj": "200", "mfs": "100", "hoh": "150", "qss": "200"}
+
+
+@pytest.fixture(autouse=True)
+def _ensure_db() -> None:
+    init_db()
+
+
+def _client() -> TestClient:
+    c = TestClient(app, base_url="http://localhost")
+    c.cookies.set("csrf", CSRF)
+    return c
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_custom_packs() -> Generator[None, None, None]:
+    """Remove any custom_v* directories created during tests."""
+    yield
+    base = Path(__file__).resolve().parent.parent / "rule_packs"
+    for custom_dir in base.rglob("custom_v*"):
+        if custom_dir.is_dir():
+            shutil.rmtree(custom_dir, ignore_errors=True)
+
+
+@pytest.fixture
+def tmp_packs(tmp_path: Path) -> Path:
+    """Minimal valid federal 2024 pack with one lookup + its constant."""
+    pack_dir = tmp_path / "federal" / "2024"
+    pack_dir.mkdir(parents=True)
+    (pack_dir / "manifest.yaml").write_text(
+        yaml.safe_dump({"version": "1.0.0", "tax_year": 2024, "jurisdiction": "federal"})
+    )
+    (pack_dir / "rules.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "constants": {"standard_deduction": {"single": "14600", "mfj": "29200"}},
+                "rules": [
+                    {
+                        "id": "fed.2024.standard_deduction",
+                        "description": "Standard deduction",
+                        "type": "lookup",
+                        "table": "constants.standard_deduction",
+                        "key": {"ref": "input.filing_status"},
+                    }
+                ],
+            }
+        )
+    )
+    return tmp_path
+
+
+def _variant(base: Path) -> str:
+    info = clone_pack("federal", 2024, "standard", "const_test", base_dir=base)
+    return info.variant
+
+
+def _read_constants(base: Path, variant: str) -> dict[str, Any]:
+    rules_path = base / "federal" / "2024" / variant / "rules.yaml"
+    data = yaml.safe_load(rules_path.read_text())
+    constants = data.get("constants", {})
+    assert isinstance(constants, dict)
+    return constants
+
+
+# ─── Service layer ──────────────────────────────────────────────
+
+
+def test_save_flat_constant(tmp_packs: Path) -> None:
+    variant = _variant(tmp_packs)
+    save_constant(
+        "federal", 2024, variant, "test_credit", dict(_STATUS_VALUES), base_dir=tmp_packs
+    )
+    constants = _read_constants(tmp_packs, variant)
+    assert constants["test_credit"] == _STATUS_VALUES
+
+
+def test_save_grouped_constant(tmp_packs: Path) -> None:
+    variant = _variant(tmp_packs)
+    value = {"lower": dict(_STATUS_VALUES), "upper": dict(_STATUS_VALUES)}
+    save_constant("federal", 2024, variant, "phaseout", value, base_dir=tmp_packs)
+    constants = _read_constants(tmp_packs, variant)
+    assert set(constants["phaseout"]) == {"lower", "upper"}
+
+
+def test_save_constant_updates_in_place(tmp_packs: Path) -> None:
+    variant = _variant(tmp_packs)
+    updated = dict(_STATUS_VALUES, single="999")
+    save_constant(
+        "federal", 2024, variant, "standard_deduction", updated, base_dir=tmp_packs
+    )
+    constants = _read_constants(tmp_packs, variant)
+    assert constants["standard_deduction"]["single"] == "999"
+    # The pack still loads (the lookup rule still resolves).
+    detail = load_pack_detail("federal", 2024, variant, base_dir=tmp_packs)
+    assert detail["constants"]["standard_deduction"]["single"] == "999"
+
+
+def test_save_constant_refuses_standard_pack(tmp_packs: Path) -> None:
+    with pytest.raises(ValueError, match="standard pack"):
+        save_constant(
+            "federal", 2024, "standard", "x", dict(_STATUS_VALUES), base_dir=tmp_packs
+        )
+
+
+def test_save_constant_rejects_bad_name(tmp_packs: Path) -> None:
+    variant = _variant(tmp_packs)
+    for bad in ("Nope", "1starts_with_digit", "has.dot", "has space", ""):
+        with pytest.raises(ValueError, match="Constant name"):
+            save_constant(
+                "federal", 2024, variant, bad, dict(_STATUS_VALUES), base_dir=tmp_packs
+            )
+
+
+def test_save_constant_rejects_non_decimal_value(tmp_packs: Path) -> None:
+    variant = _variant(tmp_packs)
+    with pytest.raises(ValueError, match="decimal"):
+        save_constant(
+            "federal",
+            2024,
+            variant,
+            "bad_value",
+            {"single": "not-a-number"},
+            base_dir=tmp_packs,
+        )
+
+
+def test_save_constant_rejects_three_level_nesting(tmp_packs: Path) -> None:
+    variant = _variant(tmp_packs)
+    too_deep = {"a": {"b": {"c": "1"}}}
+    with pytest.raises(ValueError, match="two levels"):
+        save_constant("federal", 2024, variant, "deep", too_deep, base_dir=tmp_packs)
+
+
+def test_delete_constant(tmp_packs: Path) -> None:
+    variant = _variant(tmp_packs)
+    save_constant(
+        "federal", 2024, variant, "unused", dict(_STATUS_VALUES), base_dir=tmp_packs
+    )
+    delete_constant("federal", 2024, variant, "unused", base_dir=tmp_packs)
+    assert "unused" not in _read_constants(tmp_packs, variant)
+
+
+def test_delete_referenced_constant_is_refused(tmp_packs: Path) -> None:
+    variant = _variant(tmp_packs)
+    # standard_deduction is the lookup rule's table — deleting it would
+    # only fail at calculation time, so the service must refuse now.
+    with pytest.raises(ValueError, match="referenced by rule"):
+        delete_constant("federal", 2024, variant, "standard_deduction", base_dir=tmp_packs)
+
+
+def test_delete_missing_constant_is_an_error(tmp_packs: Path) -> None:
+    variant = _variant(tmp_packs)
+    with pytest.raises(ValueError, match="not found"):
+        delete_constant("federal", 2024, variant, "ghost", base_dir=tmp_packs)
+
+
+# ─── Form parsing ───────────────────────────────────────────────
+
+
+def _row(idx: int, name: str, values: dict[str, str]) -> list[tuple[str, str]]:
+    fields = [(f"const_group_{idx}_name", name)]
+    fields.extend((f"const_group_{idx}_{status}", v) for status, v in values.items())
+    return fields
+
+
+def test_parse_constant_form_flat() -> None:
+    fd = FormData([("constant_name", "test_credit"), *_row(0, "", _STATUS_VALUES)])
+    name, value = parse_constant_form(fd)
+    assert name == "test_credit"
+    assert value == _STATUS_VALUES
+
+
+def test_parse_constant_form_grouped() -> None:
+    fd = FormData(
+        [
+            ("constant_name", "phaseout"),
+            *_row(0, "lower", _STATUS_VALUES),
+            *_row(1, "upper", _STATUS_VALUES),
+        ]
+    )
+    name, value = parse_constant_form(fd)
+    assert name == "phaseout"
+    assert set(value) == {"lower", "upper"}
+    assert value["lower"] == _STATUS_VALUES
+
+
+def test_parse_constant_form_requires_all_five_statuses() -> None:
+    partial = {"single": "1", "mfj": "2"}
+    fd = FormData([("constant_name", "partial"), *_row(0, "", partial)])
+    with pytest.raises(ValueError, match="all five filing-status values"):
+        parse_constant_form(fd)
+
+
+def test_parse_constant_form_multiple_rows_need_names() -> None:
+    fd = FormData(
+        [
+            ("constant_name", "phaseout"),
+            *_row(0, "lower", _STATUS_VALUES),
+            *_row(1, "", _STATUS_VALUES),
+        ]
+    )
+    with pytest.raises(ValueError, match="group name"):
+        parse_constant_form(fd)
+
+
+def test_parse_constant_form_rejects_duplicate_groups() -> None:
+    fd = FormData(
+        [
+            ("constant_name", "phaseout"),
+            *_row(0, "lower", _STATUS_VALUES),
+            *_row(1, "lower", _STATUS_VALUES),
+        ]
+    )
+    with pytest.raises(ValueError, match="Duplicate group"):
+        parse_constant_form(fd)
+
+
+def test_parse_constant_form_skips_gaps() -> None:
+    # A removed middle row leaves an index gap; later rows must survive.
+    fd = FormData(
+        [
+            ("constant_name", "phaseout"),
+            *_row(0, "lower", _STATUS_VALUES),
+            *_row(2, "upper", _STATUS_VALUES),
+        ]
+    )
+    _, value = parse_constant_form(fd)
+    assert set(value) == {"lower", "upper"}
+
+
+def test_constant_view_groups_round_trip() -> None:
+    flat = {"single": "1", "mfj": "2", "mfs": "1", "hoh": "1", "qss": "2"}
+    assert constant_view_groups(flat) == [{"name": "", "cells": flat}]
+    grouped = {"lower": flat, "upper": flat}
+    groups = constant_view_groups(grouped)
+    assert [g["name"] for g in groups] == ["lower", "upper"]
+    assert groups[0]["cells"] == flat
+
+
+# ─── Routes ─────────────────────────────────────────────────────
+
+
+def _route_variant(c: TestClient) -> str:
+    resp = c.post(
+        "/rule-packs/federal/2024/standard/clone",
+        data={"csrf_token": CSRF, "custom_name": "const_routes"},
+        follow_redirects=False,
+    )
+    return str(resp.headers["location"]).rstrip("/").split("/")[-1]
+
+
+def test_constant_add_form_renders() -> None:
+    c = _client()
+    variant = _route_variant(c)
+    r = c.get(f"/rule-packs/federal/2024/{variant}/constants/add")
+    assert r.status_code == 200
+    assert "Add Constant" in r.text
+
+
+def test_constant_add_edit_delete_via_routes() -> None:
+    c = _client()
+    variant = _route_variant(c)
+    data = {"csrf_token": CSRF, "constant_name": "route_credit", "const_group_0_name": ""}
+    for status, value in _STATUS_VALUES.items():
+        data[f"const_group_0_{status}"] = value
+    r = c.post(
+        f"/rule-packs/federal/2024/{variant}/constants/add",
+        data=data,
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+
+    detail = c.get(f"/rule-packs/federal/2024/{variant}")
+    assert "constants.route_credit" in detail.text
+
+    edit = c.get(f"/rule-packs/federal/2024/{variant}/constants/route_credit")
+    assert edit.status_code == 200
+    assert 'value="150"' in edit.text  # hoh cell round-trips
+
+    r = c.post(
+        f"/rule-packs/federal/2024/{variant}/constants/route_credit/delete",
+        data={"csrf_token": CSRF},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    detail = c.get(f"/rule-packs/federal/2024/{variant}")
+    assert "constants.route_credit" not in detail.text
+
+
+def test_constant_delete_referenced_via_route_is_rejected() -> None:
+    c = _client()
+    variant = _route_variant(c)
+    r = c.post(
+        f"/rule-packs/federal/2024/{variant}/constants/standard_deduction/delete",
+        data={"csrf_token": CSRF},
+        follow_redirects=False,
+    )
+    assert r.status_code == 400
+
+
+def test_constant_add_partial_row_rerenders_with_error() -> None:
+    c = _client()
+    variant = _route_variant(c)
+    r = c.post(
+        f"/rule-packs/federal/2024/{variant}/constants/add",
+        data={
+            "csrf_token": CSRF,
+            "constant_name": "partial",
+            "const_group_0_name": "",
+            "const_group_0_single": "100",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 400
+    assert "all five filing-status values" in r.text
+
+
+def test_constant_edit_missing_returns_404() -> None:
+    c = _client()
+    variant = _route_variant(c)
+    r = c.get(f"/rule-packs/federal/2024/{variant}/constants/ghost")
+    assert r.status_code == 404

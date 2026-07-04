@@ -38,11 +38,19 @@ from __future__ import annotations
 
 import re
 from decimal import ROUND_DOWN, ROUND_HALF_UP, ROUND_UP, Decimal
+from pathlib import Path
 from typing import Any
 
 from app.engine.rule_loader import RulePack, RulePackError
 from app.log import get_logger
-from app.models.domain import ReturnOutput, ReturnRun, StateReturnOutput, TaxReturnInput, TraceNode
+from app.models.domain import (
+    FilingStatus,
+    ReturnOutput,
+    ReturnRun,
+    StateReturnOutput,
+    TaxReturnInput,
+    TraceNode,
+)
 
 logger = get_logger(__name__)
 
@@ -926,3 +934,30 @@ class CalculationEngine:
     def _explain_formula(self, expr: str, inputs: dict[str, Decimal], result: Decimal) -> str:
         parts = [f"{k}={_format_usd(v)}" for k, v in inputs.items()]
         return f"{expr} where {', '.join(parts)} → {_format_usd(result)}"
+
+
+def known_input_refs() -> tuple[str, ...]:
+    """Enumerate the base ``input.*`` reference namespace the engine provides.
+
+    Derived live from ``_resolve_inputs()`` against an empty return so the
+    catalog can never drift from the engine. Not included: the per-state
+    references added at calc time by ``_run_states()`` (``input.withholding.
+    state.{ST}``, ``input.state.is_resident.{ST}``, ...) and
+    ``input.filing_status``, which is a key-only pseudo-reference usable
+    only as a lookup/bracket/matrix key.
+    """
+    placeholder_pack = RulePack(
+        pack_dir=Path("."),
+        version="0.0.0",
+        tax_year=2025,
+        jurisdiction="federal",
+        id_prefix="fed.",
+        checksum="",
+        constants={},
+        rules={},
+        rule_order=[],
+    )
+    empty_return = TaxReturnInput(tax_year=2025, filing_status=FilingStatus.SINGLE)
+    engine = CalculationEngine(placeholder_pack, empty_return)
+    engine._resolve_inputs()
+    return tuple(sorted(engine.resolved))

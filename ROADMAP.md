@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Stable — milestones 1–32, the 0.9.0 hardening arc, and the pre-1.0 housekeeping sweep are complete; released as `1.0.0` on 2026-07-04. Future work (more states, new tax years, part-year residency, pension/retirement inputs) proceeds under the 1.x compatibility promise.
+**Status:** Stable — milestones 1–33, the 0.9.0 hardening arc, and the pre-1.0 housekeeping sweep are complete; released as `1.0.0` on 2026-07-04. Future work (more states, new tax years, part-year residency, pension/retirement inputs) proceeds under the 1.x compatibility promise.
 **SemVer line:** `1.0.x`.
-**Test suite:** 695 passing, 4 skipped, 0 failures.
+**Test suite:** 747 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -286,7 +286,7 @@ These milestones add missing engine capabilities that unlock blocked features.
 
 ### M16: Multi-Dimensional Rule Lookups
 
-**Status:** Complete on 2026-07-02. `matrix_lookup` is the fifth rule type: `keys` (2+ reference entries) index a nested `table` validated to the exact key depth with numeric-string leaves; numeric key values are canonicalized (a `2.00` result indexes key `"2"`); `{ref: ...}` keys participate in topological ordering and bare-string keys resolve lazily; unknown key paths fail with the dimension, key, and available options; the trace records the full lookup path. Documented in `docs/RULE_PACK_AUTHORING.md` §4.5. The web rule editor intentionally rejects `matrix_lookup` edits (no form section yet — edit the YAML); version promoted to `0.3.0` (Phase 2 complete).
+**Status:** Complete on 2026-07-02. `matrix_lookup` is the fifth rule type: `keys` (2+ reference entries) index a nested `table` validated to the exact key depth with numeric-string leaves; numeric key values are canonicalized (a `2.00` result indexes key `"2"`); `{ref: ...}` keys participate in topological ordering and bare-string keys resolve lazily; unknown key paths fail with the dimension, key, and available options; the trace records the full lookup path. Documented in `docs/RULE_PACK_AUTHORING.md` §4.5. The web rule editor intentionally rejected `matrix_lookup` edits at the time (M33 later added a two-dimensional grid editor); version promoted to `0.3.0` (Phase 2 complete).
 
 **Goal:** Add a `matrix_lookup` rule type to the engine so rules can index by two or more keys simultaneously. This unblocks EITC and any future credit/deduction with multi-dimensional phase-in/phase-out tables.
 
@@ -642,6 +642,22 @@ Common-household items still absent after Phase 4. Verify every parameter agains
 **Status:** Complete on 2026-07-03. GA packs (→ 1.4.0) subtract $3,000 (2023) / $4,000 (2024/2025, HB 1021) per dependent from taxable income; the NY 2024 pack (→ 1.3.0) subtracts $1,000 per dependent (IT-201 line 36); the CA 2024 pack (→ 1.3.0) implements the whole Form 540 exemption-credit block — $149 personal (×2 for MFJ/QSS), blind, and senior units plus $461 per dependent — capped at tax (the R&TC §17054.1 high-AGI phaseout is unmodeled). 15 tests in `tests/test_state_dependents.py`.
 
 **Goal:** GA's $4,000-per-dependent exemption (HB 1021, noted in the GA pack comments), plus a review of CA/NY dependent handling (CA dependent exemption credit $461 for 2024; NY dependent exemption $1,000).
+
+---
+
+## Phase 6 — 1.x Usability
+
+### M33: Authoring for Non-Coders
+
+**Status:** Complete on 2026-07-04. Design doc: `docs/superpowers/specs/2026-07-03-authoring-for-non-coders-design.md`.
+
+**Goal:** Field feedback said tax accountants cannot author rule packs — the editor removed YAML syntax but not code. Close the gap from both directions:
+
+1. **AI Authoring Assistant** (`/rule-packs/ai-assist`): generate a complete schema-aware prompt (rule-type contract, expression allowlist, live reference catalog derived from the engine via `known_input_refs()`, required rule IDs) from a plain-language description; the user pastes it into any AI they already use. Zero egress — the app never contacts an AI service.
+2. **Paste-to-import**: the import page accepts the combined `# === MANIFEST === / # === RULES ===` document (AI-chat prose and code fences stripped structurally), validated by `RulePack.load()` with rollback; rejected pastes are preserved with a copy-the-error-back-to-your-AI hint.
+3. **GUI completeness**: constants editor (previously constants were uneditable anywhere, making lookup-based logic impossible to author), a `matrix_lookup` grid editor replacing the form parser's hard rejection, reference autocomplete on every ref field, and bracket-table ergonomics (copy-from-single, rate-format hints).
+
+Verified by 49 new tests, including an end-to-end test that authors a pack purely from form-encoded data and calculates a return with it.
 
 ---
 

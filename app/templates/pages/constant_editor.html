@@ -1,0 +1,113 @@
+{# SPDX-License-Identifier: AGPL-3.0-or-later #}
+{% extends "layouts/base.html" %}
+{% block title %}{% if is_new %}Add Constant{% else %}Edit Constant{% endif %}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+    <div>
+        <div class="eyebrow">Constants Editor</div>
+        <h1 class="page-title">
+            {% if is_new %}Add Constant{% else %}Edit Constant{% endif %} for {{ pack.jurisdiction | upper }} {{ pack.year }} · {{ pack.variant }}
+        </h1>
+        <p class="page-subtitle">
+            Constants are the amount tables — standard deductions, thresholds, caps — that lookup rules read at
+            calculation time. Enter one value per filing status; add named groups when a constant has sub-tables
+            (like a phaseout with a lower and upper bound).
+        </p>
+    </div>
+    <div class="action-row">
+        <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}" class="btn btn-outline">Back to Pack</a>
+    </div>
+</section>
+
+{% if error %}
+<div class="notice notice-error">
+    <h2 class="heading-danger">Constant Save Error</h2>
+    <p class="text-dim text-sm">{{ error }}</p>
+</div>
+{% endif %}
+
+<form method="POST" action="{% if is_new %}/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/constants/add{% else %}/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/constants/{{ constant_name }}{% endif %}">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+
+    <section class="card">
+        <div class="section-header">
+            <div>
+                <h2>Constant Name</h2>
+                <p class="text-dim text-sm">Lookup rules reference this as <code>constants.&lt;name&gt;</code> (or <code>constants.&lt;name&gt;.&lt;group&gt;</code> for grouped rows).</p>
+            </div>
+        </div>
+        <div class="form-row">
+            <div>
+                <label>Name</label>
+                <input type="text" name="constant_name" value="{{ constant_name }}" {% if not is_new %}readonly{% else %}required{% endif %} placeholder="e.g. standard_deduction">
+                <p class="field-hint">Lowercase letters, digits, and underscores, starting with a letter.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="section-header">
+            <div>
+                <h2>Values by Filing Status</h2>
+                <p class="text-dim text-sm">
+                    Enter plain numbers — dollar amounts like <code>14600</code> or rates like <code>0.0539</code>
+                    (that is 5.39%). Repeat a value across statuses when it does not vary. Leave the Group column
+                    empty when there is only one row.
+                </p>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline" data-add-constant-row>Add Group Row</button>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table" id="constant-rows" data-next-index="{{ groups | length if groups else 1 }}">
+                <thead>
+                    <tr>
+                        <th>Group (optional)</th>
+                        <th>Single</th>
+                        <th>MFJ</th>
+                        <th>MFS</th>
+                        <th>HOH</th>
+                        <th>QSS</th>
+                        <th class="align-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if groups %}
+                        {% for group in groups %}
+                        <tr>
+                            <td><input type="text" name="const_group_{{ loop.index0 }}_name" value="{{ group.name }}" placeholder="e.g. lower"></td>
+                            {% for status in ['single', 'mfj', 'mfs', 'hoh', 'qss'] %}
+                            <td><input type="text" name="const_group_{{ loop.index0 }}_{{ status }}" value="{{ group.cells.get(status, '') }}" inputmode="decimal"></td>
+                            {% endfor %}
+                            <td class="align-right"><button type="button" class="btn btn-sm btn-danger" data-remove-closest="tr">Remove</button></td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td><input type="text" name="const_group_0_name" value="" placeholder="leave empty for a simple table"></td>
+                            {% for status in ['single', 'mfj', 'mfs', 'hoh', 'qss'] %}
+                            <td><input type="text" name="const_group_0_{{ status }}" value="" inputmode="decimal"></td>
+                            {% endfor %}
+                            <td class="align-right"><button type="button" class="btn btn-sm btn-danger" data-remove-closest="tr">Remove</button></td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <p class="field-hint">
+            One unnamed row saves a simple table (<code>constants.name</code>). Multiple named rows save grouped
+            sub-tables (<code>constants.name.group</code>) — every row then needs a group name.
+        </p>
+    </section>
+
+    <div class="action-row">
+        <button type="submit" class="btn">Save Constant</button>
+        <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}" class="btn btn-outline">Cancel</a>
+    </div>
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/constant-editor.js"></script>
+{% endblock %}

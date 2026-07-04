@@ -279,12 +279,53 @@ def test_matrix_rule_result_feeds_downstream_formula(tmp_path: Path) -> None:
     assert engine.resolved["fed.2024.credits.eic.half"] == Decimal("3915")
 
 
-# ─── Web editor guard ──────────────────────────────────────────
+# ─── Web editor form parsing ───────────────────────────────────
 
 
-def test_web_editor_rejects_matrix_lookup_edits() -> None:
+def test_web_editor_parses_matrix_lookup_grid() -> None:
     fd = FormData(
-        [("rule_id", "fed.2024.credits.eic.max_credit"), ("rule_type", "matrix_lookup")]
+        [
+            ("rule_id", "fed.2024.credits.eic.max_credit"),
+            ("rule_type", "matrix_lookup"),
+            ("description", "EIC max credit"),
+            ("matrix_key_0", "input.filing_status"),
+            ("matrix_key_1", "fed.2024.credits.eic.num_children"),
+            ("matrix_col_0", "0"),
+            ("matrix_col_1", "1"),
+            ("matrix_row_0_key", "single"),
+            ("matrix_cell_0_0", "632"),
+            ("matrix_cell_0_1", "4213"),
+            ("matrix_row_1_key", "mfj"),
+            ("matrix_cell_1_0", "632"),
+            ("matrix_cell_1_1", "4213"),
+        ]
     )
-    with pytest.raises(ValueError, match="matrix_lookup rules cannot be edited"):
-        parse_rule_form(fd)
+    rule = parse_rule_form(fd)
+    assert rule["keys"] == [
+        {"ref": "input.filing_status"},
+        {"ref": "fed.2024.credits.eic.num_children"},
+    ]
+    assert rule["table"] == {
+        "single": {"0": "632", "1": "4213"},
+        "mfj": {"0": "632", "1": "4213"},
+    }
+
+
+def test_web_editor_matrix_grid_keeps_rows_after_a_gap() -> None:
+    # Deleting a middle row in the editor leaves an index gap; rows after
+    # the gap must survive, mirroring the bracket-row behavior.
+    fd = FormData(
+        [
+            ("rule_id", "fed.2024.credits.eic.max_credit"),
+            ("rule_type", "matrix_lookup"),
+            ("matrix_key_0", "input.filing_status"),
+            ("matrix_key_1", "fed.2024.credits.eic.num_children"),
+            ("matrix_col_0", "0"),
+            ("matrix_row_0_key", "single"),
+            ("matrix_cell_0_0", "632"),
+            ("matrix_row_2_key", "mfj"),
+            ("matrix_cell_2_0", "632"),
+        ]
+    )
+    rule = parse_rule_form(fd)
+    assert set(rule["table"]) == {"single", "mfj"}

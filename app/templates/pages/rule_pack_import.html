@@ -8,12 +8,14 @@
         <div class="eyebrow">Rule Pack Import</div>
         <h1 class="page-title">Import an external pack without crowding the workflow.</h1>
         <p class="page-subtitle">
-            Upload a manifest file and a rules file to create a new custom variant. The imported pack is validated
-            before it is saved so broken YAML stays out of the active workspace.
+            Paste a combined YAML document (for example, an AI assistant's answer) or upload manifest and rules
+            files to create a new custom variant. Every import is validated before it is saved so broken YAML
+            stays out of the active workspace.
         </p>
     </div>
     <div class="action-row">
         <a href="/rule-packs" class="btn btn-outline">Back to Manager</a>
+        <a href="/rule-packs/ai-assist" class="btn btn-outline">AI Assistant</a>
     </div>
 </section>
 
@@ -21,8 +23,45 @@
 <div class="notice notice-error">
     <h2 class="heading-danger">Import Error</h2>
     <p class="text-dim text-sm">{{ error }}</p>
+    {% if combined_text %}
+    <p class="text-dim text-sm">
+        <strong>Fixing with AI?</strong> Copy the error message above back into your AI chat, ask it to correct the
+        YAML, and paste the corrected answer below — your previous paste is preserved.
+    </p>
+    {% endif %}
 </div>
 {% endif %}
+
+<section class="card">
+    <div class="section-header">
+        <div>
+            <h2>Paste Combined YAML</h2>
+            <p class="text-dim text-sm">
+                One document containing both files, joined by <code># === MANIFEST ===</code> and
+                <code># === RULES ===</code> marker lines — the format the
+                <a href="/rule-packs/ai-assist">AI Authoring Assistant</a> requests and the Export button produces.
+                Markdown code fences from a chat window are stripped automatically.
+            </p>
+        </div>
+    </div>
+    <form method="POST" action="/rule-packs/import" enctype="multipart/form-data" class="stack-md">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <div>
+            <label for="combined_text">Combined YAML</label>
+            <textarea id="combined_text" name="combined_text" rows="12"
+                      placeholder="# === MANIFEST ===&#10;version: &quot;1.0.0&quot;&#10;tax_year: 2024&#10;jurisdiction: &quot;GA&quot;&#10;# === RULES ===&#10;constants: {}&#10;rules: []">{{ combined_text }}</textarea>
+        </div>
+        <div>
+            <label for="combined_custom_name">Custom Name</label>
+            <input type="text" id="combined_custom_name" name="custom_name" class="input-compact"
+                   value="{{ custom_name }}" placeholder="e.g. ai_drafted_pack">
+            <p class="field-hint">Label shown in the manager and calculate form.</p>
+        </div>
+        <div class="action-row">
+            <button type="submit" class="btn">Import Pasted Pack</button>
+        </div>
+    </form>
+</section>
 
 <section class="panel-grid-2">
     <div class="card">

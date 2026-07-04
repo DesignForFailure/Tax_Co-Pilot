@@ -258,17 +258,21 @@ Tax_Co-Pilot/
 │   │   └── runs.py
 │   ├── services/
 │   │   ├── __init__.py
+│   │   ├── ai_prompt.py
 │   │   ├── audit_export.py
 │   │   ├── csv_import.py
 │   │   ├── database.py
 │   │   ├── encryption.py
 │   │   ├── form_mapper.py
+│   │   ├── ref_catalog.py
 │   │   └── rule_pack_editor.py
 │   ├── static/
 │   │   ├── css/
 │   │   │   └── main.css
 │   │   └── js/
+│   │       ├── ai-assist.js
 │   │       ├── compare.js
+│   │       ├── constant-editor.js
 │   │       ├── forms.js
 │   │       ├── rule-editor.js
 │   │       ├── submit-guard.js
@@ -279,6 +283,7 @@ Tax_Co-Pilot/
 │       └── pages/
 │           ├── audit_trace.html
 │           ├── calculate.html
+│           ├── constant_editor.html
 │           ├── dashboard.html
 │           ├── forms_view.html
 │           ├── home.html
@@ -286,6 +291,7 @@ Tax_Co-Pilot/
 │           ├── legal.html
 │           ├── rotate_key.html
 │           ├── rule_editor.html
+│           ├── rule_pack_ai_assist.html
 │           ├── rule_pack_detail.html
 │           ├── rule_pack_import.html
 │           ├── rule_packs.html
@@ -324,7 +330,8 @@ Tax_Co-Pilot/
 │           ├── 2026-03-15-federal-completeness-design.md
 │           ├── 2026-03-16-state-expansion-design.md
 │           ├── 2026-03-22-hardening-qa-design.md
-│           └── 2026-03-22-rule-pack-editor-design.md
+│           ├── 2026-03-22-rule-pack-editor-design.md
+│           └── 2026-07-03-authoring-for-non-coders-design.md
 ├── LICENSE
 ├── main.py
 ├── pyproject.toml
@@ -424,10 +431,13 @@ Tax_Co-Pilot/
     ├── conftest.py
     ├── test_additional_medicare.py
     ├── test_additional_standard_deduction.py
+    ├── test_ai_prompt.py
+    ├── test_authoring_e2e.py
     ├── test_calculate_name_validation.py
     ├── test_calculator_resolve_ref.py
     ├── test_capital_loss_carryover.py
     ├── test_chain_integrity.py
+    ├── test_constants_editor.py
     ├── test_data_mgmt.py
     ├── test_deep_review_fixes.py
     ├── test_dependent_care.py
@@ -460,6 +470,7 @@ Tax_Co-Pilot/
     ├── test_niit.py
     ├── test_ny_recapture.py
     ├── test_parse_money.py
+    ├── test_paste_import.py
     ├── test_route_coverage.py
     ├── test_rule_pack_editor.py
     ├── test_rule_pack_routes.py

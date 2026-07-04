@@ -162,15 +162,151 @@ def parse_rule_form(fd: FormData) -> dict[str, Any]:
             rule["tables"] = tables
 
     elif rule_type == "matrix_lookup":
-        # The type-adaptive editor has no form section for nested matrix
-        # tables; without this guard, saving would silently rewrite the rule
-        # with a different shape. Edit the pack YAML directly instead.
-        raise ValueError(
-            "matrix_lookup rules cannot be edited in the web editor yet; "
-            "edit the pack YAML and re-import it"
-        )
+        rule["keys"] = [
+            {"ref": form_str(fd, "matrix_key_0")},
+            {"ref": form_str(fd, "matrix_key_1")},
+        ]
+        # Like the bracket rows: scan submitted indices rather than counting
+        # up, so deleting a middle row/column in the editor keeps the rest.
+        col_re = re.compile(r"^matrix_col_(\d+)$")
+        col_indices: set[int] = set()
+        for key in fd:
+            col_match = col_re.fullmatch(key)
+            if col_match and int(col_match.group(1)) < MAX_INDEXED_ENTRIES:
+                col_indices.add(int(col_match.group(1)))
+        columns: list[tuple[int, str]] = []
+        for col in sorted(col_indices):
+            col_name = str(fd.get(f"matrix_col_{col}", "") or "").strip()
+            if col_name:
+                columns.append((col, col_name))
+
+        row_re = re.compile(r"^matrix_row_(\d+)_key$")
+        matrix_row_indices: set[int] = set()
+        for key in fd:
+            row_match = row_re.fullmatch(key)
+            if row_match and int(row_match.group(1)) < MAX_INDEXED_ENTRIES:
+                matrix_row_indices.add(int(row_match.group(1)))
+
+        table: dict[str, dict[str, str]] = {}
+        for row in sorted(matrix_row_indices):
+            row_key = str(fd.get(f"matrix_row_{row}_key", "") or "").strip()
+            if not row_key:
+                continue
+            cells: dict[str, str] = {}
+            for col, col_name in columns:
+                cell = str(fd.get(f"matrix_cell_{row}_{col}", "") or "").strip()
+                if cell:
+                    cells[col_name] = cell
+            if cells:
+                table[row_key] = cells
+        rule["table"] = table
 
     return rule
+
+
+def matrix_view_from_rule(rule: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Project a two-key matrix_lookup rule into the grid the editor renders.
+
+    Returns None when the rule cannot round-trip through the grid (more
+    than two keys, or a non-mapping table) so the template can fall back
+    to a "use YAML export/import" notice instead of mangling it on save.
+    """
+    keys = rule.get("keys")
+    if not isinstance(keys, list) or len(keys) != 2:
+        return None
+    key_refs: list[str] = []
+    for spec in keys:
+        if isinstance(spec, str) and spec.strip():
+            key_refs.append(spec.strip())
+        elif isinstance(spec, dict) and isinstance(spec.get("ref"), str):
+            key_refs.append(spec["ref"])
+        else:
+            return None
+    raw_table = rule.get("table")
+    if not isinstance(raw_table, dict):
+        return None
+    columns: list[str] = []
+    for row_value in raw_table.values():
+        if not isinstance(row_value, dict):
+            return None
+        for col in row_value:
+            if str(col) not in columns:
+                columns.append(str(col))
+    rows = [
+        {
+            "key": str(row_key),
+            "cells": [str(row_value.get(col, "")) for col in columns],
+        }
+        for row_key, row_value in raw_table.items()
+    ]
+    return {"key_refs": key_refs, "columns": columns, "rows": rows}
+
+
+CONSTANT_STATUSES = ("single", "mfj", "mfs", "hoh", "qss")
+
+
+def parse_constant_form(fd: FormData) -> tuple[str, dict[str, Any]]:
+    """Parse the constants editor form into a (name, value) pair.
+
+    One unnamed row saves the flat filing-status shape
+    (``name: {single: ..., ...}``); named rows save the two-level shape
+    (``name: {group: {single: ..., ...}, ...}``) — the only two constant
+    shapes the shipped packs use.
+    """
+    name = form_str(fd, "constant_name")
+
+    row_re = re.compile(r"^const_group_(\d+)_name$")
+    row_indices: set[int] = set()
+    for key in fd:
+        match = row_re.fullmatch(key)
+        if match and int(match.group(1)) < MAX_INDEXED_ENTRIES:
+            row_indices.add(int(match.group(1)))
+
+    groups: list[tuple[str, dict[str, str]]] = []
+    for idx in sorted(row_indices):
+        group_name = str(fd.get(f"const_group_{idx}_name", "") or "").strip()
+        cells: dict[str, str] = {}
+        for status in CONSTANT_STATUSES:
+            cell_value = str(fd.get(f"const_group_{idx}_{status}", "") or "").strip()
+            if cell_value:
+                cells[status] = cell_value
+        if not cells and not group_name:
+            continue
+        # A partially filled row would silently break returns filed under
+        # the missing status at calculation time; demand all five up front.
+        if len(cells) != len(CONSTANT_STATUSES):
+            raise ValueError(
+                "Fill in all five filing-status values for each row "
+                "(repeat a value when it does not vary by status)"
+            )
+        groups.append((group_name, cells))
+
+    if not groups:
+        raise ValueError("Enter at least one row of values")
+    if len(groups) == 1 and not groups[0][0]:
+        return name, dict(groups[0][1])
+    if any(not group_name for group_name, _ in groups):
+        raise ValueError("Every row needs a group name when saving multiple rows")
+    value: dict[str, Any] = {}
+    for group_name, cells in groups:
+        if group_name in value:
+            raise ValueError(f"Duplicate group name: {group_name!r}")
+        value[group_name] = cells
+    return name, value
+
+
+def constant_view_groups(value: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Rows for the constants editor form.
+
+    A flat constant renders as one unnamed row; a grouped constant as one
+    named row per sub-table (the inverse of parse_constant_form).
+    """
+    if value and all(isinstance(child, dict) for child in value.values()):
+        return [
+            {"name": str(group), "cells": {str(k): str(v) for k, v in cells.items()}}
+            for group, cells in value.items()
+        ]
+    return [{"name": "", "cells": {str(k): str(v) for k, v in value.items()}}]
 
 
 def collect_indices(fd: FormData, prefix: str) -> list[int]:
