@@ -1,0 +1,164 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Tax_Co-Pilot - Local-first personal tax software system
+# Copyright (C) 2026  Tax_Co-Pilot Contributors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# Illinois IL-1040 (2024): flat 4.95% on base income (federal AGI
+# minus federally taxed Social Security - Illinois never taxes it)
+# less the $2,775 personal exemption per taxpayer and dependent
+# (FY Bulletin 2024-02), with an extra $1,000 per taxpayer 65+ and
+# per blind taxpayer. Exemptions are disallowed entirely when AGI
+# exceeds $250,000 ($500,000 MFJ).
+# Unmodeled (documented): retirement-income subtraction (no pension
+# inputs exist), the IL property tax and K-12 education credits, and
+# the IL EITC (20% of federal).
+
+constants:
+  taxpayer_count:
+    single: "1"
+    mfj: "2"
+    mfs: "1"
+    hoh: "1"
+    qss: "1"
+  exemption_agi_limit:
+    single: "250000"
+    mfj: "500000"
+    mfs: "250000"
+    hoh: "250000"
+    qss: "250000"
+
+rules:
+
+  - id: "il.2024.agi"
+    description: "Illinois base income: federal AGI minus federally taxed Social Security (IL-1040 Line 9 base; retirement subtraction unmodeled)"
+    form_line: "IL-1040 Line 9"
+    type: "formula"
+    expression: "fed_agi - taxable_ss"
+    inputs:
+      fed_agi: { ref: "fed.2024.agi.total" }
+      taxable_ss: { ref: "fed.2024.gross_income.social_security" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "il.2024.exemptions.taxpayers"
+    description: "Taxpayers claimable as IL exemptions (2 for MFJ, else 1)"
+    type: "lookup"
+    table: "constants.taxpayer_count"
+    key: { ref: "input.filing_status" }
+
+  - id: "il.2024.exemptions.eligible"
+    description: "Exemption eligibility gate: 1 when AGI is at or under the $250k/$500k limit, else 0"
+    type: "formula"
+    expression: "min(max((limit - agi) * 1000 + 1, 0), 1)"
+    inputs:
+      limit: { ref: "il.2024.exemptions.agi_limit" }
+      agi: { ref: "il.2024.agi" }
+    rounding: "ROUND_DOWN"
+    rounding_precision: 0
+
+  - id: "il.2024.exemptions.agi_limit"
+    description: "AGI limit above which IL exemptions are disallowed"
+    type: "lookup"
+    table: "constants.exemption_agi_limit"
+    key: { ref: "input.filing_status" }
+
+  - id: "il.2024.personal_exemption"
+    description: "IL exemption allowance: $2,775 per taxpayer and dependent, plus $1,000 per taxpayer 65+ and per blind taxpayer; zero above the AGI limit"
+    form_line: "IL-1040 Line 10"
+    type: "formula"
+    expression: "(base * (taxpayers + dependents) + extra * (seniors + blind)) * eligible"
+    inputs:
+      base: { literal: "2775" }
+      taxpayers: { ref: "il.2024.exemptions.taxpayers" }
+      dependents: { ref: "input.dependents.total" }
+      extra: { literal: "1000" }
+      seniors: { ref: "input.age_blind.seniors" }
+      blind: { ref: "input.age_blind.blind" }
+      eligible: { ref: "il.2024.exemptions.eligible" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "il.2024.taxable_income"
+    description: "Illinois net income: base income minus the exemption allowance, not below zero (IL-1040 Line 11)"
+    form_line: "IL-1040 Line 11"
+    type: "formula"
+    expression: "max(agi - exemption, 0)"
+    inputs:
+      agi: { ref: "il.2024.agi" }
+      exemption: { ref: "il.2024.personal_exemption" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "il.2024.tax.full"
+    description: "Illinois income tax before apportionment (flat 4.95%)"
+    type: "formula"
+    expression: "taxable * rate"
+    inputs:
+      taxable: { ref: "il.2024.taxable_income" }
+      rate: { literal: "0.0495" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "il.2024.tax"
+    description: "IL tax after nonresident wage apportionment (ratio 1 for residents; nonresidents pay the as-if-resident tax times the IL-wage share)"
+    type: "formula"
+    expression: "full * ratio"
+    inputs:
+      full: { ref: "il.2024.tax.full" }
+      ratio: { ref: "input.state.apportionment.IL" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "il.2024.credits.other_state"
+    description: "Resident credit for taxes paid to other states: the smaller of their net tax or this state's tax on the doubly-taxed wage share (zero for nonresidents)"
+    type: "formula"
+    expression: "min(other_tax, full * dbl_ratio) * is_resident"
+    inputs:
+      other_tax: { ref: "input.state.other_state_tax" }
+      full: { ref: "il.2024.tax.full" }
+      dbl_ratio: { ref: "input.state.other_state_ratio" }
+      is_resident: { ref: "input.state.is_resident.IL" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "il.2024.credits.total"
+    description: "Total IL nonrefundable credits (other-state resident credit), capped at tax"
+    type: "formula"
+    expression: "min(other_state, tax)"
+    inputs:
+      other_state: { ref: "il.2024.credits.other_state" }
+      tax: { ref: "il.2024.tax" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "il.2024.withholding"
+    description: "Total IL tax withheld (W-2 Box 17)"
+    type: "sum"
+    inputs:
+      items: { ref: "input.withholding.state.IL" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "il.2024.refund_or_owed"
+    description: "IL refund (positive) or amount owed (negative), after nonrefundable credits"
+    form_line: "IL-1040 Line 38"
+    type: "formula"
+    expression: "withholding - tax + credits"
+    inputs:
+      withholding: { ref: "il.2024.withholding" }
+      tax: { ref: "il.2024.tax" }
+      credits: { ref: "il.2024.credits.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0

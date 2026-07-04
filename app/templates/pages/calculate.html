@@ -90,6 +90,11 @@
                 </select>
             </div>
         </div>
+        <div class="form-row-3">
+            <div><label><input type="checkbox" name="nyc_resident" value="1"> Full-year New York City resident (NY city tax)</label></div>
+            <div><label><input type="checkbox" name="yonkers_resident" value="1"> Full-year Yonkers resident (NY surcharge)</label></div>
+            <div><label><input type="checkbox" name="ca_renter" value="1"> Paid CA rent at least half the year (renter's credit)</label></div>
+        </div>
     </div>
 
     <div class="card section-anchor" id="primary-taxpayer">
@@ -97,6 +102,10 @@
         <div class="form-row">
             <div><label>First Name</label><input type="text" name="p_first" required></div>
             <div><label>Last Name</label><input type="text" name="p_last" required></div>
+        </div>
+        <div class="form-row">
+            <div><label><input type="checkbox" name="p_65" value="1"> Born before January 2, 1960 (65 or older)</label></div>
+            <div><label><input type="checkbox" name="p_blind" value="1"> Legally blind</label></div>
         </div>
 
         <div class="section-header">
@@ -110,6 +119,10 @@
                 <div class="form-row">
                     <div><label>Wages (Box 1)</label><input type="text" name="p_w2_0_wages" placeholder="85000"></div>
                     <div><label>Federal Withheld (Box 2)</label><input type="text" name="p_w2_0_federal_withheld" placeholder="12000"></div>
+                </div>
+                <div class="form-row">
+                    <div><label>Medicare Wages (Box 5)</label><input type="text" name="p_w2_0_medicare_wages" placeholder="Blank = Box 1"></div>
+                    <div><label>Medicare Tax Withheld (Box 6)</label><input type="text" name="p_w2_0_medicare_withheld" placeholder="1233"></div>
                 </div>
                 <div class="form-row-3">
                     <div><label>State (Box 15)</label><input type="text" name="p_w2_0_state" placeholder="GA" maxlength="2"></div>
@@ -136,6 +149,25 @@
             <button type="button" class="btn btn-sm btn-outline" data-add-row="p_1099b">+ Add 1099-B</button>
         </div>
         <div id="p_1099b_container" class="dynamic-section"></div>
+        <div class="section-header">
+            <h3>1099-NEC (Self-Employment)</h3>
+            <button type="button" class="btn btn-sm btn-outline" data-add-row="p_1099nec">+ Add 1099-NEC</button>
+        </div>
+        <div id="p_1099nec_container" class="dynamic-section"></div>
+
+        <div class="section-header">
+            <h3>Military Service</h3>
+        </div>
+        <div class="form-row-3">
+            <div><label>Combat Pay (W-2 Box 12 Q)</label><input type="text" name="p_combat_pay" placeholder="0"></div>
+            <div><label>Combat Zone Months</label><input type="text" name="p_combat_months" placeholder="0"></div>
+            <div><label><input type="checkbox" name="p_officer" value="1"> Commissioned officer</label></div>
+        </div>
+        <div class="form-row">
+            <div><label>PCS Moving Expenses (Form 3903)</label><input type="text" name="p_moving_expenses" placeholder="0"></div>
+            <div><label>Reservist Travel &gt;100mi (Form 2106)</label><input type="text" name="p_reservist_travel" placeholder="0"></div>
+        </div>
+
     </div>
 
     <div class="card spouse-section section-anchor" id="spouse_section">
@@ -144,6 +176,10 @@
         <div class="form-row">
             <div><label>First Name</label><input type="text" name="s_first"></div>
             <div><label>Last Name</label><input type="text" name="s_last"></div>
+        </div>
+        <div class="form-row">
+            <div><label><input type="checkbox" name="s_65" value="1"> Born before January 2, 1960 (65 or older)</label></div>
+            <div><label><input type="checkbox" name="s_blind" value="1"> Legally blind</label></div>
         </div>
 
         <div class="section-header">
@@ -169,12 +205,33 @@
             <button type="button" class="btn btn-sm btn-outline" data-add-row="s_1099b">+ Add 1099-B</button>
         </div>
         <div id="s_1099b_container" class="dynamic-section"></div>
+        <div class="section-header">
+            <h3>1099-NEC (Self-Employment)</h3>
+            <button type="button" class="btn btn-sm btn-outline" data-add-row="s_1099nec">+ Add 1099-NEC</button>
+        </div>
+        <div id="s_1099nec_container" class="dynamic-section"></div>
+
+        <div class="section-header">
+            <h3>Military Service</h3>
+        </div>
+        <div class="form-row-3">
+            <div><label>Combat Pay (W-2 Box 12 Q)</label><input type="text" name="s_combat_pay" placeholder="0"></div>
+            <div><label>Combat Zone Months</label><input type="text" name="s_combat_months" placeholder="0"></div>
+            <div><label><input type="checkbox" name="s_officer" value="1"> Commissioned officer</label></div>
+        </div>
+        <div class="form-row">
+            <div><label>PCS Moving Expenses (Form 3903)</label><input type="text" name="s_moving_expenses" placeholder="0"></div>
+            <div><label>Reservist Travel &gt;100mi (Form 2106)</label><input type="text" name="s_reservist_travel" placeholder="0"></div>
+        </div>
+
     </div>
 
     <div class="card section-anchor" id="other-income">
         <h2>Other Income</h2>
         <div class="form-row">
             <div><label>Other Income (Schedule 1)</label><input type="text" name="other_income" placeholder="0"></div>
+            <div><label>Short-Term Loss Carryover (prior year)</label><input type="text" name="st_loss_carryover" placeholder="0"></div>
+            <div><label>Long-Term Loss Carryover (prior year)</label><input type="text" name="lt_loss_carryover" placeholder="0"></div>
         </div>
     </div>
 
@@ -190,7 +247,7 @@
             <div><label>IRA Contributions</label><input type="text" name="adj_ira" placeholder="0"></div>
         </div>
         <div class="form-row">
-            <div><label>SE Tax Deduction</label><input type="text" name="adj_se_tax" placeholder="0"></div>
+            <div><label>SE Tax Deduction</label><input type="text" name="adj_se_tax" placeholder="0"><p class="field-hint">Auto-calculated from 1099-NEC income when present; this manual value applies only without NEC income.</p></div>
         </div>
     </div>
 
@@ -215,6 +272,24 @@
         <h2>Dependents</h2>
         <div class="form-row">
             <div><label>Qualifying Children (for Child Tax Credit)</label><input type="number" name="qualifying_children" value="0" min="0" max="20"></div>
+            <div><label>Other Dependents (for $500 ODC)</label><input type="number" name="other_dependents" value="0" min="0" max="20"></div>
+        </div>
+        <div class="form-row">
+            <div><label>Qualifying Persons for Dependent Care (Form 2441)</label><input type="number" name="care_persons" value="0" min="0" max="20"></div>
+            <div><label>Dependent Care Expenses Paid</label><input type="text" name="care_expenses" placeholder="0"></div>
+        </div>
+    </div>
+
+    <div class="card section-anchor" id="education">
+        <h2>Education Credits (Form 8863)</h2>
+        <p class="text-dim text-sm u-mb-12">American Opportunity Credit: enter qualified expenses per eligible student (first 4 years of postsecondary education). Lifetime Learning: one combined amount per return.</p>
+        <div class="section-header">
+            <h3>AOTC Students</h3>
+            <button type="button" class="btn btn-sm btn-outline" data-add-row="edu">+ Add Student</button>
+        </div>
+        <div id="edu_container" class="dynamic-section"></div>
+        <div class="form-row">
+            <div><label>Lifetime Learning Expenses (per return)</label><input type="text" name="llc_expenses" placeholder="0"></div>
         </div>
     </div>
 

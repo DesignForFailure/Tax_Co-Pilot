@@ -29,7 +29,9 @@ from __future__ import annotations
 
 import csv
 import io
+from collections.abc import Iterator
 from decimal import Decimal, InvalidOperation
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -123,7 +125,20 @@ def import_csv(csv_text: str, record_type: str) -> tuple[list[BaseModel], list[s
             f"Found columns: {', '.join(sorted(headers)) or '(none)'}"
         ]
 
-    for idx, row in enumerate(reader, start=2):  # header is line 1
+    def _rows() -> Iterator[tuple[int, dict[str, Any]]]:
+        # csv.Error escapes from the iterator itself (e.g. a field beyond
+        # the csv module's field_size_limit), outside the per-row handler.
+        it = enumerate(reader, start=2)  # header is line 1
+        while True:
+            try:
+                yield next(it)
+            except StopIteration:
+                return
+            except csv.Error as exc:
+                errors.append(f"CSV structure error (malformed or oversized field): {exc}")
+                return
+
+    for idx, row in _rows():
         try:
             if record_type == "W2":
                 records.append(
@@ -133,6 +148,10 @@ def import_csv(csv_text: str, record_type: str) -> tuple[list[BaseModel], list[s
                         federal_withheld=_money(
                             row.get("federal_withheld", "0"), allow_negative=False
                         ),
+                        medicare_wages=_money(
+                            row.get("medicare_wages", "0"), allow_negative=False
+                        ),
+                        medicare_tax=_money(row.get("medicare_tax", "0"), allow_negative=False),
                         state=(row.get("state") or "").strip(),
                         state_withheld=_money(row.get("state_withheld", "0"), allow_negative=False),
                         state_wages=_money(

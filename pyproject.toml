@@ -14,7 +14,7 @@ authors = [
   { name = "Tax Co-Pilot Contributors" },
 ]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
   "Programming Language :: Python :: 3",
@@ -49,9 +49,9 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/tax-co-pilot/Tax_Co-Pilot"
-Issues = "https://github.com/tax-co-pilot/Tax_Co-Pilot/issues"
-Documentation = "https://github.com/tax-co-pilot/Tax_Co-Pilot#readme"
+Repository = "https://github.com/DesignForFailure/Tax_Co-Pilot"
+Issues = "https://github.com/DesignForFailure/Tax_Co-Pilot/issues"
+Documentation = "https://github.com/DesignForFailure/Tax_Co-Pilot#readme"
 
 [tool.setuptools.packages.find]
 include = ["app*"]

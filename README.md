@@ -20,7 +20,7 @@ $$$$$$$$╱______   __    __       ╱$$$$$$  │  ______          $$$$$$$  │$
 [![CI](https://github.com/DesignForFailure/Tax_Co-Pilot/actions/workflows/ci.yml/badge.svg)](https://github.com/DesignForFailure/Tax_Co-Pilot/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB.svg)](https://python.org)
-[![Status: Alpha](https://img.shields.io/badge/Status-Alpha-orange.svg)](#project-status)
+[![Status: Stable](https://img.shields.io/badge/Status-Stable-brightgreen.svg)](#project-status)
 
 An engineering-focused system for modeling tax rules, storing tax-relevant data, and deterministically calculating outcomes using transparent, verifiable logic.
 
@@ -190,22 +190,25 @@ pytest -q
 
 ## Project Status
 
-Tax Co-Pilot is currently **alpha / MVP**.
+Tax Co-Pilot is **stable** (1.0.x). The application compatibility promise described under Versioning is in effect.
 
 ### Current Scope
 
-- Tax years 2023 and 2024 with federal 1040-style calculations
-- W-2, 1099-INT, 1099-DIV, 1099-B income support
+- Tax years 2023, 2024, and 2025 with federal 1040-style calculations
+- W-2 (incl. Medicare wages Box 5/6), 1099-INT, 1099-DIV, 1099-B, 1099-NEC, and SSA-1099 income support
+- Preferential LTCG/qualified-dividend rates, self-employment tax, Social Security taxability, and capital-loss carryover
+- Credits and surtaxes: EITC (with the combat pay election), CTC + refundable ACTC + ODC, education credits, dependent care, NIIT, Additional Medicare Tax (Form 8959 incl. Part IV withholding), age-65+/blind deductions, military provisions
 - Withholding and estimated payments
 - Two-person filing (MFJ / MFS / Single / HoH / QSS)
-- 12 state packs (GA, CA, NY + 9 no-income-tax states)
-- What-if scenario comparison engine
+- 15 state packs: GA, CA, NY, PA, IL, NC (with dependent exemptions, state credits, NYC/Yonkers city tax, and the NY recapture) plus 9 no-income-tax stubs
+- Multi-state W-2 returns: nonresident wage apportionment and the resident credit for taxes paid to other states
+- What-if scenario comparison engine (filing-status and combat-pay-election scenarios)
 - Local web UI with landing page, light/dark theme support, and full calculation trace
-- JSON and HTML audit export
+- JSON and HTML audit export, IRS form-line mapping, encrypted-at-rest storage (SQLCipher)
 
 ### Versioning
 
-This project follows [Semantic Versioning](https://semver.org/) for application releases. During alpha, application releases use numeric `0.y.z` versions while lifecycle labels such as `Alpha` remain separate status markers. Rule pack manifests use their own independent SemVer line, while editor variant IDs such as `custom_v1` are workspace labels that sit alongside the manifest version. For backward compatibility, legacy custom packs with shorthand manifest versions such as `1` continue to load as `1.0.0` and are rewritten to canonical SemVer when edited, cloned, or re-imported. The SQLite schema uses its own integer generation via `PRAGMA user_version`, independent of both application and rule-pack versions. A stable application compatibility promise begins at `1.0.0`.
+This project follows [Semantic Versioning](https://semver.org/) for application releases. Before `1.0.0`, application releases use numeric `0.y.z` versions while lifecycle labels such as `Beta` remain separate status markers. Rule pack manifests use their own independent SemVer line, while editor variant IDs such as `custom_v1` are workspace labels that sit alongside the manifest version. For backward compatibility, legacy custom packs with shorthand manifest versions such as `1` continue to load as `1.0.0` and are rewritten to canonical SemVer when edited, cloned, or re-imported. The SQLite schema uses its own integer generation via `PRAGMA user_version`, independent of both application and rule-pack versions. A stable application compatibility promise begins at `1.0.0`.
 
 ---
 
@@ -249,13 +252,16 @@ Tax_Co-Pilot/
 │   ├── 03_testing_rules.md
 │   ├── 04_doc_updater.md
 │   └── 05_session_log.md
+├── .claude/
+│   └── settings.json
 ├── .editorconfig
 ├── .github/
 │   ├── ISSUE_TEMPLATE/
 │   │   ├── bug_report.md
-│   │   ├── custom.md
+│   │   ├── config.yml
 │   │   ├── feature_request.md
-│   │   └── new_state.md
+│   │   ├── new_state.md
+│   │   └── tax_calculation_error.yml
 │   ├── PULL_REQUEST_TEMPLATE.md
 │   └── workflows/
 │       └── ci.yml
@@ -291,17 +297,21 @@ Tax_Co-Pilot/
 │   │   └── runs.py
 │   ├── services/
 │   │   ├── __init__.py
+│   │   ├── ai_prompt.py
 │   │   ├── audit_export.py
 │   │   ├── csv_import.py
 │   │   ├── database.py
 │   │   ├── encryption.py
 │   │   ├── form_mapper.py
+│   │   ├── ref_catalog.py
 │   │   └── rule_pack_editor.py
 │   ├── static/
 │   │   ├── css/
 │   │   │   └── main.css
 │   │   └── js/
+│   │       ├── ai-assist.js
 │   │       ├── compare.js
+│   │       ├── constant-editor.js
 │   │       ├── forms.js
 │   │       ├── rule-editor.js
 │   │       ├── submit-guard.js
@@ -312,6 +322,7 @@ Tax_Co-Pilot/
 │       └── pages/
 │           ├── audit_trace.html
 │           ├── calculate.html
+│           ├── constant_editor.html
 │           ├── dashboard.html
 │           ├── forms_view.html
 │           ├── home.html
@@ -319,6 +330,7 @@ Tax_Co-Pilot/
 │           ├── legal.html
 │           ├── rotate_key.html
 │           ├── rule_editor.html
+│           ├── rule_pack_ai_assist.html
 │           ├── rule_pack_detail.html
 │           ├── rule_pack_import.html
 │           ├── rule_packs.html
@@ -327,6 +339,7 @@ Tax_Co-Pilot/
 │           ├── unlock.html
 │           └── whatif.html
 ├── CHANGELOG.md
+├── CITATION.cff
 ├── CLAUDE.md
 ├── CODE_OF_CONDUCT.md
 ├── CONTRIBUTING.md
@@ -356,7 +369,8 @@ Tax_Co-Pilot/
 │           ├── 2026-03-15-federal-completeness-design.md
 │           ├── 2026-03-16-state-expansion-design.md
 │           ├── 2026-03-22-hardening-qa-design.md
-│           └── 2026-03-22-rule-pack-editor-design.md
+│           ├── 2026-03-22-rule-pack-editor-design.md
+│           └── 2026-07-03-authoring-for-non-coders-design.md
 ├── LICENSE
 ├── main.py
 ├── pyproject.toml
@@ -403,6 +417,14 @@ Tax_Co-Pilot/
 │       │   └── 2025/
 │       │       ├── state_GA_2025_manifest.yaml
 │       │       └── state_GA_2025_rules.yaml
+│       ├── IL/
+│       │   └── 2024/
+│       │       ├── state_IL_2024_manifest.yaml
+│       │       └── state_IL_2024_rules.yaml
+│       ├── NC/
+│       │   └── 2024/
+│       │       ├── state_NC_2024_manifest.yaml
+│       │       └── state_NC_2024_rules.yaml
 │       ├── NH/
 │       │   └── 2024/
 │       │       ├── state_NH_2024_manifest.yaml
@@ -415,6 +437,10 @@ Tax_Co-Pilot/
 │       │   └── 2024/
 │       │       ├── state_NY_2024_manifest.yaml
 │       │       └── state_NY_2024_rules.yaml
+│       ├── PA/
+│       │   └── 2024/
+│       │       ├── state_PA_2024_manifest.yaml
+│       │       └── state_PA_2024_rules.yaml
 │       ├── SD/
 │       │   └── 2024/
 │       │       ├── state_SD_2024_manifest.yaml
@@ -443,12 +469,23 @@ Tax_Co-Pilot/
 └── tests/
     ├── __init__.py
     ├── conftest.py
+    ├── test_additional_medicare.py
+    ├── test_additional_standard_deduction.py
+    ├── test_ai_prompt.py
+    ├── test_authoring_e2e.py
     ├── test_calculate_name_validation.py
     ├── test_calculator_resolve_ref.py
+    ├── test_capital_loss_carryover.py
     ├── test_chain_integrity.py
+    ├── test_constants_editor.py
     ├── test_data_mgmt.py
+    ├── test_deep_review_fixes.py
+    ├── test_dependent_care.py
+    ├── test_edge_cases.py
+    ├── test_education_credits.py
     ├── test_encoding_guard.py
     ├── test_encrypted_database.py
+    ├── test_eitc.py
     ├── test_encryption.py
     ├── test_engine_hardening.py
     ├── test_error_paths.py
@@ -460,19 +497,32 @@ Tax_Co-Pilot/
     ├── test_hash_versioning.py
     ├── test_itemized_credits.py
     ├── test_logging.py
+    ├── test_ltcg_rates.py
+    ├── test_matrix_lookup.py
+    ├── test_medicare_wages.py
+    ├── test_military.py
     ├── test_milestone12_structure.py
     ├── test_milestone14_csp.py
     ├── test_milestone15_pagination.py
     ├── test_milestone6_routes.py
     ├── test_multi_year.py
+    ├── test_multistate.py
+    ├── test_niit.py
+    ├── test_ny_recapture.py
     ├── test_parse_money.py
+    ├── test_paste_import.py
     ├── test_route_coverage.py
     ├── test_rule_pack_editor.py
     ├── test_rule_pack_routes.py
+    ├── test_schedule_8812.py
+    ├── test_se_tax.py
     ├── test_services_hardening.py
     ├── test_state_ca_ny.py
     ├── test_state_corrections.py
+    ├── test_state_credits.py
+    ├── test_state_dependents.py
     ├── test_state_expansion.py
+    ├── test_state_pa_il_nc.py
     └── test_web_hardening.py
 ```
 

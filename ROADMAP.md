@@ -9,9 +9,9 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Late Alpha — milestones 1–15 complete; Phase 1 (structural hardening) is done. Next up: Phase 2 (M16).
-**SemVer line:** `0.2.x` (promoted from `0.1.x` on Phase 1 completion, per the release trajectory below).
-**Test suite:** 396 passing, 4 skipped, 0 failures.
+**Status:** Stable — milestones 1–32, the 0.9.0 hardening arc, and the pre-1.0 housekeeping sweep were released as `1.0.0` on 2026-07-04; M33 (authoring for non-coders) is complete and unreleased. Future work (more states, new tax years, part-year residency, pension/retirement inputs) proceeds under the 1.x compatibility promise.
+**SemVer line:** `1.0.x`.
+**Test suite:** 763 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
 ---
@@ -286,6 +286,8 @@ These milestones add missing engine capabilities that unlock blocked features.
 
 ### M16: Multi-Dimensional Rule Lookups
 
+**Status:** Complete on 2026-07-02. `matrix_lookup` is the fifth rule type: `keys` (2+ reference entries) index a nested `table` validated to the exact key depth with numeric-string leaves; numeric key values are canonicalized (a `2.00` result indexes key `"2"`); `{ref: ...}` keys participate in topological ordering and bare-string keys resolve lazily; unknown key paths fail with the dimension, key, and available options; the trace records the full lookup path. Documented in `docs/RULE_PACK_AUTHORING.md` §4.5. The web rule editor intentionally rejected `matrix_lookup` edits at the time (M33 later added a two-dimensional grid editor); version promoted to `0.3.0` (Phase 2 complete).
+
 **Goal:** Add a `matrix_lookup` rule type to the engine so rules can index by two or more keys simultaneously. This unblocks EITC and any future credit/deduction with multi-dimensional phase-in/phase-out tables.
 
 **Current state:**
@@ -346,6 +348,8 @@ These milestones add missing engine capabilities that unlock blocked features.
 These milestones fix known calculation inaccuracies.
 
 ### M17: Long-Term Capital Gains Preferential Rates
+
+**Status:** Complete on 2026-07-02. The 2023/2024/2025 federal packs (v1.2.0) implement the Qualified Dividends and Capital Gain Tax Worksheet: Schedule D short/long netting, preferential income capped at taxable income, year-correct 0%/15% ceilings, 0%/15%/20% stacking on top of ordinary income, and the worksheet's final smaller-of comparison against all-ordinary tax (which binds in the narrow band where 15% exceeds the ordinary marginal rate). `fed.YYYY.tax.total_before_credits` now owns 1040 Line 16; `ReturnOutput.tax_before_credits` falls back to the bracket tax for older custom packs. 16 hand-verified golden vectors in `tests/test_ltcg_rates.py`.
 
 **Goal:** Tax long-term capital gains and qualified dividends at the correct preferential rates (0%/15%/20%) instead of ordinary income rates.
 
@@ -419,6 +423,8 @@ These milestones fix known calculation inaccuracies.
 
 ### M18: Self-Employment Tax Auto-Calculation
 
+**Status:** Complete on 2026-07-02. The 2023/2024/2025 federal packs (v1.3.0) implement Schedule SE: the 92.35% factor, the $400 net-earnings floor, the SS portion capped at the year's wage base reduced by W-2 wages, and the uncapped Medicare portion. The employer-half deduction flows into AGI automatically (manual field remains the fallback when no NEC income exists), the refund settles against `fed.YYYY.tax.total_liability` (1040 Line 24), `ReturnOutput.self_employment_tax` is exposed, and the calculate/what-if pages gained 1099-NEC entry rows. 15 golden vectors in `tests/test_se_tax.py`. (The 0.9% Additional Medicare Tax remains unmodeled — tracked alongside NIIT in M22-era work.)
+
 **Goal:** Automatically compute self-employment tax and the above-the-line SE tax deduction from 1099-NEC income, instead of requiring manual input.
 
 **Current state:**
@@ -480,6 +486,8 @@ These milestones fix known calculation inaccuracies.
 
 ### M19: Earned Income Tax Credit (EITC)
 
+**Status:** Complete on 2026-07-02. The 2023/2024/2025 packs (v1.4.0) implement IRC §32 with `matrix_lookup` parameter tables (filing status × children capped at 3; MFS ineligible via a zero column; MFJ gets the higher phaseout thresholds), Pub 596 Worksheet B earned income (wages + SE net profit − half-SE-tax deduction), phaseout on the greater of AGI or earned income, and the per-year investment income limit. Deviation from the sketch below: the EIC is refundable, so it flows into total payments (1040 Line 27) instead of `tax.after_credits` — refundability is preserved and golden-tested. Parameter dollar amounts were corrected to each year's Revenue Procedure (the figures below are TY2023 values). 18 golden vectors in `tests/test_eitc.py`.
+
 **Goal:** Implement EITC using the `matrix_lookup` rule type from M16.
 
 **Depends on:** M16 (multi-dimensional lookups), M18 (SE income for earned income calculation).
@@ -531,6 +539,8 @@ These milestones fix known calculation inaccuracies.
 
 ### M20: Education Credits (AOTC / LLC)
 
+**Status:** Complete on 2026-07-02. The 2023/2024/2025 packs (v1.5.0) implement Form 8863: per-student AOTC tiers (100% of the first $2,000 + 25% of the next $2,000) via input aggregation, the 40% refundable / 60% nonrefundable split (refundable portion flows to 1040 Line 29 in payments; nonrefundable joins the credit total), the per-return LLC (20% of up to $10,000, nonrefundable), the shared MAGI phaseout ($80k–$90k, doubled for MFJ; AGI used as MAGI), and MFS ineligibility (IRC §25A(g)(6)). New `education_students`/`llc_expenses` inputs with dynamic web-form rows. 19 golden vectors in `tests/test_education_credits.py`.
+
 **Goal:** Add American Opportunity Tax Credit and Lifetime Learning Credit.
 
 - AOTC: 100% of first $2,000 + 25% of next $2,000 per student, max $2,500. Phaseout at $80k/$160k. 40% refundable.
@@ -540,6 +550,8 @@ These milestones fix known calculation inaccuracies.
 
 ### M21: Dependent Care Credit
 
+**Status:** Complete on 2026-07-03. The 2023/2024/2025 packs (v1.6.0) implement Form 2441: $3,000/$6,000 expense caps, the earned-income limit (lesser spouse for MFJ; both spouses must have earned income — the student/disabled deemed-income exception is unmodeled), and the 35%→20% sliding rate matching the IRS table boundaries. Nonrefundable. 15 golden vectors in `tests/test_dependent_care.py`.
+
 **Goal:** Add Credit for Child and Dependent Care Expenses (Form 2441).
 
 - 20–35% of up to $3,000 (one dependent) or $6,000 (two+) in care expenses.
@@ -547,11 +559,15 @@ These milestones fix known calculation inaccuracies.
 
 ### M22: Net Investment Income Tax (NIIT)
 
+**Status:** Complete on 2026-07-03. The 2023/2024/2025 packs (v1.7.0) implement Form 8960 / IRC §1411: 3.8% of the smaller of net investment income (interest + dividends + capital gains after the Schedule D loss limitation, floored at zero) or the MAGI excess over the statutory thresholds ($200k single/HoH, $250k MFJ/QSS, $125k MFS — not inflation-indexed; AGI used as MAGI). A new `fed.YYYY.tax.other_taxes` rule (Schedule 2 → 1040 Line 23) aggregates SE tax + NIIT into `tax.total_liability`. 12 golden vectors in `tests/test_niit.py`.
+
 **Goal:** Add the 3.8% NIIT on investment income above $200k single / $250k MFJ.
 
 - Simple formula rule: `max(0, min(net_investment_income, agi - threshold)) * 0.038`
 
 ### M23: Additional State Credits & Deductions
+
+**Status:** Complete on 2026-07-03 (with one documented exclusion). GA packs (2023/2024/2025 → 1.2.0) implement the §48-7A-3 low income credit (per-exemption AGI bands, nonrefundable, capped at tax; age-65 extra exemption unmodeled). The NY 2024 pack (→ 1.2.0) implements the NYC resident income tax (2024 rate schedule, verified against published cumulative amounts) and the 16.75% Yonkers resident surcharge behind mutually-exclusive full-year residency flags. The CA 2024 pack (→ 1.2.0) implements the nonrefundable renter's credit ($60/$120, AGI ceilings $52,421/$104,842). **CalEITC excluded:** the FTB publishes its two-segment phaseout only as worksheet tables that cannot be verified into a closed-form rule from official sources; revisit if the FTB publishes the underlying parameters. 29 tests in `tests/test_state_credits.py`.
 
 **Goal:** Add state-specific credits beyond the basic tax calculation for CA, NY, and GA.
 
@@ -560,6 +576,8 @@ These milestones fix known calculation inaccuracies.
 - GA: Low-income credit
 
 ### M24: Military-Specific Tax Calculations
+
+**Status:** Complete on 2026-07-03. The 2023/2024/2025 packs (v1.8.0) implement the IRC §112 combat pay exclusion (informational trace — Box 12 Q is already absent from Box 1 and never re-subtracted), the officer monthly cap with warning trace ($10,011.00 / $10,519.80 / $10,983.00 = highest enlisted basic pay + $225 IDP, verified against Pub 3 and DoD pay tables — the sketch's 2024 figure of $9,736.50 below was wrong), Form 3903 moving expenses and reservist travel as Schedule 1 adjustments, and the EITC combat pay election as a parallel elected chain with `credits.eic.final` taking the better result. What-if gains a scenario selector with `compare_combat_pay_election`. 17 tests in `tests/test_military.py`.
 
 **Goal:** Model the federal tax treatment of U.S. armed forces members: the combat zone pay exclusion and the military-only deductions that survive TCJA. Verify every parameter against IRS Publication 3 (Armed Forces' Tax Guide) for the target tax year.
 
@@ -597,12 +615,60 @@ These milestones fix known calculation inaccuracies.
 
 ---
 
+## Phase 5 — The Missing 10% (toward 0.5.0)
+
+Common-household items still absent after Phase 4. Verify every parameter against the year's Rev. Proc. / form instructions before shipping.
+
+### M25: Additional Standard Deduction (Age 65+ / Blind)
+
+**Status:** Complete on 2026-07-03. The 2023/2024/2025 packs (v1.9.0) implement IRC §63(f): per checked condition, $1,850/$1,950/$2,000 unmarried and $1,500/$1,550/$1,600 married, via new per-taxpayer `is_65_or_older`/`is_blind` flags (no birth dates stored). `deductions.standard_total` feeds the itemized-vs-standard comparison and `ReturnOutput.standard_deduction`. The GA low income credit now counts the extra exemption per taxpayer 65+ (GA packs v1.3.0), closing the M23 limitation. 11 tests in `tests/test_additional_standard_deduction.py`. MFS boxes for a non-filing spouse remain unmodeled (documented).
+
+**Goal:** IRC §63(f) additional standard deduction per age-65+/blind condition, with age/blindness flags on the taxpayer model.
+
+### M26: Refundable ACTC + Credit for Other Dependents
+
+**Status:** Complete on 2026-07-03. The 2023/2024/2025 packs (v1.10.0) implement Schedule 8812: the $500 ODC inside the shared phaseout, the Credit Limit Worksheet (other nonrefundable credits apply first), and the refundable ACTC (per-child ceilings $1,600/$1,700/$1,700; 15% of earned income over $2,500; Form 8812 earned income includes combat pay mandatorily) on 1040 line 28. The what-if combat-pay comparison now isolates the EIC election from the trace. The 3+-children Social Security tax alternative is unmodeled (no payroll-tax inputs). 14 tests in `tests/test_schedule_8812.py`.
+
+**Goal:** Schedule 8812 in full: the refundable Additional Child Tax Credit (up to $1,600/$1,700/$1,700 per child for 2023/2024/2025, 15% of earned income over $2,500) flowing to 1040 line 28, and the $500 nonrefundable credit for other dependents (ODC). Requires modeling `other_dependents` alongside `qualifying_children`.
+
+### M27: Additional Medicare Tax (Form 8959)
+
+**Status:** Complete on 2026-07-03. The 2023/2024/2025 packs (v1.11.0) implement the 0.9% surtax with the wage-reduced SE threshold and the floor-gated Schedule SE earnings base, joining Schedule 2 → line 23. Box 1 stands in for Box 5, and employer surtax withholding remains unmodeled (documented). 11 tests in `tests/test_additional_medicare.py`.
+
+**Goal:** 0.9% on Medicare wages + SE income above $200k single/HoH/QSS, $250k MFJ, $125k MFS (not inflation-indexed). Joins Schedule 2 → 1040 line 23 alongside SE tax and NIIT. Withholding of the surtax (W-2 Box 6 over 1.45%) is out of scope until Box 5/6 inputs exist — document.
+
+### M28: State Dependent Exemptions
+
+**Status:** Complete on 2026-07-03. GA packs (→ 1.4.0) subtract $3,000 (2023) / $4,000 (2024/2025, HB 1021) per dependent from taxable income; the NY 2024 pack (→ 1.3.0) subtracts $1,000 per dependent (IT-201 line 36); the CA 2024 pack (→ 1.3.0) implements the whole Form 540 exemption-credit block — $149 personal (×2 for MFJ/QSS), blind, and senior units plus $461 per dependent — capped at tax (the R&TC §17054.1 high-AGI phaseout is unmodeled). 15 tests in `tests/test_state_dependents.py`.
+
+**Goal:** GA's $4,000-per-dependent exemption (HB 1021, noted in the GA pack comments), plus a review of CA/NY dependent handling (CA dependent exemption credit $461 for 2024; NY dependent exemption $1,000).
+
+---
+
+## Phase 6 — 1.x Usability
+
+### M33: Authoring for Non-Coders
+
+**Status:** Complete on 2026-07-04. Design doc: `docs/superpowers/specs/2026-07-03-authoring-for-non-coders-design.md`.
+
+**Goal:** Field feedback said tax accountants cannot author rule packs — the editor removed YAML syntax but not code. Close the gap from both directions:
+
+1. **AI Authoring Assistant** (`/rule-packs/ai-assist`): generate a complete schema-aware prompt (rule-type contract, expression allowlist, live reference catalog derived from the engine via `known_input_refs()`, required rule IDs) from a plain-language description; the user pastes it into any AI they already use. Zero egress — the app never contacts an AI service.
+2. **Paste-to-import**: the import page accepts the combined `# === MANIFEST === / # === RULES ===` document (AI-chat prose and code fences stripped structurally), validated by `RulePack.load()` with rollback; rejected pastes are preserved with a copy-the-error-back-to-your-AI hint.
+3. **GUI completeness**: constants editor (previously constants were uneditable anywhere, making lookup-based logic impossible to author), a `matrix_lookup` grid editor replacing the form parser's hard rejection, reference autocomplete on every ref field, and bracket-table ergonomics (copy-from-single, rate-format hints).
+
+Verified by 67 new tests, including an end-to-end test that authors a pack purely from form-encoded data and calculates a return with it. An adversarial multi-agent review pass on the milestone surfaced and fixed eleven further defects (see CHANGELOG), including a pre-existing editor 500 on every list-shaped sum rule.
+
+---
+
 ## Versioning & Release Trajectory
 
-- Continue **Semantic Versioning** on the `0.1.x` line.
-- Promote to `0.2.0` after Phase 1 (structural hardening) is complete.
-- Promote to `0.3.0` after Phase 2 (capability expansion) is complete.
-- Promote to `1.0.0` when: Phase 3 tax correctness milestones are complete, LTCG rates are correct, EITC works, and the engine handles >90% of common household scenarios accurately.
+- ~~Promote to `0.2.0` after Phase 1 (structural hardening) is complete.~~ Done 2026-07-02.
+- ~~Promote to `0.3.0` after Phase 2 (capability expansion) is complete.~~ Done 2026-07-02.
+- ~~Promote to `0.4.0` after Phase 4 (M20–M24) is complete.~~ Done 2026-07-03.
+- ~~Promote to `0.5.0` after closing the remaining common-household gaps (the "missing 10%": e.g. additional standard deduction for age 65+/blind, refundable ACTC, $500 credit for other dependents, Additional Medicare Tax, dependent exemptions in state packs).~~ Done 2026-07-03.
+- ~~Promote to `0.9.0` after a deep review of the entire codebase plus testing and patching of well-known/common edge cases.~~ Done 2026-07-03.
+- Promote to `1.0.0` after the codebase is packaged for easy installation on Linux and Windows.
 
 ---
 

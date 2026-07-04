@@ -115,6 +115,68 @@
 <section class="card">
     <div class="section-header">
         <div>
+            <h2>Constants ({{ pack.constants | length }})</h2>
+            <p class="text-dim text-sm">
+                Amount tables that lookup rules read — standard deductions, thresholds, caps. Rules reference them
+                as <code>constants.&lt;name&gt;</code>.
+            </p>
+        </div>
+        {% if pack.is_custom %}
+        <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/constants/add" class="btn btn-sm">Add Constant</a>
+        {% endif %}
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Structure</th>
+                    <th class="align-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for name, value in pack.constants.items() %}
+                <tr>
+                    <td><code>constants.{{ name }}</code></td>
+                    <td class="text-dim">
+                        {% if value is mapping %}
+                            {% set subtables = value.values() | select('mapping') | list %}
+                            {% if value and subtables | length == value | length %}
+                            {{ value | length }} groups: {{ value.keys() | join(', ') }}
+                            {% else %}
+                            {{ value | length }} values
+                            {% endif %}
+                        {% else %}
+                        single value
+                        {% endif %}
+                    </td>
+                    <td class="align-right">
+                        <div class="table-actions">
+                            {% if pack.is_custom and value is mapping %}
+                            <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/constants/{{ name }}" class="btn btn-sm">Edit</a>
+                            <form method="POST" action="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}/constants/{{ name }}/delete" class="inline-form" data-confirm="Delete this constant? Rules that reference it will block the delete.">
+                                <input type="hidden" name="csrf_token" value="{{ csrf }}">
+                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                            </form>
+                            {% else %}
+                            <span class="pill">Read Only</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="3" class="text-center text-dim">No constants in this pack.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="card">
+    <div class="section-header">
+        <div>
             <h2>Rules ({{ pack.rule_count }})</h2>
             <p class="text-dim text-sm">Open a rule to inspect its YAML fields or edit it in a custom variant.</p>
         </div>

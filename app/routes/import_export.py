@@ -45,6 +45,7 @@ from app.services.database import (
     list_all_return_runs,
     save_return_run,
 )
+from app.services.encryption import DatabaseState, detect_encryption_state
 from app.services.form_mapper import map_return_run
 
 router = APIRouter(tags=["import-export"])
@@ -200,7 +201,10 @@ async def import_returns(request: Request) -> Response:
     try:
         entries = json.loads(content)
     except json.JSONDecodeError as exc:
-        return PlainTextResponse(f"Invalid JSON: {exc}", status_code=400)
+        logger.warning("Import rejected: invalid JSON: %s", exc)
+        return PlainTextResponse(
+            "Invalid JSON: the uploaded file is not well-formed.", status_code=400
+        )
     if not isinstance(entries, list):
         return HTMLResponse("Expected a JSON array", status_code=400)
     if len(entries) > MAX_IMPORT_ENTRIES:
@@ -242,6 +246,16 @@ def backup_database() -> Response:
             conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     except Exception:
         logger.warning("Backup: WAL checkpoint failed", exc_info=True)
+        wal_path = Path(str(DB_PATH) + "-wal")
+        if wal_path.exists() and wal_path.stat().st_size > 0:
+            # Serving only the main file now would silently omit committed
+            # transactions still sitting in the write-ahead log.
+            return HTMLResponse(
+                "Backup unavailable: recent changes are still in the "
+                "write-ahead log and could not be flushed. Unlock the "
+                "database and try again.",
+                status_code=409,
+            )
     logger.info("Backup downloaded (db=%s)", DB_PATH.name)
     return Response(
         content=DB_PATH.read_bytes(),
@@ -254,6 +268,11 @@ def backup_database() -> Response:
 async def restore_database(request: Request) -> Response:
     fd = await request.form()
     verify_csrf(request, str(fd.get("csrf_token", "")))
+    locked = locked_database_response()
+    if locked is not None:
+        # A locked encrypted database must never be silently replaced —
+        # restoring requires the active password to verify the result.
+        return locked
     upload = fd.get("file")
     if not isinstance(upload, UploadFile):
         return HTMLResponse("No file uploaded", status_code=400)
@@ -266,6 +285,20 @@ async def restore_database(request: Request) -> Response:
     is_plaintext_sqlite = content[:16].startswith(b"SQLite format 3")
     if not is_plaintext_sqlite and not encryption_config.enabled:
         return HTMLResponse("Not a valid SQLite database file", status_code=400)
+    if (
+        is_plaintext_sqlite
+        and encryption_config.enabled
+        and detect_encryption_state(DB_PATH) == DatabaseState.ENCRYPTED_SQLCIPHER
+    ):
+        # Silently swapping an encrypted database for a plaintext upload
+        # would irreversibly downgrade encryption-at-rest.
+        logger.warning("Restore rejected: plaintext backup over an encrypted database")
+        return HTMLResponse(
+            "Refusing to overwrite the encrypted database with an unencrypted "
+            "backup. Import the runs via Import Returns instead, or disable "
+            "encryption first.",
+            status_code=400,
+        )
 
     if is_plaintext_sqlite:
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
@@ -315,15 +348,16 @@ async def restore_database(request: Request) -> Response:
 
     try:
         init_db()
-    except Exception as exc:
+    except Exception:
         logger.exception("Restore failed; original database preserved")
         if backup_copy and backup_copy.exists():
             for suffix in ("-wal", "-shm"):
                 Path(str(DB_PATH) + suffix).unlink(missing_ok=True)
             os.replace(backup_copy, DB_PATH)
         return PlainTextResponse(
-            f"Restore failed — original database has been preserved. Error: {exc}. "
-            "If the backup is encrypted, ensure the same password is active.",
+            "Restore failed — the original database has been preserved. "
+            "If the backup is encrypted, ensure the same password is active. "
+            "See the server log for details.",
             status_code=400,
         )
     if backup_copy and backup_copy.exists():

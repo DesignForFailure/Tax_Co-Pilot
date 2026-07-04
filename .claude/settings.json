@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest)",
+      "Bash(python -m pytest *)",
+      "Bash(python -m ruff check *)",
+      "Bash(python -m mypy *)",
+      "Bash(.venv/bin/python -m pytest)",
+      "Bash(.venv/bin/python -m pytest *)",
+      "Bash(.venv/bin/python -m ruff check *)",
+      "Bash(.venv/bin/python -m mypy *)",
+      "Bash(pytest)",
+      "Bash(pytest *)",
+      "Bash(ruff check *)",
+      "Bash(mypy *)",
+      "Bash(git fetch origin *)",
+      "Bash(shellcheck *)",
+      "mcp__github__pull_request_read"
+    ]
+  }
+}

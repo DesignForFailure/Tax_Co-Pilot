@@ -81,7 +81,7 @@ The loader enforces this at load time — a rule whose ID does not start with th
 
 ---
 
-## 4. The Four Rule Types
+## 4. The Five Rule Types
 
 ### 4.1 `formula` — Arithmetic over named inputs
 
@@ -188,6 +188,37 @@ Bracket rules:
 - Each filing status must be a non-empty list.
 - Required fields per bracket entry: `lower`, `rate`. (`upper` is optional only for the final bracket.)
 - The `tables` mapping must include every filing status your users may file under.
+
+### 4.5 `matrix_lookup` — Multi-dimensional constant lookup
+
+Indexes a nested table by two or more keys at once — for example filing status × number of children, the shape the Earned Income Credit parameter tables need. Each entry in `keys` is resolved in order and selects the next level of the `table` mapping.
+
+```yaml
+- id: "fed.2024.credits.eic.max_credit"
+  description: "EIC maximum credit by filing status and children"
+  type: "matrix_lookup"
+  keys:
+    - "input.filing_status"
+    - { ref: "fed.2024.credits.eic.num_children" }
+  table:
+    single:
+      "0": "632"
+      "1": "4213"
+      "2": "6960"
+      "3": "7830"
+    mfj:
+      "0": "632"
+      "1": "4213"
+      "2": "6960"
+      "3": "7830"
+```
+
+Matrix lookup rules:
+- `keys` must list **at least two** entries. Each entry is a reference string (`"input.filing_status"`, a rule id) or a `{ ref: ... }` mapping.
+- `table` must nest exactly as deep as `keys` is long: one mapping level per key, with numeric string leaves.
+- Table keys must be **strings** — quote numeric keys in YAML (`"2":` not `2:`). Numeric key values are canonicalized before lookup, so a rule result of `2.00` indexes key `"2"`.
+- Like `lookup`, matrix rules return the raw table value and do not need `rounding` or `inputs` fields.
+- An unknown key value fails the calculation with an error naming the dimension, the failing key, and the available keys — clamp open-ended inputs (e.g. `min(children, 3)`) with an upstream `formula` rule.
 
 ---
 
@@ -357,7 +388,9 @@ Every rule that produces a numeric result should declare a rounding mode and pre
 
 | Field                | Value             | Meaning                                      |
 |----------------------|-------------------|----------------------------------------------|
-| `rounding`           | `"ROUND_HALF_UP"` | Standard round-half-up (the only supported mode) |
+| `rounding`           | `"ROUND_HALF_UP"` | Standard round-half-up (the default and most common) |
+| `rounding`           | `"ROUND_UP"`      | Away from zero — for step counts like "per $1,000 or fraction thereof" (e.g. CTC phaseout units) |
+| `rounding`           | `"ROUND_DOWN"`    | Truncate toward zero — for floor semantics (e.g. 0/1 eligibility gates) |
 | `rounding_precision` | `0`               | Round to whole dollars                       |
 | `rounding_precision` | `2`               | Round to cents                               |
 
@@ -500,12 +533,65 @@ The validator runs the same `RulePack.load()` call the engine uses, so a pack th
 
 | Pack                              | Tax structure                            | Notable features                           |
 |-----------------------------------|------------------------------------------|--------------------------------------------|
-| `rule_packs/federal/2024/`        | Full 1040-style federal return           | All four rule types, SS taxability worksheet, CTC phaseout |
+| `rule_packs/federal/2024/`        | Full 1040-style federal return           | All five rule types, SS taxability worksheet, CTC phaseout, QDCGT worksheet, Schedule 8812 |
 | `rule_packs/state/GA/2024/`       | Flat rate (5.39%) with deductions        | Simplest state pack with constants         |
 | `rule_packs/state/CA/2024/`       | Progressive brackets + surtax            | `bracket_table` + supplemental `formula` for the 1% MHS surtax |
 | `rule_packs/state/TX/2024/`       | No income tax                            | Minimal stub: zero tax, withholding sum, refund of over-withheld amounts |
 
 For adding a new state specifically, see `docs/STATE_AUTHORING_GUIDE.md`, which covers required rule IDs, the state template, and integration testing patterns.
+
+---
+
+## Authoring Without Writing YAML
+
+Two paths exist for authors who prefer not to hand-edit YAML:
+
+### The web editor
+
+**Rule Packs** in the web UI covers the full authoring surface:
+
+- **Constants editor** (pack detail page → Constants): create and edit the
+  filing-status amount tables lookup rules read, including grouped
+  sub-tables (`constants.name.group`). Deleting a constant that a lookup
+  rule still references is refused, because the loader would not catch the
+  dangling path until calculation time.
+- **Rule editor**: structured forms for all five rule types, including a
+  grid editor for two-dimensional `matrix_lookup` tables. Reference fields
+  autocomplete from the pack's own rule IDs, its `constants.*` paths, the
+  engine `input.*` namespace, and (for state packs) the federal rule IDs
+  for that year. Every save is validated with `RulePack.load()` before it
+  touches disk. Matrices with more than two dimensions remain
+  export-edit-reimport territory.
+
+### The AI Authoring Assistant
+
+**Rule Packs → AI Assistant** generates a complete authoring prompt from a
+plain-language description: it embeds this document's contract (rule
+types, expression allowlist, manifest fields), the live reference catalog
+for the chosen jurisdiction/year, and the required rule IDs. Paste the
+prompt into any AI assistant you already use; the app never contacts an AI
+service itself, keeping the local-first privacy posture intact.
+
+The AI is instructed to answer in the **combined document format**:
+
+```
+# === MANIFEST ===
+<manifest.yaml content>
+# === RULES ===
+<rules.yaml content>
+```
+
+Paste that answer into **Rule Packs → Import YAML → Paste combined YAML**
+(chat prose and Markdown code fences are stripped automatically). The
+import validates the pack with `RulePack.load()` and rolls back on any
+failure; if it is rejected, copy the error message back to the AI and
+paste its corrected answer. The Export button produces the same combined
+format, so existing packs round-trip through the paste box too.
+
+**Always verify AI-drafted logic against the official forms and
+instructions.** Validation proves the pack is well-formed and loadable —
+not that the rates and thresholds are correct. Review every number, run a
+test calculation, and read the audit trace before relying on it.
 
 ---
 

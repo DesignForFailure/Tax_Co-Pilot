@@ -41,10 +41,15 @@ class Form1040Lines(BaseModel):
     line_19: Decimal = Decimal("0")   # Child tax credit
     line_21: Decimal = Decimal("0")   # Total credits
     line_22: Decimal = Decimal("0")   # Tax after credits
+    line_23: Decimal = Decimal("0")   # Other taxes (incl. self-employment tax)
+    line_24: Decimal = Decimal("0")   # Total tax
 
     # Payments
     line_25d: Decimal = Decimal("0")  # Federal income tax withheld
     line_26: Decimal = Decimal("0")   # Estimated tax payments
+    line_27: Decimal = Decimal("0")   # Earned income credit (EIC, refundable)
+    line_28: Decimal = Decimal("0")   # Additional child tax credit (Schedule 8812)
+    line_29: Decimal = Decimal("0")   # Refundable American opportunity credit (Form 8863)
     line_33: Decimal = Decimal("0")   # Total payments
 
     # Refund or Amount Owed

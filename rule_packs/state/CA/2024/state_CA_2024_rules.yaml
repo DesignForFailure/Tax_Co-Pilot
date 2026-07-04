@@ -23,6 +23,32 @@ constants:
     hoh: "11080"
     qss: "11080"
 
+  # FTB nonrefundable renter's credit, TY 2024 (R&TC 17053.5): flat amount
+  # by filing status, allowed only when CA AGI is at or under the ceiling.
+  renter_credit_amount:
+    single: "60"
+    mfj: "120"
+    mfs: "60"
+    hoh: "120"
+    qss: "120"
+  renter_credit_agi_limit:
+    single: "52421"
+    mfj: "104842"
+    mfs: "52421"
+    hoh: "104842"
+    qss: "104842"
+
+  # Form 540 lines 7-10 exemption credits for 2024: $149 per personal/
+  # blind/senior unit (2 personal units for MFJ and QSS), $461 per
+  # dependent. The high-AGI exemption credit phaseout (R&TC 17054.1)
+  # is unmodeled.
+  exemption_credit_personal:
+    single: "149"
+    mfj: "298"
+    mfs: "149"
+    hoh: "149"
+    qss: "298"
+
 rules:
   - id: "ca.2024.agi"
     description: "California AGI (MVP: starts from federal AGI)"
@@ -120,13 +146,124 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
-  - id: "ca.2024.tax"
-    description: "California total income tax"
+  - id: "ca.2024.tax.full"
+    description: "California total income tax before apportionment"
     type: "formula"
     expression: "base_tax + mhs"
     inputs:
       base_tax: { ref: "ca.2024.tax.base" }
       mhs: { ref: "ca.2024.tax.mhs" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  # CalEITC is deliberately not modeled: the FTB publishes its two-segment
+  # phaseout only as Form 3514 worksheet tables, which cannot be verified
+  # into a closed-form rule from official sources. Known limitation (M23).
+  - id: "ca.2024.credits.renter.amount"
+    description: "Renter's credit amount by filing status ($60 single/MFS, $120 MFJ/HoH/QSS)"
+    type: "lookup"
+    table: "constants.renter_credit_amount"
+    key: { ref: "input.filing_status" }
+
+  - id: "ca.2024.credits.renter.agi_limit"
+    description: "Renter's credit CA AGI ceiling for 2024 ($52,421 single/MFS, $104,842 MFJ/HoH/QSS)"
+    type: "lookup"
+    table: "constants.renter_credit_agi_limit"
+    key: { ref: "input.filing_status" }
+
+  - id: "ca.2024.credits.renter"
+    description: "Nonrefundable renter's credit: flat amount when the filer paid rent on a principal CA residence at least half the year and CA AGI is at or under the ceiling; capped at tax"
+    form_line: "CA Form 540 Line 46"
+    type: "formula"
+    expression: "min(amount, tax) * renter * min(max((limit - agi) * 1000 + 1, 0), 1)"
+    inputs:
+      amount: { ref: "ca.2024.credits.renter.amount" }
+      tax: { ref: "ca.2024.tax" }
+      renter: { ref: "input.state.ca_renter" }
+      limit: { ref: "ca.2024.credits.renter.agi_limit" }
+      agi: { ref: "ca.2024.agi" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ca.2024.tax"
+    description: "CA tax after nonresident wage apportionment (ratio 1 for residents; nonresidents pay the as-if-resident tax times the CA-wage share, the standard ratio method)"
+    type: "formula"
+    expression: "full * ratio"
+    inputs:
+      full: { ref: "ca.2024.tax.full" }
+      ratio: { ref: "input.state.apportionment.CA" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ca.2024.credits.other_state"
+    description: "Resident credit for taxes paid to other states: the smaller of their net tax or this state's tax on the doubly-taxed wage share (zero for nonresidents; nonresident credits are not prorated - documented simplification)"
+    type: "formula"
+    expression: "min(other_tax, full * dbl_ratio) * is_resident"
+    inputs:
+      other_tax: { ref: "input.state.other_state_tax" }
+      full: { ref: "ca.2024.tax.full" }
+      dbl_ratio: { ref: "input.state.other_state_ratio" }
+      is_resident: { ref: "input.state.is_resident.CA" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ca.2024.credits.exemption.personal"
+    description: "Personal exemption credit ($149 per Form 540 line 7 unit; 2 units for MFJ/QSS)"
+    type: "lookup"
+    table: "constants.exemption_credit_personal"
+    key: { ref: "input.filing_status" }
+
+  - id: "ca.2024.credits.exemption.blind"
+    description: "Blind exemption credit: $149 per visually impaired taxpayer (Form 540 line 8)"
+    type: "formula"
+    expression: "amount * blind"
+    inputs:
+      amount: { literal: "149" }
+      blind: { ref: "input.age_blind.blind" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ca.2024.credits.exemption.senior"
+    description: "Senior exemption credit: $149 per taxpayer 65 or older (Form 540 line 9)"
+    type: "formula"
+    expression: "amount * seniors"
+    inputs:
+      amount: { literal: "149" }
+      seniors: { ref: "input.age_blind.seniors" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ca.2024.credits.exemption.dependent"
+    description: "Dependent exemption credit: $461 per dependent (Form 540 line 10)"
+    type: "formula"
+    expression: "amount * dependents"
+    inputs:
+      amount: { literal: "461" }
+      dependents: { ref: "input.dependents.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ca.2024.credits.exemptions"
+    description: "Total Form 540 exemption credits (line 11; high-AGI phaseout unmodeled)"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "ca.2024.credits.exemption.personal" }
+        - { ref: "ca.2024.credits.exemption.blind" }
+        - { ref: "ca.2024.credits.exemption.senior" }
+        - { ref: "ca.2024.credits.exemption.dependent" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "ca.2024.credits.total"
+    description: "Total California nonrefundable credits (exemption credits + renter's credit), capped at tax"
+    type: "formula"
+    expression: "min(renter + exemptions + other_state, tax)"
+    inputs:
+      renter: { ref: "ca.2024.credits.renter" }
+      exemptions: { ref: "ca.2024.credits.exemptions" }
+      other_state: { ref: "ca.2024.credits.other_state" }
+      tax: { ref: "ca.2024.tax" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
@@ -139,11 +276,12 @@ rules:
     rounding_precision: 2
 
   - id: "ca.2024.refund_or_owed"
-    description: "California refund (positive) or amount owed (negative)"
+    description: "California refund (positive) or amount owed (negative), after nonrefundable credits"
     type: "formula"
-    expression: "withholding - tax"
+    expression: "withholding - tax + credits"
     inputs:
       withholding: { ref: "ca.2024.withholding" }
       tax: { ref: "ca.2024.tax" }
+      credits: { ref: "ca.2024.credits.total" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0

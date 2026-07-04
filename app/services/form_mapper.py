@@ -28,6 +28,9 @@ _FORM_LINE_MAP: dict[str, tuple[str, str]] = {
     "1040 Line 16": ("form_1040", "line_16"),
     "1040 Line 25d": ("form_1040", "line_25d"),
     "1040 Line 26": ("form_1040", "line_26"),
+    "1040 Line 27": ("form_1040", "line_27"),
+    "1040 Line 28": ("form_1040", "line_28"),
+    "1040 Line 29": ("form_1040", "line_29"),
     "1040 Line 33": ("form_1040", "line_33"),
     "Schedule 1 Line 3": ("schedule_1", "line_3"),
     "Schedule 1 Line 8": ("schedule_1", "line_8"),
@@ -41,6 +44,8 @@ _FORM_LINE_MAP: dict[str, tuple[str, str]] = {
     "1040 Line 19": ("form_1040", "line_19"),
     "1040 Line 21": ("form_1040", "line_21"),
     "1040 Line 22": ("form_1040", "line_22"),
+    "1040 Line 23": ("form_1040", "line_23"),
+    "1040 Line 24": ("form_1040", "line_24"),
     "Schedule A Line 4": ("schedule_a", "line_4"),
     "Schedule A Line 7": ("schedule_a", "line_7"),
     "Schedule A Line 10": ("schedule_a", "line_10"),
@@ -95,9 +100,13 @@ def map_return_run(run: ReturnRun) -> FormPacket:
     )
 
     # Refund (Line 34) vs Amount Owed (Line 37)
-    # Use post-credit tax whenever credits are present. This includes scenarios
-    # where credits reduce line_22 to zero.
-    tax_amount = form_1040.line_22 if form_1040.line_21 > 0 else form_1040.line_16
+    # Line 24 (total tax incl. SE tax) wins when present; otherwise use
+    # post-credit tax whenever credits are present, including scenarios where
+    # credits reduce line_22 to zero.
+    if form_1040.line_24 > 0:
+        tax_amount = form_1040.line_24
+    else:
+        tax_amount = form_1040.line_22 if form_1040.line_21 > 0 else form_1040.line_16
     if form_1040.line_33 > tax_amount:
         form_1040.line_34 = form_1040.line_33 - tax_amount
         form_1040.line_37 = Decimal("0")
@@ -134,11 +143,12 @@ def _check_consistency(f: Form1040Lines, s: Schedule1Lines) -> list[str]:
             f"Line 15 (taxable={f.line_15}) exceeds Line 11 (AGI={f.line_11})"
         )
 
-    expected_payments = f.line_25d + f.line_26
+    expected_payments = f.line_25d + f.line_26 + f.line_27 + f.line_28 + f.line_29
     if f.line_33 != expected_payments:
         errors.append(
             f"Line 33 (total payments={f.line_33}) != "
-            f"Line 25d ({f.line_25d}) + Line 26 ({f.line_26})"
+            f"Line 25d ({f.line_25d}) + Line 26 ({f.line_26}) + "
+            f"Line 27 ({f.line_27}) + Line 28 ({f.line_28}) + Line 29 ({f.line_29})"
         )
 
     if f.line_22 > f.line_16:

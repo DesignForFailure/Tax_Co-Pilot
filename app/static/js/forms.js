@@ -5,8 +5,9 @@
    refresh only activate when the page has the matching elements. */
 (function () {
     var counters = {
-        p_w2: 1, p_1099int: 0, p_1099div: 0, p_1099b: 0,
-        s_w2: 0, s_1099int: 0, s_1099div: 0, s_1099b: 0
+        p_w2: 1, p_1099int: 0, p_1099div: 0, p_1099b: 0, p_1099nec: 0,
+        s_w2: 0, s_1099int: 0, s_1099div: 0, s_1099b: 0, s_1099nec: 0,
+        edu: 0
     };
 
     function getTemplate(section, idx) {
@@ -18,6 +19,10 @@
                 + '<div class="form-row">'
                 + '<div><label>Wages (Box 1)</label><input type="text" name="' + prefix + '_wages" placeholder="85000"></div>'
                 + '<div><label>Federal Withheld (Box 2)</label><input type="text" name="' + prefix + '_federal_withheld" placeholder="12000"></div>'
+                + '</div>'
+                + '<div class="form-row">'
+                + '<div><label>Medicare Wages (Box 5)</label><input type="text" name="' + prefix + '_medicare_wages" placeholder="Blank = Box 1"></div>'
+                + '<div><label>Medicare Tax Withheld (Box 6)</label><input type="text" name="' + prefix + '_medicare_withheld" placeholder="1233"></div>'
                 + '</div>'
                 + '<div class="form-row-3">'
                 + '<div><label>State (Box 15)</label><input type="text" name="' + prefix + '_state" placeholder="GA" maxlength="2"></div>'
@@ -42,6 +47,23 @@
                 + '<div><label>Ordinary Dividends (Box 1a)</label><input type="text" name="' + prefix + '_ordinary" placeholder="1000"></div>'
                 + '<div><label>Qualified Dividends (Box 1b)</label><input type="text" name="' + prefix + '_qualified" placeholder="800"></div>'
                 + '<div><label>Federal Withheld</label><input type="text" name="' + prefix + '_federal_withheld" placeholder="0"></div>'
+                + '</div></div>';
+        }
+        if (section.endsWith('_1099nec')) {
+            return '<div class="dynamic-row" data-section="' + section + '" data-index="' + idx + '">'
+                + '<button type="button" class="remove-btn">Remove</button>'
+                + '<div><label>Payer Name</label><input type="text" name="' + prefix + '_payer" placeholder="Client name"></div>'
+                + '<div class="form-row">'
+                + '<div><label>Nonemployee Compensation (Box 1)</label><input type="text" name="' + prefix + '_compensation" placeholder="30000"></div>'
+                + '<div><label>Federal Withheld (Box 4)</label><input type="text" name="' + prefix + '_federal_withheld" placeholder="0"></div>'
+                + '</div></div>';
+        }
+        if (section === 'edu') {
+            return '<div class="dynamic-row" data-section="' + section + '" data-index="' + idx + '">'
+                + '<button type="button" class="remove-btn">Remove</button>'
+                + '<div class="form-row">'
+                + '<div><label>Student Name</label><input type="text" name="' + prefix + '_student" placeholder="Student name"></div>'
+                + '<div><label>Qualified Expenses</label><input type="text" name="' + prefix + '_expenses" placeholder="4000"></div>'
                 + '</div></div>';
         }
         if (section.endsWith('_1099b')) {

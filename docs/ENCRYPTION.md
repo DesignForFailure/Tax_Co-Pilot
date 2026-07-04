@@ -73,10 +73,12 @@ If no password is found, the app will prompt you on startup.
 ### New Installation
 
 1. Start the app with encryption enabled
-2. You'll be prompted to set a database password
-3. Password is stored in your system keyring
-4. Database is created with encryption enabled
-5. Access the app normally
+2. If a password is available at startup (via `TAX_COPILOT_DB_PASSWORD`
+   or the system keyring), the database is created encrypted immediately
+3. Otherwise database creation is deferred: the app redirects to the
+   unlock page, and the first password you submit there becomes the
+   encryption password (it is stored in your system keyring)
+4. Access the app normally
 
 ### Migrating Existing Database
 
@@ -92,17 +94,19 @@ If you already have an unencrypted database:
    export TAX_COPILOT_ENCRYPTION_ENABLED=true
    ```
 
-3. Start the app - you'll see a migration prompt
+3. Start the app:
+   - If a password is available (env var or keyring), migration runs
+     at startup automatically
+   - Otherwise open the unlock page (`/unlock`) and submit your
+     password; migration runs then
 
-4. Set your encryption password
-
-5. Migration runs automatically:
+4. Migration steps:
    - Creates encrypted copy
    - Verifies data integrity (row counts, checksums)
    - Original backed up to `tax_copilot.db.unencrypted.backup`
    - Encrypted database becomes active
 
-6. **After successful migration**:
+5. **After successful migration**:
    - Test that you can access your data
    - Keep the `.unencrypted.backup` file until confirmed working
    - Securely delete backup when ready:

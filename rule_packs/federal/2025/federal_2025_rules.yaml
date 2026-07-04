@@ -34,6 +34,49 @@ constants:
     hoh: "-3000"
     qss: "-3000"
   # Source: OBBBA Sec. 110001 + Rev. Proc. 2024-40
+  ltcg_threshold_0:
+    single: "48350"
+    mfj: "96700"
+    mfs: "48350"
+    hoh: "64750"
+    qss: "96700"
+  ltcg_threshold_15:
+    single: "533400"
+    mfj: "600050"
+    mfs: "300000"
+    hoh: "566700"
+    qss: "600050"
+  education_phaseout:
+    lower:
+      single: "80000"
+      mfj: "160000"
+      mfs: "80000"
+      hoh: "80000"
+      qss: "80000"
+    upper:
+      single: "90000"
+      mfj: "180000"
+      mfs: "90000"
+      hoh: "90000"
+      qss: "90000"
+  education_eligible:
+    single: "1"
+    mfj: "1"
+    mfs: "0"
+    hoh: "1"
+    qss: "1"
+  care_spouse_required:
+    single: "0"
+    mfj: "1"
+    mfs: "0"
+    hoh: "0"
+    qss: "0"
+  niit_threshold:
+    single: "200000"
+    mfj: "250000"
+    mfs: "125000"
+    hoh: "200000"
+    qss: "250000"
   standard_deduction:
     single: "15750"
     mfj: "31500"
@@ -57,9 +100,6 @@ constants:
       qss: "44000"
 
   adjustment_limits:
-    student_loan_interest_max: "2500"
-    educator_expenses_max: "300"
-    ira_limit: "7000"
     # Source: Rev. Proc. 2024-25 (self-only / family HDHP coverage)
     hsa_limit:
       single: "4300"
@@ -99,6 +139,22 @@ constants:
     hoh: "200000"
     qss: "400000"
 
+  additional_standard_deduction:
+    single: "2000"
+    mfj: "1600"
+    mfs: "1600"
+    hoh: "2000"
+    qss: "1600"
+
+  # IRC 3101(b)(2) Additional Medicare Tax thresholds - statutory,
+  # deliberately identical across years (not inflation-indexed).
+  additional_medicare_threshold:
+    single: "200000"
+    mfj: "250000"
+    mfs: "125000"
+    hoh: "200000"
+    qss: "250000"
+
 rules:
   # =========================================================================
   # GROSS INCOME
@@ -132,11 +188,13 @@ rules:
     rounding_precision: 2
 
   - id: "fed.2025.gross_income.capital_gains"
-    description: "Net capital gains (1099-B proceeds - basis)"
+    description: "Net capital gain or loss including prior-year carryovers (Schedule D Line 16)"
     form_line: "Schedule D"
-    type: "sum"
+    type: "formula"
+    expression: "st + lt"
     inputs:
-      items: { ref: "input.1099b.net_gain" }
+      st: { ref: "fed.2025.income.short_term_net" }
+      lt: { ref: "fed.2025.income.long_term_net" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
@@ -151,7 +209,7 @@ rules:
 
   - id: "fed.2025.gross_income.capital_loss_limit"
     description: "Capital loss deduction limit (IRC 1211(b): -$1,500 for MFS)"
-    form_line: "1040 Line 7"
+    form_line: "Schedule D Loss Limit"
     type: "lookup"
     table: "constants.capital_loss_limit"
     key: { ref: "input.filing_status" }
@@ -350,12 +408,72 @@ rules:
     rounding_precision: 2
 
   - id: "fed.2025.adjustments.se_tax"
-    description: "Self-employment tax deduction (user provides deductible half)"
+    description: "SE tax deduction: calculated employer-equivalent half when 1099-NEC income exists, else the manual input"
     form_line: "Schedule 1 Line 15"
     type: "formula"
-    expression: "input"
+    expression: "calc * gate + manual * (one - gate)"
     inputs:
-      input: { ref: "input.adjustments.self_employment_tax_deduction" }
+      calc: { ref: "fed.2025.se.deduction" }
+      gate: { ref: "fed.2025.se.has_nec" }
+      manual: { ref: "input.adjustments.self_employment_tax_deduction" }
+      one: { literal: "1" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  # Military service (M24). Combat pay arrives via W-2 Box 12 code Q and is
+  # already excluded from Box 1 wages by the employer; the engine records it
+  # in the trace without re-subtracting it. Out of scope (documented):
+  # IRC 7508 deadline extensions, veterans' disability compensation, and
+  # state military pay exemptions / SCRA residency rules.
+  - id: "fed.2025.military.combat_pay_exclusion"
+    description: "Combat zone pay excluded from federal wages (IRC 112; W-2 Box 12 code Q). Informational: the amount is already absent from Box 1 wages and is never re-subtracted"
+    form_line: "W-2 Box 12 Q"
+    type: "formula"
+    expression: "combat_pay"
+    inputs:
+      combat_pay: { ref: "input.military.combat_pay" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.military.officer_cap"
+    description: "Commissioned officer exclusion ceiling: monthly cap times qualifying months (IRC 112(b) for 2025: $10,758.00 highest enlisted basic pay plus $225 hostile fire/imminent danger pay = 10983.00/month)"
+    form_line: "Pub 3 officer limit"
+    type: "formula"
+    expression: "monthly_cap * months"
+    inputs:
+      monthly_cap: { literal: "10983.00" }
+      months: { ref: "input.military.officer_combat_months" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.military.officer_excess"
+    description: "Warning trace: amount by which a commissioned officer's reported Box 12 Q exceeds the IRC 112(b) ceiling. Any excess is taxable and should already appear in Box 1 wages - verify the W-2 when nonzero"
+    form_line: "Pub 3 officer limit"
+    type: "formula"
+    expression: "max(officer_pay - cap, 0)"
+    inputs:
+      officer_pay: { ref: "input.military.officer_combat_pay" }
+      cap: { ref: "fed.2025.military.officer_cap" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.adjustments.military_moving"
+    description: "Active-duty PCS moving expenses (Form 3903; military moves remain deductible post-TCJA per IRC 217(g))"
+    form_line: "Schedule 1 Line 14"
+    type: "formula"
+    expression: "amount"
+    inputs:
+      amount: { ref: "input.military.moving_expenses" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.adjustments.reservist_travel"
+    description: "Reservist overnight travel more than 100 miles from home (above-the-line, IRC 62(a)(2)(E))"
+    form_line: "Schedule 1 Line 12"
+    type: "formula"
+    expression: "amount"
+    inputs:
+      amount: { ref: "input.military.reservist_travel" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
@@ -370,6 +488,8 @@ rules:
         - { ref: "fed.2025.adjustments.hsa" }
         - { ref: "fed.2025.adjustments.ira" }
         - { ref: "fed.2025.adjustments.se_tax" }
+        - { ref: "fed.2025.adjustments.military_moving" }
+        - { ref: "fed.2025.adjustments.reservist_travel" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
@@ -399,6 +519,35 @@ rules:
     type: "lookup"
     table: "constants.standard_deduction"
     key: { ref: "input.filing_status" }
+
+  - id: "fed.2025.deductions.additional_rate"
+    description: "Additional standard deduction per age-65+/blind condition (IRC 63(f), Rev. Proc. amounts for 2025: $2000 unmarried, $1600 married)"
+    form_line: "1040 Standard Deduction Chart"
+    type: "lookup"
+    table: "constants.additional_standard_deduction"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2025.deductions.additional_standard"
+    description: "Additional standard deduction: rate times the number of checked age-65+/blind boxes (up to 4 on a joint return)"
+    form_line: "1040 Standard Deduction Chart"
+    type: "formula"
+    expression: "rate * boxes"
+    inputs:
+      rate: { ref: "fed.2025.deductions.additional_rate" }
+      boxes: { ref: "input.age_blind.boxes" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.deductions.standard_total"
+    description: "Standard deduction including age-65+/blind additions"
+    form_line: "Standard Deduction Worksheet"
+    type: "formula"
+    expression: "base + additional"
+    inputs:
+      base: { ref: "fed.2025.standard_deduction" }
+      additional: { ref: "fed.2025.deductions.additional_standard" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
 
   # =========================================================================
   # ITEMIZED DEDUCTIONS
@@ -526,10 +675,10 @@ rules:
     rounding_precision: 2
 
   - id: "fed.2025.itemized.charitable"
-    description: "Charitable contributions (cash capped at 60% AGI, noncash at 30% AGI)"
+    description: "Charitable contributions: cash capped at 60% of AGI, noncash at 30%, combined at 60% (Pub 526 ordering rules between categories are simplified)"
     form_line: "Schedule A Line 14"
     type: "formula"
-    expression: "min(cash, agi_cap) + min(noncash, noncash_cap)"
+    expression: "min(min(cash, agi_cap) + min(noncash, noncash_cap), agi_cap)"
     inputs:
       cash: { ref: "input.itemized.charitable_cash" }
       noncash: { ref: "input.itemized.charitable_noncash" }
@@ -563,7 +712,7 @@ rules:
     type: "formula"
     expression: "max(standard, itemized)"
     inputs:
-      standard: { ref: "fed.2025.standard_deduction" }
+      standard: { ref: "fed.2025.deductions.standard_total" }
       itemized: { ref: "fed.2025.itemized.total" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
@@ -589,8 +738,8 @@ rules:
   # =========================================================================
 
   - id: "fed.2025.tax.brackets"
-    description: "Federal income tax using 2025 bracket tables"
-    form_line: "1040 Line 16"
+    description: "Tax on all taxable income at ordinary rates (QDCGT Worksheet comparison figure)"
+    form_line: "QDCGT Worksheet Line 24"
     type: "bracket_table"
     input: { ref: "fed.2025.taxable_income" }
     key: { ref: "input.filing_status" }
@@ -642,9 +791,225 @@ rules:
   # CREDITS
   # =========================================================================
 
+  - id: "fed.2025.income.long_term_gains"
+    description: "Current-year net long-term capital gain or loss (1099-B long-term lots)"
+    form_line: "Schedule D Lines 8-10"
+    type: "sum"
+    inputs:
+      items: { ref: "input.1099b.long_term_gain" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.income.short_term_gains"
+    description: "Current-year net short-term capital gain or loss (1099-B short-term lots)"
+    form_line: "Schedule D Lines 1-3"
+    type: "sum"
+    inputs:
+      items: { ref: "input.1099b.short_term_gain" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.income.short_term_net"
+    description: "Short-term total after the prior-year carryover (Schedule D Line 7 = lines 1-3 minus line 6)"
+    form_line: "Schedule D Line 7"
+    type: "formula"
+    expression: "current - carryover"
+    inputs:
+      current: { ref: "fed.2025.income.short_term_gains" }
+      carryover: { ref: "input.carryover.short_term" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.income.long_term_net"
+    description: "Long-term total after the prior-year carryover (Schedule D Line 15 = lines 8-10 minus line 14)"
+    form_line: "Schedule D Line 15"
+    type: "formula"
+    expression: "current - carryover"
+    inputs:
+      current: { ref: "fed.2025.income.long_term_gains" }
+      carryover: { ref: "input.carryover.long_term" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.carryover.used"
+    description: "Capital loss absorbed this year, up to the IRC 1211(b) limit (assumes the full limit is used; the Carryover Worksheet's negative-taxable-income adjustment is unmodeled)"
+    form_line: "Capital Loss Carryover Worksheet"
+    type: "formula"
+    expression: "min(max(0 - st - lt, 0), 0 - neg_limit)"
+    inputs:
+      st: { ref: "fed.2025.income.short_term_net" }
+      lt: { ref: "fed.2025.income.long_term_net" }
+      neg_limit: { ref: "fed.2025.gross_income.capital_loss_limit" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.carryover.next_short"
+    description: "Short-term loss carrying to next year: the ST loss (after LT-gain netting) beyond what the limit absorbed - ST losses are used first"
+    form_line: "Capital Loss Carryover Worksheet"
+    type: "formula"
+    expression: "max(0 - st - max(lt, 0) - used, 0)"
+    inputs:
+      st: { ref: "fed.2025.income.short_term_net" }
+      lt: { ref: "fed.2025.income.long_term_net" }
+      used: { ref: "fed.2025.carryover.used" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.carryover.next_total"
+    description: "Total capital loss carrying to next year (informational; enter next year as Schedule D lines 6/14)"
+    form_line: "Capital Loss Carryover Worksheet"
+    type: "formula"
+    expression: "max(0 - st - lt - used, 0)"
+    inputs:
+      st: { ref: "fed.2025.income.short_term_net" }
+      lt: { ref: "fed.2025.income.long_term_net" }
+      used: { ref: "fed.2025.carryover.used" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.carryover.next_long"
+    description: "Long-term loss carrying to next year (total minus the short-term portion)"
+    form_line: "Capital Loss Carryover Worksheet"
+    type: "formula"
+    expression: "total - short"
+    inputs:
+      total: { ref: "fed.2025.carryover.next_total" }
+      short: { ref: "fed.2025.carryover.next_short" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.income.net_capital_gain"
+    description: "Net capital gain eligible for preferential rates (smaller of Schedule D lines 15 and 16, not below zero)"
+    form_line: "Schedule D Line 16"
+    type: "formula"
+    expression: "max(min(lt, lt + st), 0)"
+    inputs:
+      lt: { ref: "fed.2025.income.long_term_net" }
+      st: { ref: "fed.2025.income.short_term_net" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.income.preferential"
+    description: "Preferential-rate income: qualified dividends + net capital gain, capped at taxable income"
+    form_line: "QDCGT Worksheet Line 6"
+    type: "formula"
+    expression: "min(qualified + net_gain, taxable)"
+    inputs:
+      qualified: { ref: "input.1099div.qualified" }
+      net_gain: { ref: "fed.2025.income.net_capital_gain" }
+      taxable: { ref: "fed.2025.taxable_income" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.income.ordinary"
+    description: "Taxable income taxed at ordinary rates (taxable income minus preferential income)"
+    form_line: "QDCGT Worksheet Line 7"
+    type: "formula"
+    expression: "taxable - preferential"
+    inputs:
+      taxable: { ref: "fed.2025.taxable_income" }
+      preferential: { ref: "fed.2025.income.preferential" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.ltcg.threshold_0"
+    description: "Top of the 0% long-term capital gains bracket by filing status"
+    form_line: "QDCGT Worksheet Line 9"
+    type: "lookup"
+    table: "constants.ltcg_threshold_0"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2025.ltcg.threshold_15"
+    description: "Top of the 15% long-term capital gains bracket by filing status"
+    form_line: "QDCGT Worksheet Line 15"
+    type: "lookup"
+    table: "constants.ltcg_threshold_15"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2025.tax.ordinary"
+    description: "Ordinary-rate tax on non-preferential income using 2025 bracket tables"
+    form_line: "QDCGT Worksheet Line 22"
+    type: "bracket_table"
+    input: { ref: "fed.2025.income.ordinary" }
+    key: { ref: "input.filing_status" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+    tables:
+      single:
+        - { lower: "0", upper: "11925", rate: "0.10" }
+        - { lower: "11925", upper: "48475", rate: "0.12" }
+        - { lower: "48475", upper: "103350", rate: "0.22" }
+        - { lower: "103350", upper: "197300", rate: "0.24" }
+        - { lower: "197300", upper: "250525", rate: "0.32" }
+        - { lower: "250525", upper: "626350", rate: "0.35" }
+        - { lower: "626350", upper: null, rate: "0.37" }
+      mfj:
+        - { lower: "0", upper: "23850", rate: "0.10" }
+        - { lower: "23850", upper: "96950", rate: "0.12" }
+        - { lower: "96950", upper: "206700", rate: "0.22" }
+        - { lower: "206700", upper: "394600", rate: "0.24" }
+        - { lower: "394600", upper: "501050", rate: "0.32" }
+        - { lower: "501050", upper: "751600", rate: "0.35" }
+        - { lower: "751600", upper: null, rate: "0.37" }
+      mfs:
+        - { lower: "0", upper: "11925", rate: "0.10" }
+        - { lower: "11925", upper: "48475", rate: "0.12" }
+        - { lower: "48475", upper: "103350", rate: "0.22" }
+        - { lower: "103350", upper: "197300", rate: "0.24" }
+        - { lower: "197300", upper: "250525", rate: "0.32" }
+        - { lower: "250525", upper: "375800", rate: "0.35" }
+        - { lower: "375800", upper: null, rate: "0.37" }
+      hoh:
+        - { lower: "0", upper: "17000", rate: "0.10" }
+        - { lower: "17000", upper: "64850", rate: "0.12" }
+        - { lower: "64850", upper: "103350", rate: "0.22" }
+        - { lower: "103350", upper: "197300", rate: "0.24" }
+        - { lower: "197300", upper: "250500", rate: "0.32" }
+        - { lower: "250500", upper: "626350", rate: "0.35" }
+        - { lower: "626350", upper: null, rate: "0.37" }
+      qss:
+        - { lower: "0", upper: "23850", rate: "0.10" }
+        - { lower: "23850", upper: "96950", rate: "0.12" }
+        - { lower: "96950", upper: "206700", rate: "0.22" }
+        - { lower: "206700", upper: "394600", rate: "0.24" }
+        - { lower: "394600", upper: "501050", rate: "0.32" }
+        - { lower: "501050", upper: "751600", rate: "0.35" }
+        - { lower: "751600", upper: null, rate: "0.37" }
+
+  # =========================================================================
+  # CREDITS
+  # =========================================================================
+
+  - id: "fed.2025.tax.ltcg"
+    description: "Tax on preferential income at 0%/15%/20% rates, stacked on top of ordinary income"
+    form_line: "QDCGT Worksheet Lines 18-21"
+    type: "formula"
+    expression: "(min(pref, max(t15 - ordinary, 0)) - min(pref, max(t0 - ordinary, 0))) * r15 + (pref - min(pref, max(t15 - ordinary, 0))) * r20"
+    inputs:
+      pref: { ref: "fed.2025.income.preferential" }
+      ordinary: { ref: "fed.2025.income.ordinary" }
+      t0: { ref: "fed.2025.ltcg.threshold_0" }
+      t15: { ref: "fed.2025.ltcg.threshold_15" }
+      r15: { literal: "0.15" }
+      r20: { literal: "0.20" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.tax.total_before_credits"
+    description: "Tax before credits: smaller of stacked ordinary+LTCG tax or all-ordinary bracket tax (QDCGT Worksheet Line 25)"
+    form_line: "1040 Line 16"
+    type: "formula"
+    expression: "min(ordinary_tax + ltcg_tax, all_ordinary_tax)"
+    inputs:
+      ordinary_tax: { ref: "fed.2025.tax.ordinary" }
+      ltcg_tax: { ref: "fed.2025.tax.ltcg" }
+      all_ordinary_tax: { ref: "fed.2025.tax.brackets" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
   - id: "fed.2025.credits.ctc.base"
     description: "Child tax credit base amount ($2,200 per qualifying child, OBBBA)"
-    form_line: "1040 Line 19"
+    form_line: "Form 8812 Line 5"
     type: "formula"
     expression: "children * credit"
     inputs:
@@ -684,15 +1049,117 @@ rules:
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
+  - id: "fed.2025.credits.odc.base"
+    description: "Credit for other dependents: $500 per dependent who is not a CTC qualifying child (IRC 24(h)(4); never refundable)"
+    form_line: "Form 8812 Line 7"
+    type: "formula"
+    expression: "dependents * credit"
+    inputs:
+      dependents: { ref: "input.other_dependents" }
+      credit: { literal: "500" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.ctc.combined"
+    description: "CTC plus ODC after the shared AGI phaseout (Form 8812 Line 12)"
+    form_line: "Form 8812 Line 12"
+    type: "formula"
+    expression: "max(ctc + odc - phaseout, 0)"
+    inputs:
+      ctc: { ref: "fed.2025.credits.ctc.base" }
+      odc: { ref: "fed.2025.credits.odc.base" }
+      phaseout: { ref: "fed.2025.credits.ctc.phaseout" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.other_nonrefundable"
+    description: "Nonrefundable credits other than CTC/ODC, applied first per the Form 8812 Credit Limit Worksheet"
+    form_line: "Form 8812 Credit Limit Worksheet"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "fed.2025.credits.edu.aotc_nonrefundable" }
+        - { ref: "fed.2025.credits.edu.llc" }
+        - { ref: "fed.2025.credits.care.final" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.ctc.tax_limit"
+    description: "Tax available for the CTC/ODC after other nonrefundable credits (Form 8812 Line 13)"
+    form_line: "Form 8812 Line 13"
+    type: "formula"
+    expression: "max(tax - other_credits, 0)"
+    inputs:
+      tax: { ref: "fed.2025.tax.total_before_credits" }
+      other_credits: { ref: "fed.2025.credits.other_nonrefundable" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
   - id: "fed.2025.credits.ctc.final"
-    description: "Child tax credit after phaseout"
+    description: "Nonrefundable CTC plus ODC allowed against tax (Form 8812 Line 14)"
     form_line: "1040 Line 19"
     type: "formula"
-    expression: "max(base - phaseout, zero)"
+    expression: "min(combined, tax_limit)"
     inputs:
-      base: { ref: "fed.2025.credits.ctc.base" }
-      phaseout: { ref: "fed.2025.credits.ctc.phaseout" }
-      zero: { literal: "0" }
+      combined: { ref: "fed.2025.credits.ctc.combined" }
+      tax_limit: { ref: "fed.2025.credits.ctc.tax_limit" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.actc.unused"
+    description: "CTC/ODC not usable against tax (Form 8812 Line 16a)"
+    form_line: "Form 8812 Line 16a"
+    type: "formula"
+    expression: "combined - allowed"
+    inputs:
+      combined: { ref: "fed.2025.credits.ctc.combined" }
+      allowed: { ref: "fed.2025.credits.ctc.final" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.actc.cap"
+    description: "Refundable ACTC ceiling for 2025: $1700 per qualifying child (Form 8812 Line 16b; Rev. Proc. amount)"
+    form_line: "Form 8812 Line 16b"
+    type: "formula"
+    expression: "children * cap"
+    inputs:
+      children: { ref: "input.qualifying_children" }
+      cap: { literal: "1700" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.actc.earned_income"
+    description: "Form 8812 earned income: the EIC-worksheet figure plus nontaxable combat pay (always included here, unlike the elective EIC treatment)"
+    form_line: "Form 8812 Line 18a"
+    type: "formula"
+    expression: "earned + combat_pay"
+    inputs:
+      earned: { ref: "fed.2025.credits.eic.earned_income" }
+      combat_pay: { ref: "input.military.combat_pay" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.credits.actc.phase_in"
+    description: "15% of earned income above $2,500 (Form 8812 Line 19; the 3-or-more-children Social Security tax alternative is unmodeled - no payroll-tax inputs)"
+    form_line: "Form 8812 Line 19"
+    type: "formula"
+    expression: "max((earned - floor) * rate, 0)"
+    inputs:
+      earned: { ref: "fed.2025.credits.actc.earned_income" }
+      floor: { literal: "2500" }
+      rate: { literal: "0.15" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.actc.final"
+    description: "Additional child tax credit: the unused CTC/ODC, limited to the per-child ceiling and the 15% earned-income phase-in (refundable; reported with payments)"
+    form_line: "1040 Line 28"
+    type: "formula"
+    expression: "min(min(unused, cap), phase_in)"
+    inputs:
+      unused: { ref: "fed.2025.credits.actc.unused" }
+      cap: { ref: "fed.2025.credits.actc.cap" }
+      phase_in: { ref: "fed.2025.credits.actc.phase_in" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
@@ -703,6 +1170,9 @@ rules:
     inputs:
       items:
         - { ref: "fed.2025.credits.ctc.final" }
+        - { ref: "fed.2025.credits.edu.aotc_nonrefundable" }
+        - { ref: "fed.2025.credits.edu.llc" }
+        - { ref: "fed.2025.credits.care.final" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0
 
@@ -710,13 +1180,594 @@ rules:
   # TAX AFTER CREDITS
   # =========================================================================
 
+  - id: "fed.2025.credits.eic.num_children"
+    description: "Qualifying children for EIC, capped at 3 (parameters do not grow past three)"
+    form_line: "Schedule EIC"
+    type: "formula"
+    expression: "min(kids, cap)"
+    inputs:
+      kids: { ref: "input.qualifying_children" }
+      cap: { literal: "3" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.eic.earned_income"
+    description: "Earned income for EIC: wages plus SE net profit minus the half-SE-tax deduction (Pub 596 Worksheet B)"
+    form_line: "EIC Worksheet Line 1"
+    type: "formula"
+    expression: "max(wages + nec - se_ded, 0)"
+    inputs:
+      wages: { ref: "fed.2025.gross_income.wages" }
+      nec: { ref: "fed.2025.gross_income.self_employment" }
+      se_ded: { ref: "fed.2025.se.deduction" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.credits.eic.max_credit"
+    description: "EIC maximum credit by filing status and qualifying children (MFS ineligible)"
+    form_line: "EIC Parameters"
+    type: "matrix_lookup"
+    keys:
+      - "input.filing_status"
+      - { ref: "fed.2025.credits.eic.num_children" }
+    table:
+      single:
+        "0": "649"
+        "1": "4328"
+        "2": "7152"
+        "3": "8046"
+      mfj:
+        "0": "649"
+        "1": "4328"
+        "2": "7152"
+        "3": "8046"
+      mfs:
+        "0": "0"
+        "1": "0"
+        "2": "0"
+        "3": "0"
+      hoh:
+        "0": "649"
+        "1": "4328"
+        "2": "7152"
+        "3": "8046"
+      qss:
+        "0": "649"
+        "1": "4328"
+        "2": "7152"
+        "3": "8046"
+
+  - id: "fed.2025.credits.eic.phase_in_rate"
+    description: "EIC phase-in (credit) percentage by qualifying children"
+    form_line: "EIC Parameters"
+    type: "matrix_lookup"
+    keys:
+      - "input.filing_status"
+      - { ref: "fed.2025.credits.eic.num_children" }
+    table:
+      single:
+        "0": "0.0765"
+        "1": "0.34"
+        "2": "0.40"
+        "3": "0.45"
+      mfj:
+        "0": "0.0765"
+        "1": "0.34"
+        "2": "0.40"
+        "3": "0.45"
+      mfs:
+        "0": "0.0765"
+        "1": "0.34"
+        "2": "0.40"
+        "3": "0.45"
+      hoh:
+        "0": "0.0765"
+        "1": "0.34"
+        "2": "0.40"
+        "3": "0.45"
+      qss:
+        "0": "0.0765"
+        "1": "0.34"
+        "2": "0.40"
+        "3": "0.45"
+
+  - id: "fed.2025.credits.eic.phase_out_start"
+    description: "AGI/earned income where the EIC phaseout begins (higher for MFJ)"
+    form_line: "EIC Parameters"
+    type: "matrix_lookup"
+    keys:
+      - "input.filing_status"
+      - { ref: "fed.2025.credits.eic.num_children" }
+    table:
+      single:
+        "0": "10620"
+        "1": "23350"
+        "2": "23350"
+        "3": "23350"
+      mfj:
+        "0": "17730"
+        "1": "30470"
+        "2": "30470"
+        "3": "30470"
+      mfs:
+        "0": "10620"
+        "1": "23350"
+        "2": "23350"
+        "3": "23350"
+      hoh:
+        "0": "10620"
+        "1": "23350"
+        "2": "23350"
+        "3": "23350"
+      qss:
+        "0": "10620"
+        "1": "23350"
+        "2": "23350"
+        "3": "23350"
+
+  - id: "fed.2025.credits.eic.phase_out_rate"
+    description: "EIC phaseout percentage by qualifying children"
+    form_line: "EIC Parameters"
+    type: "matrix_lookup"
+    keys:
+      - "input.filing_status"
+      - { ref: "fed.2025.credits.eic.num_children" }
+    table:
+      single:
+        "0": "0.0765"
+        "1": "0.1598"
+        "2": "0.2106"
+        "3": "0.2106"
+      mfj:
+        "0": "0.0765"
+        "1": "0.1598"
+        "2": "0.2106"
+        "3": "0.2106"
+      mfs:
+        "0": "0.0765"
+        "1": "0.1598"
+        "2": "0.2106"
+        "3": "0.2106"
+      hoh:
+        "0": "0.0765"
+        "1": "0.1598"
+        "2": "0.2106"
+        "3": "0.2106"
+      qss:
+        "0": "0.0765"
+        "1": "0.1598"
+        "2": "0.2106"
+        "3": "0.2106"
+
+  - id: "fed.2025.credits.eic.phase_in_amount"
+    description: "EIC phase-in amount (earned income times credit rate, capped at the maximum credit)"
+    form_line: "EIC Worksheet"
+    type: "formula"
+    expression: "min(earned * rate, max_credit)"
+    inputs:
+      earned: { ref: "fed.2025.credits.eic.earned_income" }
+      rate: { ref: "fed.2025.credits.eic.phase_in_rate" }
+      max_credit: { ref: "fed.2025.credits.eic.max_credit" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.credits.eic.phase_out_amount"
+    description: "EIC phaseout: reduction based on the greater of AGI or earned income above the threshold"
+    form_line: "EIC Worksheet"
+    type: "formula"
+    expression: "max((max(agi, earned) - start) * rate, 0)"
+    inputs:
+      agi: { ref: "fed.2025.agi.total" }
+      earned: { ref: "fed.2025.credits.eic.earned_income" }
+      start: { ref: "fed.2025.credits.eic.phase_out_start" }
+      rate: { ref: "fed.2025.credits.eic.phase_out_rate" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.credits.eic.tentative"
+    description: "Tentative EIC before the investment income test"
+    form_line: "EIC Worksheet"
+    type: "formula"
+    expression: "max(phase_in - phase_out, 0)"
+    inputs:
+      phase_in: { ref: "fed.2025.credits.eic.phase_in_amount" }
+      phase_out: { ref: "fed.2025.credits.eic.phase_out_amount" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.eic.earned_income_elected"
+    description: "EIC earned income under the combat pay election: nontaxable combat pay (W-2 Box 12 Q) added to earned income, all-or-nothing per IRC 32(c)(2)(B)(vi)"
+    form_line: "EIC Worksheet (combat pay election)"
+    type: "formula"
+    expression: "earned + combat_pay"
+    inputs:
+      earned: { ref: "fed.2025.credits.eic.earned_income" }
+      combat_pay: { ref: "input.military.combat_pay" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.credits.eic.phase_in_elected"
+    description: "EIC phase-in amount under the combat pay election"
+    form_line: "EIC Worksheet (combat pay election)"
+    type: "formula"
+    expression: "min(earned * rate, max_credit)"
+    inputs:
+      earned: { ref: "fed.2025.credits.eic.earned_income_elected" }
+      rate: { ref: "fed.2025.credits.eic.phase_in_rate" }
+      max_credit: { ref: "fed.2025.credits.eic.max_credit" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.credits.eic.phase_out_elected"
+    description: "EIC phaseout under the combat pay election (elected earned income also enters the greater-of comparison with AGI)"
+    form_line: "EIC Worksheet (combat pay election)"
+    type: "formula"
+    expression: "max((max(agi, earned) - start) * rate, 0)"
+    inputs:
+      agi: { ref: "fed.2025.agi.total" }
+      earned: { ref: "fed.2025.credits.eic.earned_income_elected" }
+      start: { ref: "fed.2025.credits.eic.phase_out_start" }
+      rate: { ref: "fed.2025.credits.eic.phase_out_rate" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.credits.eic.tentative_elected"
+    description: "Tentative EIC under the combat pay election, before the investment income test"
+    form_line: "EIC Worksheet (combat pay election)"
+    type: "formula"
+    expression: "max(phase_in - phase_out, 0)"
+    inputs:
+      phase_in: { ref: "fed.2025.credits.eic.phase_in_elected" }
+      phase_out: { ref: "fed.2025.credits.eic.phase_out_elected" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.eic.investment_income"
+    description: "Investment income for the EIC limit: taxable + tax-exempt interest, dividends, and net capital gain (not below zero)"
+    form_line: "Pub 596 Worksheet 1"
+    type: "formula"
+    expression: "interest + tax_exempt + dividends + max(gains, 0)"
+    inputs:
+      interest: { ref: "fed.2025.gross_income.interest" }
+      tax_exempt: { ref: "input.1099int.tax_exempt" }
+      dividends: { ref: "fed.2025.gross_income.dividends" }
+      gains: { ref: "fed.2025.gross_income.capital_gains" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.credits.eic.eligible"
+    description: "Investment income test (2025 limit $11950): 1 when at or under the limit, else 0"
+    form_line: "Pub 596 Rule 6"
+    type: "formula"
+    expression: "one - min(max((inv - limit) * mult, 0), one)"
+    inputs:
+      inv: { ref: "fed.2025.credits.eic.investment_income" }
+      limit: { literal: "11950.005" }
+      mult: { literal: "1000" }
+      one: { literal: "1" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.credits.eic.final"
+    description: "Earned income credit (refundable; reported with payments). Takes the better of the base credit or the combat pay election (IRC 32(c)(2)(B)(vi)); the trace records both tentative amounts"
+    form_line: "1040 Line 27"
+    type: "formula"
+    expression: "max(tentative, tentative_elected) * eligible"
+    inputs:
+      tentative: { ref: "fed.2025.credits.eic.tentative" }
+      tentative_elected: { ref: "fed.2025.credits.eic.tentative_elected" }
+      eligible: { ref: "fed.2025.credits.eic.eligible" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.edu.phaseout_lower"
+    description: "Education credit MAGI phaseout floor (IRC 25A(d): fixed since 2021)"
+    form_line: "Form 8863"
+    type: "lookup"
+    table: "constants.education_phaseout.lower"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2025.credits.edu.phaseout_upper"
+    description: "Education credit MAGI phaseout ceiling"
+    form_line: "Form 8863"
+    type: "lookup"
+    table: "constants.education_phaseout.upper"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2025.credits.edu.eligible"
+    description: "Education credit eligibility: MFS filers are barred (IRC 25A(g)(6))"
+    form_line: "Form 8863"
+    type: "lookup"
+    table: "constants.education_eligible"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2025.credits.edu.ratio"
+    description: "MAGI phaseout ratio (Form 8863 lines 2-6; AGI used as MAGI — foreign exclusions unmodeled)"
+    form_line: "Form 8863 Line 6"
+    type: "formula"
+    expression: "min(max((upper - agi) / (upper - lower), 0), one) * eligible"
+    inputs:
+      upper: { ref: "fed.2025.credits.edu.phaseout_upper" }
+      lower: { ref: "fed.2025.credits.edu.phaseout_lower" }
+      agi: { ref: "fed.2025.agi.total" }
+      one: { literal: "1" }
+      eligible: { ref: "fed.2025.credits.edu.eligible" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 3
+
+  - id: "fed.2025.credits.edu.aotc_tentative"
+    description: "Tentative American Opportunity Credit: 100% of first $2,000 + 25% of next $2,000 per student"
+    form_line: "Form 8863 Line 1"
+    type: "formula"
+    expression: "tier1 + quarter * (tier2 - tier1)"
+    inputs:
+      tier1: { ref: "input.education.aotc_tier1" }
+      tier2: { ref: "input.education.aotc_tier2" }
+      quarter: { literal: "0.25" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.credits.edu.aotc"
+    description: "American Opportunity Credit after MAGI phaseout"
+    form_line: "Form 8863 Line 7"
+    type: "formula"
+    expression: "tentative * ratio"
+    inputs:
+      tentative: { ref: "fed.2025.credits.edu.aotc_tentative" }
+      ratio: { ref: "fed.2025.credits.edu.ratio" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.edu.aotc_refundable"
+    description: "Refundable 40% of the AOTC (paid out even with zero tax)"
+    form_line: "1040 Line 29"
+    type: "formula"
+    expression: "aotc * rate"
+    inputs:
+      aotc: { ref: "fed.2025.credits.edu.aotc" }
+      rate: { literal: "0.40" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.edu.aotc_nonrefundable"
+    description: "Nonrefundable 60% of the AOTC (joins the credit total)"
+    form_line: "Form 8863 Line 9"
+    type: "formula"
+    expression: "aotc - refundable"
+    inputs:
+      aotc: { ref: "fed.2025.credits.edu.aotc" }
+      refundable: { ref: "fed.2025.credits.edu.aotc_refundable" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.edu.llc_tentative"
+    description: "Tentative Lifetime Learning Credit: 20% of up to $10,000 expenses per return"
+    form_line: "Form 8863 Line 11"
+    type: "formula"
+    expression: "min(expenses, cap) * rate"
+    inputs:
+      expenses: { ref: "input.education.llc_expenses" }
+      cap: { literal: "10000" }
+      rate: { literal: "0.20" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.credits.edu.llc"
+    description: "Lifetime Learning Credit after MAGI phaseout (nonrefundable)"
+    form_line: "Form 8863 Line 19"
+    type: "formula"
+    expression: "tentative * ratio"
+    inputs:
+      tentative: { ref: "fed.2025.credits.edu.llc_tentative" }
+      ratio: { ref: "fed.2025.credits.edu.ratio" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.care.spouse_required"
+    description: "1 for MFJ (both spouses' earned income limits Form 2441), else 0"
+    form_line: "Form 2441"
+    type: "lookup"
+    table: "constants.care_spouse_required"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2025.credits.care.persons_capped"
+    description: "Qualifying persons for dependent care, capped at 2 (expense limit does not grow past two)"
+    form_line: "Form 2441 Line 2"
+    type: "formula"
+    expression: "min(persons, cap)"
+    inputs:
+      persons: { ref: "input.care.qualifying_persons" }
+      cap: { literal: "2" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.care.dollar_cap"
+    description: "Care expense dollar limit: $3,000 for one qualifying person, $6,000 for two or more"
+    form_line: "Form 2441 Line 3"
+    type: "formula"
+    expression: "persons * per_person"
+    inputs:
+      persons: { ref: "fed.2025.credits.care.persons_capped" }
+      per_person: { literal: "3000" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.care.earned_cap"
+    description: "Earned income limit: taxpayer's earned income; for MFJ the smaller of the two spouses' (a no-income spouse zeroes the credit)"
+    form_line: "Form 2441 Lines 4-5"
+    type: "formula"
+    expression: "primary * (one - mfj) + min(primary, spouse) * mfj"
+    inputs:
+      primary: { ref: "input.earned_income.primary" }
+      spouse: { ref: "input.earned_income.spouse" }
+      mfj: { ref: "fed.2025.credits.care.spouse_required" }
+      one: { literal: "1" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.credits.care.eligible_expenses"
+    description: "Care expenses limited by the dollar cap and the earned income cap"
+    form_line: "Form 2441 Line 6"
+    type: "formula"
+    expression: "max(min(expenses, dollar_cap, earned_cap), 0)"
+    inputs:
+      expenses: { ref: "input.care.expenses" }
+      dollar_cap: { ref: "fed.2025.credits.care.dollar_cap" }
+      earned_cap: { ref: "fed.2025.credits.care.earned_cap" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.credits.care.agi_steps"
+    description: "AGI steps of $2,000 (or fraction) above $15,000, rounded up (Form 2441 rate table)"
+    form_line: "Form 2441 Line 8"
+    type: "formula"
+    expression: "max((agi - base) / step, 0)"
+    inputs:
+      agi: { ref: "fed.2025.agi.total" }
+      base: { literal: "15000" }
+      step: { literal: "2000" }
+    rounding: "ROUND_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.credits.care.rate"
+    description: "Applicable percentage: 35% minus 1% per step, floored at 20% (AGI over $43,000)"
+    form_line: "Form 2441 Line 8"
+    type: "formula"
+    expression: "max(top - steps * point, floor)"
+    inputs:
+      top: { literal: "0.35" }
+      steps: { ref: "fed.2025.credits.care.agi_steps" }
+      point: { literal: "0.01" }
+      floor: { literal: "0.20" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.credits.care.final"
+    description: "Credit for child and dependent care expenses (nonrefundable)"
+    form_line: "Form 2441 Line 9"
+    type: "formula"
+    expression: "expenses * rate"
+    inputs:
+      expenses: { ref: "fed.2025.credits.care.eligible_expenses" }
+      rate: { ref: "fed.2025.credits.care.rate" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.niit.threshold"
+    description: "NIIT MAGI threshold (IRC 1411(b): statutory, not inflation-indexed)"
+    form_line: "Form 8960 Line 14"
+    type: "lookup"
+    table: "constants.niit_threshold"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2025.niit.investment_income"
+    description: "Net investment income: taxable interest + dividends + net capital gain as included in income, not below zero (tax-exempt interest excluded)"
+    form_line: "Form 8960 Line 8"
+    type: "formula"
+    expression: "max(interest + dividends + gains, 0)"
+    inputs:
+      interest: { ref: "fed.2025.gross_income.interest" }
+      dividends: { ref: "fed.2025.gross_income.dividends" }
+      gains: { ref: "fed.2025.gross_income.capital_gains_limited" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.niit.magi_excess"
+    description: "MAGI above the NIIT threshold (AGI used as MAGI — foreign exclusions unmodeled)"
+    form_line: "Form 8960 Line 15"
+    type: "formula"
+    expression: "max(agi - threshold, 0)"
+    inputs:
+      agi: { ref: "fed.2025.agi.total" }
+      threshold: { ref: "fed.2025.niit.threshold" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.niit.final"
+    description: "Net investment income tax: 3.8% of the smaller of net investment income or the MAGI excess"
+    form_line: "Form 8960 Line 17"
+    type: "formula"
+    expression: "min(nii, excess) * rate"
+    inputs:
+      nii: { ref: "fed.2025.niit.investment_income" }
+      excess: { ref: "fed.2025.niit.magi_excess" }
+      rate: { literal: "0.038" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  # Additional Medicare Tax (M27, Form 8959; M29 wired W-2 Box 5/6 in,
+  # including Part IV surtax withholding). RRTA compensation unmodeled.
+  - id: "fed.2025.addl_medicare.threshold"
+    description: "Additional Medicare Tax threshold (IRC 3101(b)(2): $200k single/HoH, $250k MFJ/QSS, $125k MFS; statutory, not indexed)"
+    form_line: "Form 8959"
+    type: "lookup"
+    table: "constants.additional_medicare_threshold"
+    key: { ref: "input.filing_status" }
+
+  - id: "fed.2025.addl_medicare.wage_excess"
+    description: "Medicare wages above the threshold (Form 8959 Line 6; W-2 Box 5, falling back to Box 1 per W-2 when Box 5 is blank)"
+    form_line: "Form 8959 Line 6"
+    type: "formula"
+    expression: "max(wages - threshold, 0)"
+    inputs:
+      wages: { ref: "input.w2.medicare_wages" }
+      threshold: { ref: "fed.2025.addl_medicare.threshold" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.addl_medicare.se_threshold"
+    description: "Threshold remaining for SE income: the filing-status threshold reduced (not below zero) by Medicare wages (Form 8959 Line 12)"
+    form_line: "Form 8959 Line 12"
+    type: "formula"
+    expression: "max(threshold - wages, 0)"
+    inputs:
+      threshold: { ref: "fed.2025.addl_medicare.threshold" }
+      wages: { ref: "input.w2.medicare_wages" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.addl_medicare.se_excess"
+    description: "SE net earnings (Schedule SE Line 6, zero below the $400 floor) above the remaining threshold (Form 8959 Line 13 base)"
+    form_line: "Form 8959 Line 13"
+    type: "formula"
+    expression: "max(se_earnings - se_threshold, 0)"
+    inputs:
+      se_earnings: { ref: "fed.2025.se.net_earnings" }
+      se_threshold: { ref: "fed.2025.addl_medicare.se_threshold" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.addl_medicare.final"
+    description: "Additional Medicare Tax: 0.9% of wage and SE income above the thresholds (RRTA compensation unmodeled)"
+    form_line: "Form 8959 Line 18"
+    type: "formula"
+    expression: "(wage_excess + se_excess) * rate"
+    inputs:
+      wage_excess: { ref: "fed.2025.addl_medicare.wage_excess" }
+      se_excess: { ref: "fed.2025.addl_medicare.se_excess" }
+      rate: { literal: "0.009" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.tax.other_taxes"
+    description: "Other taxes from Schedule 2: self-employment tax + net investment income tax + Additional Medicare Tax"
+    form_line: "1040 Line 23"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "fed.2025.se.total" }
+        - { ref: "fed.2025.niit.final" }
+        - { ref: "fed.2025.addl_medicare.final" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
   - id: "fed.2025.tax.after_credits"
     description: "Federal tax after credits (cannot go below zero)"
     form_line: "1040 Line 22"
     type: "formula"
     expression: "max(tax - credits, zero)"
     inputs:
-      tax: { ref: "fed.2025.tax.brackets" }
+      tax: { ref: "fed.2025.tax.total_before_credits" }
       credits: { ref: "fed.2025.credits.total" }
       zero: { literal: "0" }
     rounding: "ROUND_HALF_UP"
@@ -726,12 +1777,150 @@ rules:
   # PAYMENTS
   # =========================================================================
 
+  - id: "fed.2025.se.has_nec"
+    description: "1 when any 1099-NEC self-employment income exists, else 0 (gates the SE deduction override)"
+    form_line: "Schedule SE"
+    type: "formula"
+    expression: "min(max(nec * mult, 0), one)"
+    inputs:
+      nec: { ref: "input.1099nec.compensation" }
+      mult: { literal: "1000" }
+      one: { literal: "1" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.se.net_earnings_raw"
+    description: "Net earnings from self-employment (92.35% of 1099-NEC income)"
+    form_line: "Schedule SE Line 4a"
+    type: "formula"
+    expression: "nec * factor"
+    inputs:
+      nec: { ref: "input.1099nec.compensation" }
+      factor: { literal: "0.9235" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.se.applies"
+    description: "SE tax $400 net-earnings floor (IRC 1402(b)(2)): 1 when net earnings reach $400, else 0. The 399.995 cutoff with a x1000 step puts the switch between representable cent values."
+    form_line: "Schedule SE Line 4c"
+    type: "formula"
+    expression: "min(max((net - cutoff) * mult, 0), one)"
+    inputs:
+      net: { ref: "fed.2025.se.net_earnings_raw" }
+      cutoff: { literal: "399.995" }
+      mult: { literal: "1000" }
+      one: { literal: "1" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.se.net_earnings"
+    description: "Net SE earnings subject to SE tax (zero below the $400 floor)"
+    form_line: "Schedule SE Line 6"
+    type: "formula"
+    expression: "raw * gate"
+    inputs:
+      raw: { ref: "fed.2025.se.net_earnings_raw" }
+      gate: { ref: "fed.2025.se.applies" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.se.ss_taxable"
+    description: "SE earnings subject to Social Security (2025 wage base $176100 reduced by W-2 wages)"
+    form_line: "Schedule SE Lines 8-9"
+    type: "formula"
+    expression: "max(min(net, base - wages), 0)"
+    inputs:
+      net: { ref: "fed.2025.se.net_earnings" }
+      base: { literal: "176100" }
+      wages: { ref: "input.w2.wages" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.se.ss_tax"
+    description: "Social Security portion of SE tax (12.4%)"
+    form_line: "Schedule SE Line 10"
+    type: "formula"
+    expression: "ss_taxable * rate"
+    inputs:
+      ss_taxable: { ref: "fed.2025.se.ss_taxable" }
+      rate: { literal: "0.124" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.se.medicare_tax"
+    description: "Medicare portion of SE tax (2.9%, no wage cap)"
+    form_line: "Schedule SE Line 11"
+    type: "formula"
+    expression: "net * rate"
+    inputs:
+      net: { ref: "fed.2025.se.net_earnings" }
+      rate: { literal: "0.029" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.se.total"
+    description: "Total self-employment tax (Schedule SE Line 12, reported via Schedule 2 Line 4)"
+    form_line: "Schedule 2 Line 4"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "fed.2025.se.ss_tax" }
+        - { ref: "fed.2025.se.medicare_tax" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.se.deduction"
+    description: "Deduction for one-half of SE tax (employer-equivalent portion)"
+    form_line: "Schedule SE Line 13"
+    type: "formula"
+    expression: "total * half"
+    inputs:
+      total: { ref: "fed.2025.se.total" }
+      half: { literal: "0.5" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.tax.total_liability"
+    description: "Total tax: income tax after credits plus self-employment tax"
+    form_line: "1040 Line 24"
+    type: "sum"
+    inputs:
+      items:
+        - { ref: "fed.2025.tax.after_credits" }
+        - { ref: "fed.2025.tax.other_taxes" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "fed.2025.addl_medicare.regular_withholding"
+    description: "Regular Medicare tax on Medicare wages: 1.45% of W-2 Box 5 (Form 8959 Line 20)"
+    form_line: "Form 8959 Line 20"
+    type: "formula"
+    expression: "wages * rate"
+    inputs:
+      wages: { ref: "input.w2.medicare_wages" }
+      rate: { literal: "0.0145" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "fed.2025.addl_medicare.withholding"
+    description: "Additional Medicare Tax withheld by employers: Box 6 in excess of 1.45% of Box 5 (Form 8959 Line 22; credited on 1040 line 25c)"
+    form_line: "Form 8959 Line 22"
+    type: "formula"
+    expression: "max(withheld - regular, 0)"
+    inputs:
+      withheld: { ref: "input.w2.medicare_withheld" }
+      regular: { ref: "fed.2025.addl_medicare.regular_withholding" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
   - id: "fed.2025.total_withholding"
-    description: "Total federal withholding"
+    description: "Total federal withholding (Box 2 income tax plus Form 8959 Part IV Additional Medicare Tax withholding)"
     form_line: "1040 Line 25d"
     type: "sum"
     inputs:
-      items: { ref: "input.withholding.federal" }
+      items:
+        - { ref: "input.withholding.federal" }
+        - { ref: "fed.2025.addl_medicare.withholding" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
@@ -745,13 +1934,16 @@ rules:
     rounding_precision: 2
 
   - id: "fed.2025.total_payments"
-    description: "Total payments (withholding + estimated)"
+    description: "Total payments (withholding + estimated + refundable EIC)"
     form_line: "1040 Line 33"
     type: "sum"
     inputs:
       items:
         - { ref: "fed.2025.total_withholding" }
         - { ref: "fed.2025.estimated_payments" }
+        - { ref: "fed.2025.credits.eic.final" }
+        - { ref: "fed.2025.credits.actc.final" }
+        - { ref: "fed.2025.credits.edu.aotc_refundable" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 2
 
@@ -766,6 +1958,6 @@ rules:
     expression: "payments - tax"
     inputs:
       payments: { ref: "fed.2025.total_payments" }
-      tax: { ref: "fed.2025.tax.after_credits" }
+      tax: { ref: "fed.2025.tax.total_liability" }
     rounding: "ROUND_HALF_UP"
     rounding_precision: 0

@@ -1,0 +1,114 @@
+{# SPDX-License-Identifier: AGPL-3.0-or-later #}
+{% extends "layouts/base.html" %}
+{% block title %}AI Authoring Assistant{% endblock %}
+{% block content %}
+
+<section class="page-header">
+    <div>
+        <div class="eyebrow">Rule Packs</div>
+        <h1 class="page-title">Have an AI draft your rule pack — without your data leaving this machine.</h1>
+        <p class="page-subtitle">
+            Describe the tax rules you want in plain language. This page generates a complete prompt containing the
+            rule-pack format, the validation rules, and the reference catalog. Paste it into any AI assistant you
+            already use, then paste the YAML it returns into the import page — every import is validated before it
+            is saved. Nothing on this page contacts any AI service.
+        </p>
+    </div>
+    <div class="action-row">
+        <a href="/rule-packs" class="btn btn-outline">Back to Manager</a>
+        <a href="/rule-packs/import" class="btn">Import YAML</a>
+    </div>
+</section>
+
+{% if error %}
+<div class="notice notice-error">
+    <h2 class="heading-danger">Prompt Error</h2>
+    <p class="text-dim text-sm">{{ error }}</p>
+</div>
+{% endif %}
+
+<section class="panel-grid-2">
+    <div class="card">
+        <h2>1. Describe What You Want</h2>
+        <form method="POST" action="/rule-packs/ai-assist" class="stack-md">
+            <input type="hidden" name="csrf_token" value="{{ csrf }}">
+            <div class="form-row">
+                <div>
+                    <label for="jurisdiction">Jurisdiction</label>
+                    <input type="text" id="jurisdiction" name="jurisdiction" value="{{ jurisdiction }}"
+                           list="jurisdiction-options" required placeholder="federal or a state code, e.g. GA">
+                    <datalist id="jurisdiction-options">
+                        {% for code in known_jurisdictions %}
+                        <option value="{{ code }}"></option>
+                        {% endfor %}
+                    </datalist>
+                    <p class="field-hint">Any two-letter state code works — even one without a shipped pack yet.</p>
+                </div>
+                <div>
+                    <label for="year">Tax Year</label>
+                    <input type="number" id="year" name="year" value="{{ year }}" min="2000" max="2099" required>
+                </div>
+            </div>
+            <div>
+                <label for="description">What should the pack (or rule change) do?</label>
+                <textarea id="description" name="description" rows="6" maxlength="10000" required
+                          placeholder="e.g. A Georgia 2025 pack: flat 5.29% income tax on federal AGI minus a standard deduction of $12,000 single / $24,000 married filing jointly, with a $3,000 dependent exemption per dependent.">{{ description }}</textarea>
+                <p class="field-hint">
+                    Write it the way you would brief a colleague: rates, thresholds, deductions, credits, and which
+                    filing statuses differ. The more specific the amounts, the less the AI has to guess.
+                </p>
+            </div>
+            <div class="action-row">
+                <button type="submit" class="btn">Generate Prompt</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>How the Round Trip Works</h2>
+        <ol class="list-compact text-sm text-dim">
+            <li>Generate the prompt here and copy it.</li>
+            <li>Paste it into the AI assistant you already use (Claude, ChatGPT, a local model — your choice).</li>
+            <li>Copy the AI's answer — one block with <code># === MANIFEST ===</code> and <code># === RULES ===</code> markers.</li>
+            <li>Paste it into <a href="/rule-packs/import">Import YAML → Paste combined YAML</a>. The import validates everything before saving.</li>
+            <li>If validation rejects it, copy the error message back to the AI and paste its corrected answer.</li>
+        </ol>
+        <hr>
+        <p class="text-dim text-sm">
+            <strong>Privacy:</strong> this app never contacts an AI service. Only what you yourself paste into an AI
+            chat leaves this machine — the prompt contains the rules you describe plus public rule-pack format
+            documentation, never your return data.
+        </p>
+        <p class="text-dim text-sm">
+            <strong>Verify the result:</strong> AI-drafted tax logic must be checked against the official forms and
+            instructions. Validation proves the pack is well-formed, not that the rates are right — review every
+            number, then run a test calculation and read the audit trace.
+        </p>
+    </div>
+</section>
+
+{% if prompt %}
+<section class="card section-anchor" id="generated-prompt">
+    <div class="section-header">
+        <div>
+            <h2>2. Copy This Prompt Into Your AI</h2>
+            <p class="text-dim text-sm">
+                The prompt includes the full rule-pack contract and the live reference catalog for
+                {{ jurisdiction }} {{ year }}.
+            </p>
+        </div>
+        <button type="button" class="btn btn-sm" data-copy-target="prompt-text" data-copy-label="Copy prompt">Copy prompt</button>
+    </div>
+    <textarea id="prompt-text" rows="24" readonly>{{ prompt }}</textarea>
+    <p class="field-hint">
+        Then take the AI's answer to <a href="/rule-packs/import">Import YAML</a> and paste it into the
+        "Paste combined YAML" box.
+    </p>
+</section>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/ai-assist.js"></script>
+{% endblock %}

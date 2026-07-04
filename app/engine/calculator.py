@@ -38,11 +38,19 @@ from __future__ import annotations
 
 import re
 from decimal import ROUND_DOWN, ROUND_HALF_UP, ROUND_UP, Decimal
+from pathlib import Path
 from typing import Any
 
 from app.engine.rule_loader import RulePack, RulePackError
 from app.log import get_logger
-from app.models.domain import ReturnOutput, ReturnRun, StateReturnOutput, TaxReturnInput, TraceNode
+from app.models.domain import (
+    FilingStatus,
+    ReturnOutput,
+    ReturnRun,
+    StateReturnOutput,
+    TaxReturnInput,
+    TraceNode,
+)
 
 logger = get_logger(__name__)
 
@@ -109,19 +117,46 @@ class CalculationEngine:
         self._filing_status: str = inputs.filing_status.value
         self._evaluating: list[str] = []
 
-    def run(self) -> ReturnRun:
-        # 1) Normalize inputs into resolved values (engine inputs are also traceable).
-        self._resolve_inputs()
+    def evaluate(self) -> None:
+        """Resolve inputs and evaluate every rule, without sealing a run.
 
-        # 2) Evaluate rules in dependency-safe order.
+        Useful for exercising rule mechanics against partial packs; a full
+        return must go through run(), which enforces headline outputs.
+        """
+        self._resolve_inputs()
         for rule_id in self.rp.rule_order:
             self._evaluate_rule(self.rp.rules[rule_id])
 
+    def run(self) -> ReturnRun:
+        self.evaluate()
+
         yr = self.rp.tax_year
+
+        # Headline outputs must exist: silently defaulting them to $0 would
+        # seal a run reporting zero tax/refund whenever a custom pack renames
+        # or drops one of these rules (fail loudly, like _round does).
+        required = [
+            f"fed.{yr}.agi.total",
+            f"fed.{yr}.taxable_income",
+            f"fed.{yr}.tax.after_credits",
+            f"fed.{yr}.refund_or_owed",
+        ]
+        missing = [key for key in required if key not in self.resolved]
+        if missing:
+            raise RulePackError(
+                f"Rule pack v{self.rp.version} did not produce required "
+                f"output rules: {', '.join(missing)}"
+            )
+
         output = ReturnOutput(
             gross_income=self.resolved.get(f"fed.{yr}.gross_income.total", Decimal("0")),
             agi=self.resolved.get(f"fed.{yr}.agi.total", Decimal("0")),
-            standard_deduction=self.resolved.get(f"fed.{yr}.standard_deduction", Decimal("0")),
+            standard_deduction=self.resolved.get(
+                # Prefer the M25 total (base + age/blind additions); older
+                # custom packs may only define the base lookup.
+                f"fed.{yr}.deductions.standard_total",
+                self.resolved.get(f"fed.{yr}.standard_deduction", Decimal("0")),
+            ),
             taxable_income=self.resolved.get(f"fed.{yr}.taxable_income", Decimal("0")),
             federal_tax=self.resolved.get(f"fed.{yr}.tax.after_credits", Decimal("0")),
             total_withholding=self.resolved.get(f"fed.{yr}.total_withholding", Decimal("0")),
@@ -133,7 +168,35 @@ class CalculationEngine:
             deduction_applied=self.resolved.get(f"fed.{yr}.deductions.applied", Decimal("0")),
             child_tax_credit=self.resolved.get(f"fed.{yr}.credits.ctc.final", Decimal("0")),
             total_credits=self.resolved.get(f"fed.{yr}.credits.total", Decimal("0")),
-            tax_before_credits=self.resolved.get(f"fed.{yr}.tax.brackets", Decimal("0")),
+            # Prefer the QDCGT-worksheet total (ordinary + LTCG); fall back to
+            # the plain bracket tax for custom packs predating M17.
+            tax_before_credits=self.resolved.get(
+                f"fed.{yr}.tax.total_before_credits",
+                self.resolved.get(f"fed.{yr}.tax.brackets", Decimal("0")),
+            ),
+            self_employment_tax=self.resolved.get(f"fed.{yr}.se.total", Decimal("0")),
+            earned_income_credit=self.resolved.get(
+                f"fed.{yr}.credits.eic.final", Decimal("0")
+            ),
+            education_credits=(
+                self.resolved.get(f"fed.{yr}.credits.edu.aotc", Decimal("0"))
+                + self.resolved.get(f"fed.{yr}.credits.edu.llc", Decimal("0"))
+            ),
+            dependent_care_credit=self.resolved.get(
+                f"fed.{yr}.credits.care.final", Decimal("0")
+            ),
+            net_investment_income_tax=self.resolved.get(
+                f"fed.{yr}.niit.final", Decimal("0")
+            ),
+            additional_child_tax_credit=self.resolved.get(
+                f"fed.{yr}.credits.actc.final", Decimal("0")
+            ),
+            additional_medicare_tax=self.resolved.get(
+                f"fed.{yr}.addl_medicare.final", Decimal("0")
+            ),
+            capital_loss_carryover_next=self.resolved.get(
+                f"fed.{yr}.carryover.next_total", Decimal("0")
+            ),
         )
 
         state_outputs = self._run_states()
@@ -156,7 +219,24 @@ class CalculationEngine:
         if not self.state_packs:
             return outs
 
-        # Resolve withholding for every state in state_packs.
+        # Resolve withholding and apportionment inputs for every state.
+        residence = (self.inputs.state_of_residence or "").strip().upper()
+        total_wages = self.inputs.total_wages()
+
+        def _state_wages(sc: str) -> Decimal:
+            # Box 16 when reported; a W-2 with a state code but no Box 16
+            # amount treats Box 1 as fully sourced to that state.
+            return sum(
+                (
+                    w.state_wages if w.state_wages > 0 else w.wages
+                    for tp in self.inputs.taxpayers
+                    for w in tp.w2s
+                    if (w.state or "").upper() == sc
+                ),
+                Decimal("0"),
+            )
+
+        nonresident_wages = Decimal("0")
         for state_code in sorted(self.state_packs):
             sc = state_code.upper()
             self.resolved[f"input.withholding.state.{sc}"] = sum(
@@ -168,8 +248,32 @@ class CalculationEngine:
                 ),
                 Decimal("0"),
             )
+            is_resident = residence in ("", sc)
+            self.resolved[f"input.state.is_resident.{sc}"] = (
+                Decimal("1") if is_resident else Decimal("0")
+            )
+            if is_resident or total_wages <= 0:
+                ratio = Decimal("1") if is_resident else Decimal("0")
+            else:
+                ratio = min(_state_wages(sc) / total_wages, Decimal("1"))
+                nonresident_wages += _state_wages(sc)
+            self.resolved[f"input.state.apportionment.{sc}"] = ratio.quantize(
+                Decimal("0.0001")
+            )
 
-        for state_code in sorted(self.state_packs):
+        # Aggregates for the residence state's other-state credit; zero while
+        # nonresident packs run, updated after they finish.
+        self.resolved["input.state.other_state_tax"] = Decimal("0")
+        self.resolved["input.state.other_state_ratio"] = Decimal("0")
+
+        # Nonresident states run first so the residence pack can reference
+        # their net tax through the aggregates above.
+        ordered = sorted(
+            self.state_packs,
+            key=lambda code: (code.upper() == residence, code),
+        )
+
+        for state_code in ordered:
             sp = self.state_packs[state_code]
             expected_prefix = f"{state_code.lower()}."
             if sp.id_prefix != expected_prefix:
@@ -181,6 +285,27 @@ class CalculationEngine:
                     f"{sp.jurisdiction!r} (prefix {sp.id_prefix!r}); expected "
                     f"prefix {expected_prefix!r}"
                 )
+            if residence and state_code.upper() == residence:
+                # All nonresident packs have run; expose their net tax and
+                # the doubly-taxed wage share to the residence pack's
+                # other-state credit rules.
+                other_tax = Decimal("0")
+                for other_code, other_pack in self.state_packs.items():
+                    if other_code.upper() == residence:
+                        continue
+                    lower = other_code.lower()
+                    oyr = other_pack.tax_year
+                    other_tax += max(
+                        self.resolved.get(f"{lower}.{oyr}.tax", Decimal("0"))
+                        - self.resolved.get(f"{lower}.{oyr}.credits.total", Decimal("0")),
+                        Decimal("0"),
+                    )
+                self.resolved["input.state.other_state_tax"] = other_tax
+                if total_wages > 0:
+                    self.resolved["input.state.other_state_ratio"] = min(
+                        nonresident_wages / total_wages, Decimal("1")
+                    ).quantize(Decimal("0.0001"))
+
             orig_pack = self.rp
             self.rp = sp
             try:
@@ -208,6 +333,12 @@ class CalculationEngine:
                         state_tax=self.resolved.get(
                             f"{st_lower}.{yr}.tax", Decimal("0")
                         ),
+                        state_credits=self.resolved.get(
+                            f"{st_lower}.{yr}.credits.total", Decimal("0")
+                        ),
+                        state_city_tax=self.resolved.get(
+                            f"{st_lower}.{yr}.city_tax", Decimal("0")
+                        ),
                         state_withholding=self.resolved.get(
                             f"{st_lower}.{yr}.withholding", Decimal("0")
                         ),
@@ -225,11 +356,21 @@ class CalculationEngine:
 
     def _resolve_inputs(self) -> None:
         self.resolved["input.w2.wages"] = self.inputs.total_wages()
+        self.resolved["input.w2.medicare_wages"] = self.inputs.total_medicare_wages()
+        self.resolved["input.w2.medicare_withheld"] = self.inputs.total_medicare_withheld()
         self.resolved["input.1099int.amount"] = self.inputs.total_interest()
         self.resolved["input.1099int.tax_exempt"] = self.inputs.total_tax_exempt_interest()
         self.resolved["input.1099div.ordinary"] = self.inputs.total_dividends()
         self.resolved["input.1099div.qualified"] = self.inputs.total_qualified_dividends()
         self.resolved["input.1099b.net_gain"] = self.inputs.total_capital_gains()
+        self.resolved["input.1099b.long_term_gain"] = (
+            self.inputs.total_long_term_capital_gains()
+        )
+        self.resolved["input.carryover.short_term"] = self.inputs.short_term_loss_carryover
+        self.resolved["input.carryover.long_term"] = self.inputs.long_term_loss_carryover
+        self.resolved["input.1099b.short_term_gain"] = (
+            self.inputs.total_short_term_capital_gains()
+        )
         self.resolved["input.withholding.federal"] = self.inputs.total_federal_withholding()
         self.resolved["input.1099nec.compensation"] = self.inputs.total_self_employment_income()
         self.resolved["input.ssa.total_benefits"] = self.inputs.total_social_security_benefits()
@@ -275,6 +416,51 @@ class CalculationEngine:
         self.resolved["input.qualifying_children"] = Decimal(
             self.inputs.qualifying_children
         )
+        self.resolved["input.other_dependents"] = Decimal(self.inputs.other_dependents)
+        self.resolved["input.dependents.total"] = self.inputs.total_dependents()
+
+        # Education credits (Form 8863)
+        self.resolved["input.education.aotc_tier1"] = self.inputs.aotc_expenses_tier1()
+        self.resolved["input.education.aotc_tier2"] = self.inputs.aotc_expenses_tier2()
+        self.resolved["input.education.llc_expenses"] = self.inputs.llc_expenses
+
+        # Dependent care credit (Form 2441)
+        self.resolved["input.care.expenses"] = self.inputs.dependent_care_expenses
+        self.resolved["input.care.qualifying_persons"] = Decimal(
+            self.inputs.dependent_care_qualifying_persons
+        )
+        self.resolved["input.earned_income.primary"] = self.inputs.earned_income_primary()
+        self.resolved["input.earned_income.spouse"] = self.inputs.earned_income_spouse()
+
+        # Age / blindness checkboxes (M25)
+        self.resolved["input.age_blind.boxes"] = self.inputs.age_blind_boxes()
+        self.resolved["input.age_blind.seniors"] = self.inputs.seniors_count()
+        self.resolved["input.age_blind.blind"] = self.inputs.blind_count()
+
+        # Military service inputs (M24)
+        self.resolved["input.military.combat_pay"] = self.inputs.total_combat_pay()
+        self.resolved["input.military.officer_combat_pay"] = self.inputs.officer_combat_pay()
+        self.resolved["input.military.officer_combat_months"] = (
+            self.inputs.officer_combat_months()
+        )
+        self.resolved["input.military.moving_expenses"] = (
+            self.inputs.total_military_moving_expenses()
+        )
+        self.resolved["input.military.reservist_travel"] = (
+            self.inputs.total_reservist_travel_expenses()
+        )
+
+        # State residency / credit eligibility flags (M23), exposed as 0/1
+        # so state rules can gate amounts with plain multiplication.
+        self.resolved["input.state.nyc_resident"] = (
+            Decimal("1") if self.inputs.nyc_full_year_resident else Decimal("0")
+        )
+        self.resolved["input.state.yonkers_resident"] = (
+            Decimal("1") if self.inputs.yonkers_full_year_resident else Decimal("0")
+        )
+        self.resolved["input.state.ca_renter"] = (
+            Decimal("1") if self.inputs.ca_renter else Decimal("0")
+        )
 
     # ─── Rule evaluation dispatch ───────────────────────────────
 
@@ -301,6 +487,8 @@ class CalculationEngine:
                 self._eval_lookup(rule)
             elif rule_type == "bracket_table":
                 self._eval_bracket_table(rule)
+            elif rule_type == "matrix_lookup":
+                self._eval_matrix_lookup(rule)
             else:
                 raise RulePackError(f"Unknown rule type: {rule_type}")
         finally:
@@ -455,6 +643,65 @@ class CalculationEngine:
             )
         )
 
+    def _matrix_key_str(self, spec: Any) -> str:
+        """Resolve a matrix_lookup key spec to the string used for table indexing.
+
+        Numeric values are canonicalized (Decimal("2.00") indexes key "2") so
+        rounded rule results still match integer-keyed tables.
+        """
+        if isinstance(spec, str) and spec.strip() == "input.filing_status":
+            return self._filing_status
+        if isinstance(spec, dict) and spec.get("ref") == "input.filing_status":
+            return self._filing_status
+        value = self._resolve_ref(spec)
+        integral = value.to_integral_value()
+        if value == integral:
+            return str(int(integral))
+        return str(value.normalize())
+
+    def _eval_matrix_lookup(self, rule: dict[str, Any]) -> None:
+        rule_id = rule["id"]
+        self._enforce_rule_namespace(rule_id)
+
+        keys = [self._matrix_key_str(spec) for spec in rule["keys"]]
+
+        node: Any = rule["table"]
+        path: list[str] = []
+        for dim, key in enumerate(keys):
+            if not isinstance(node, dict):
+                raise RulePackError(
+                    f"Rule {rule_id} (matrix_lookup) table is too shallow at "
+                    f"dimension {dim} (path: {' → '.join(path) or '<root>'})"
+                )
+            if key not in node:
+                raise RulePackError(
+                    f"Rule {rule_id} (matrix_lookup) has no entry for key {key!r} at "
+                    f"dimension {dim} (path: {' → '.join(path) or '<root>'}; "
+                    f"available: {sorted(node)})"
+                )
+            path.append(key)
+            node = node[key]
+
+        value = _to_decimal(node)
+        self.resolved[rule_id] = value
+
+        self.traces.append(
+            TraceNode(
+                node_id=rule_id,
+                rule_id=rule_id,
+                rule_pack_version=self.rp.version,
+                description=rule.get("description", ""),
+                inputs={"keys": keys, "path": " → ".join(path)},
+                intermediates=[],
+                result={"value": str(value), "units": "USD"},
+                explanation=(
+                    f"{rule.get('form_line', '')}: " if rule.get("form_line") else ""
+                )
+                + f"{' × '.join(path)} → {_format_usd(value)}",
+                form_line=rule.get("form_line", ""),
+            )
+        )
+
     def _eval_bracket_table(self, rule: dict[str, Any]) -> None:
         rule_id = rule["id"]
         self._enforce_rule_namespace(rule_id)
@@ -567,6 +814,10 @@ class CalculationEngine:
                 if match_end == len(expr) - 1:
                     inner = expr[len(func) + 1 : -1]
                     args = self._split_args(inner)
+                    if not args:
+                        raise RulePackError(
+                            f"{func}() requires at least one argument"
+                        )
                     vals = [self._safe_eval(a.strip(), variables) for a in args]
                     return max(vals) if func == "max" else min(vals)
 
@@ -661,6 +912,10 @@ class CalculationEngine:
                 if match_end == len(expr) - 1:
                     inner = expr[len(func) + 1 : -1]
                     args = self._split_args(inner)
+                    if not args:
+                        raise RulePackError(
+                            f"{func}() requires at least one argument"
+                        )
                     vals = [self._safe_eval(a.strip(), variables) for a in args]
                     return max(vals) if func == "max" else min(vals)
 
@@ -679,3 +934,30 @@ class CalculationEngine:
     def _explain_formula(self, expr: str, inputs: dict[str, Decimal], result: Decimal) -> str:
         parts = [f"{k}={_format_usd(v)}" for k, v in inputs.items()]
         return f"{expr} where {', '.join(parts)} → {_format_usd(result)}"
+
+
+def known_input_refs() -> tuple[str, ...]:
+    """Enumerate the base ``input.*`` reference namespace the engine provides.
+
+    Derived live from ``_resolve_inputs()`` against an empty return so the
+    catalog can never drift from the engine. Not included: the per-state
+    references added at calc time by ``_run_states()`` (``input.withholding.
+    state.{ST}``, ``input.state.is_resident.{ST}``, ...) and
+    ``input.filing_status``, which is a key-only pseudo-reference usable
+    only as a lookup/bracket/matrix key.
+    """
+    placeholder_pack = RulePack(
+        pack_dir=Path("."),
+        version="0.0.0",
+        tax_year=2025,
+        jurisdiction="federal",
+        id_prefix="fed.",
+        checksum="",
+        constants={},
+        rules={},
+        rule_order=[],
+    )
+    empty_return = TaxReturnInput(tax_year=2025, filing_status=FilingStatus.SINGLE)
+    engine = CalculationEngine(placeholder_pack, empty_return)
+    engine._resolve_inputs()
+    return tuple(sorted(engine.resolved))

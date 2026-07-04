@@ -14,7 +14,9 @@
         </h1>
         <p class="page-subtitle">
             Review the rule identity, choose the correct rule type, and update the supporting inputs in one place.
-            Standard packs remain view-only to keep the shipped baseline immutable.
+            Standard packs remain view-only to keep the shipped baseline immutable. Reference fields suggest valid
+            targets as you type; the full format reference lives in
+            <a href="https://github.com/DesignForFailure/Tax_Co-Pilot/blob/main/docs/RULE_PACK_AUTHORING.md">docs/RULE_PACK_AUTHORING.md</a>.
         </p>
     </div>
     <div class="action-row">
@@ -82,6 +84,7 @@
                     <option value="formula" {% if rtype == 'formula' %}selected{% endif %}>formula</option>
                     <option value="lookup" {% if rtype == 'lookup' %}selected{% endif %}>lookup</option>
                     <option value="bracket_table" {% if rtype == 'bracket_table' %}selected{% endif %}>bracket_table</option>
+                    <option value="matrix_lookup" {% if rtype == 'matrix_lookup' %}selected{% endif %}>matrix_lookup</option>
                 </select>
             </div>
         </div>
@@ -98,10 +101,40 @@
     </section>
 
     <section class="card type-section" id="section-sum" {% if rtype != 'sum' %}hidden{% endif %}>
-        <h2>Sum Inputs</h2>
-        <p class="text-dim text-sm mb-4">Use this rule type when the result is the total of a referenced collection.</p>
-        <label>Items Reference</label>
-        <input type="text" name="sum_items_ref" value="{% if rtype == 'sum' and r.get('inputs') %}{{ r['inputs'].get('items', {}).get('ref', '') }}{% endif %}" {% if readonly %}readonly{% endif %} placeholder="e.g. input.w2.wages">
+        <div class="section-header">
+            <div>
+                <h2>Sum Inputs</h2>
+                <p class="text-dim text-sm">
+                    Adds one or more referenced values. A single reference that covers a whole collection
+                    (like <code>input.w2.wages</code>) is already summed across all its entries.
+                </p>
+            </div>
+            {% if not readonly and sum_editable %}
+            <button type="button" class="btn btn-sm btn-outline" data-add-sum-item>Add Item</button>
+            {% endif %}
+        </div>
+        {% if not sum_editable %}
+        <div class="notice notice-error">
+            <p class="text-dim text-sm">
+                This sum uses item shapes the grid cannot represent (for example literal values). Export the
+                pack YAML, edit it directly, and re-import it instead.
+            </p>
+        </div>
+        {% else %}
+        <div id="sum-items" data-next-index="{{ sum_view | length }}">
+            {% for ref in sum_view %}
+            <div class="form-grid-4 sum-item-row">
+                <div>
+                    <label>Item Reference</label>
+                    <input type="text" name="sum_item_{{ loop.index0 }}" list="ref-options" value="{{ ref }}" {% if readonly %}readonly{% endif %} placeholder="e.g. input.w2.wages">
+                </div>
+                {% if not readonly %}
+                <button type="button" class="btn btn-sm btn-danger" data-remove-closest=".sum-item-row">Remove</button>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
     </section>
 
     <section class="card type-section" id="section-formula" {% if rtype != 'formula' %}hidden{% endif %}>
@@ -118,10 +151,15 @@
             <div>
                 <label>Expression</label>
                 <input type="text" name="expression" value="{{ r.get('expression', '') }}" {% if readonly %}readonly{% endif %} placeholder="e.g. max(gains, neg_limit)">
-                <p class="field-hint">Allowed characters: letters, digits, math operators, parentheses, commas, periods, and spaces.</p>
+                <p class="field-hint">Allowed characters: letters, digits, math operators, parentheses, commas, periods, and spaces. Only <code>max()</code> and <code>min()</code> functions. Every name used here must be declared as an input below.</p>
             </div>
             <div>
                 <h3>Inputs</h3>
+                <p class="field-hint">
+                    <strong>ref</strong> = pull a value from another rule or an input field (pick from the
+                    suggestions). <strong>literal</strong> = a fixed number typed in directly, like
+                    <code>0.04</code> for a 4% rate.
+                </p>
                 <div id="formula-inputs" data-next-index="{{ (r.get('inputs', {}) | length) if (r and rtype == 'formula') else 0 }}">
                     {% if rtype == 'formula' and r.get('inputs') %}
                         {% for name, val in r['inputs'].items() %}
@@ -139,7 +177,7 @@
                             </div>
                             <div>
                                 <label>Value</label>
-                                <input type="text" name="input_value_{{ loop.index0 }}" value="{{ val.get('ref', val.get('literal', '')) }}" {% if readonly %}readonly{% endif %} placeholder="value">
+                                <input type="text" name="input_value_{{ loop.index0 }}" list="ref-options" value="{{ val.get('ref', val.get('literal', '')) }}" {% if readonly %}readonly{% endif %} placeholder="value">
                             </div>
                             {% if not readonly %}
                             <button type="button" class="btn btn-sm btn-danger" data-remove-closest=".formula-input-row">Remove</button>
@@ -158,11 +196,12 @@
         <div class="form-row">
             <div>
                 <label>Table Path</label>
-                <input type="text" name="lookup_table" value="{{ r.get('table', '') }}" {% if readonly %}readonly{% endif %} placeholder="e.g. constants.standard_deduction">
+                <input type="text" name="lookup_table" list="table-options" value="{{ r.get('table', '') }}" {% if readonly %}readonly{% endif %} placeholder="e.g. constants.standard_deduction">
+                <p class="field-hint">Define the table itself under <a href="/rule-packs/{{ pack.jurisdiction }}/{{ pack.year }}/{{ pack.variant }}">Constants on the pack page</a>.</p>
             </div>
             <div>
                 <label>Key Reference</label>
-                <input type="text" name="lookup_key_ref" value="{% if r.get('key') %}{{ r['key'].get('ref', '') }}{% endif %}" {% if readonly %}readonly{% endif %} placeholder="e.g. input.filing_status">
+                <input type="text" name="lookup_key_ref" list="key-options" value="{% if r.get('key') %}{{ r['key'].get('ref', '') }}{% endif %}" {% if readonly %}readonly{% endif %} placeholder="e.g. input.filing_status">
             </div>
         </div>
     </section>
@@ -177,13 +216,17 @@
         <div class="form-row">
             <div>
                 <label>Input Reference</label>
-                <input type="text" name="bracket_input_ref" value="{% if r.get('input') %}{{ r['input'].get('ref', '') }}{% endif %}" {% if readonly %}readonly{% endif %} placeholder="e.g. fed.2024.taxable_income">
+                <input type="text" name="bracket_input_ref" list="ref-options" value="{% if r.get('input') %}{{ r['input'].get('ref', '') }}{% endif %}" {% if readonly %}readonly{% endif %} placeholder="e.g. fed.2024.taxable_income">
             </div>
             <div>
                 <label>Key Reference</label>
-                <input type="text" name="bracket_key_ref" value="{% if r.get('key') %}{{ r['key'].get('ref', '') }}{% endif %}" {% if readonly %}readonly{% endif %} placeholder="e.g. input.filing_status">
+                <input type="text" name="bracket_key_ref" list="key-options" value="{% if r.get('key') %}{{ r['key'].get('ref', '') }}{% endif %}" {% if readonly %}readonly{% endif %} placeholder="e.g. input.filing_status">
             </div>
         </div>
+        <p class="field-hint">
+            Rates are decimals: <code>0.22</code> means 22%. Rows must not overlap; leave Upper empty on the last
+            row to mean "no ceiling". Rates apply only to the income inside each bracket's range.
+        </p>
 
         <div class="stack-md">
             {% for status in ['single', 'mfj', 'mfs', 'hoh', 'qss'] %}
@@ -191,7 +234,12 @@
                 <div class="section-header">
                     <h3>{{ status | upper }}</h3>
                     {% if not readonly %}
-                    <button type="button" class="btn btn-sm btn-outline" data-add-bracket-row="{{ status }}">Add Row</button>
+                    <div class="action-row">
+                        {% if status != 'single' %}
+                        <button type="button" class="btn btn-sm btn-outline" data-copy-brackets="{{ status }}">Copy rows from SINGLE</button>
+                        {% endif %}
+                        <button type="button" class="btn btn-sm btn-outline" data-add-bracket-row="{{ status }}">Add Row</button>
+                    </div>
                     {% endif %}
                 </div>
                 <div class="table-wrap">
@@ -236,6 +284,79 @@
         </div>
     </section>
 
+    <section class="card type-section" id="section-matrix_lookup" {% if rtype != 'matrix_lookup' %}hidden{% endif %}>
+        <div class="section-header">
+            <div>
+                <h2>Matrix Lookup</h2>
+                <p class="text-dim text-sm">
+                    A two-way table: the row key picks a row, the column key picks a column. Values are plain
+                    numbers (amounts like <code>4213</code> or rates like <code>0.1598</code>).
+                </p>
+            </div>
+            {% if not readonly and matrix_editable %}
+            <div class="action-row">
+                <button type="button" class="btn btn-sm btn-outline" data-add-matrix-column>Add Column</button>
+                <button type="button" class="btn btn-sm btn-outline" data-add-matrix-row>Add Row</button>
+            </div>
+            {% endif %}
+        </div>
+        {% if not matrix_editable %}
+        <div class="notice notice-error">
+            <p class="text-dim text-sm">
+                This matrix has more than two dimensions, which the grid editor cannot represent. Export the pack
+                YAML, edit it directly, and re-import it instead.
+            </p>
+        </div>
+        {% else %}
+        <div class="form-row">
+            <div>
+                <label>Row Key Reference</label>
+                <input type="text" name="matrix_key_0" list="key-options" value="{{ matrix_view.key_refs[0] }}" {% if readonly %}readonly{% endif %} placeholder="e.g. input.filing_status">
+            </div>
+            <div>
+                <label>Column Key Reference</label>
+                <input type="text" name="matrix_key_1" list="key-options" value="{{ matrix_view.key_refs[1] }}" {% if readonly %}readonly{% endif %} placeholder="e.g. fed.2024.credits.eic.num_children">
+            </div>
+        </div>
+        <p class="field-hint">
+            An unknown key value fails the calculation, so clamp open-ended counts with an upstream formula rule
+            (e.g. <code>min(children, 3)</code>). To remove a column, clear its header; to remove a row, use its
+            Remove button or clear its key. Rows with no values entered are not saved.
+        </p>
+        <div class="table-wrap">
+            <table class="data-table" id="matrix-table"
+                   data-next-row-index="{{ matrix_view.rows | length }}"
+                   data-next-col-index="{{ matrix_view.columns | length }}">
+                <thead>
+                    <tr>
+                        <th>Row Key \ Column Key</th>
+                        {% for col in matrix_view.columns %}
+                        <th><input type="text" name="matrix_col_{{ loop.index0 }}" value="{{ col }}" {% if readonly %}readonly{% endif %} placeholder="column key"></th>
+                        {% endfor %}
+                        {% if not readonly %}
+                        <th class="align-right">Actions</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in matrix_view.rows %}
+                    {% set row_index = loop.index0 %}
+                    <tr data-row-index="{{ row_index }}">
+                        <td><input type="text" name="matrix_row_{{ row_index }}_key" value="{{ row.key }}" {% if readonly %}readonly{% endif %} placeholder="row key"></td>
+                        {% for cell in row.cells %}
+                        <td><input type="text" name="matrix_cell_{{ row_index }}_{{ loop.index0 }}" value="{{ cell }}" inputmode="decimal" {% if readonly %}readonly{% endif %}></td>
+                        {% endfor %}
+                        {% if not readonly %}
+                        <td class="align-right"><button type="button" class="btn btn-sm btn-danger" data-remove-closest="tr">Remove</button></td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </section>
+
     <div class="action-row section-anchor" id="save-actions">
         {% if not readonly %}
         <button type="submit" class="btn">Save Rule</button>
@@ -245,6 +366,22 @@
         {% endif %}
     </div>
 </form>
+
+<datalist id="ref-options">
+    {% for ref in catalog.ref_options %}
+    <option value="{{ ref }}"></option>
+    {% endfor %}
+</datalist>
+<datalist id="key-options">
+    {% for ref in catalog.key_options %}
+    <option value="{{ ref }}"></option>
+    {% endfor %}
+</datalist>
+<datalist id="table-options">
+    {% for path in catalog.table_options %}
+    <option value="{{ path }}"></option>
+    {% endfor %}
+</datalist>
 
 {% endblock %}
 

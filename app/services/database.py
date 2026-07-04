@@ -143,8 +143,8 @@ def get_connection(password: str | None = None) -> sqlite3.Connection:
             )
 
         elif db_state == DatabaseState.UNENCRYPTED:
-            # Database exists but is unencrypted
-            # For now, allow unencrypted connections (migration happens in main.py)
+            # Database exists but is unencrypted. startup() migrates it to
+            # encrypted when a password is available, or defers to /unlock.
             DB_PATH.parent.mkdir(parents=True, exist_ok=True)
             conn = sqlite3.connect(str(DB_PATH), timeout=5.0, isolation_level=None)
             conn.row_factory = hybrid_factory
@@ -283,6 +283,24 @@ def init_db() -> None:
             )
             # Auto-detect version for existing rows that already have a hash.
             _backfill_hash_versions(conn)
+        if "chain_seq" not in columns:
+            # The integrity chain is ordered by insertion, not created_at:
+            # imported runs keep their historical timestamps, so a
+            # created_at ordering would interleave them into the middle of
+            # the chain and report false chain breaks forever.
+            conn.execute(
+                "ALTER TABLE return_runs ADD COLUMN chain_seq INTEGER NOT NULL DEFAULT 0"
+            )
+            # Legacy rows were chained in created_at order; number them the
+            # same way so existing chains stay intact.
+            conn.execute(
+                """UPDATE return_runs SET chain_seq = (
+                       SELECT COUNT(*) FROM return_runs AS other
+                       WHERE other.created_at < return_runs.created_at
+                          OR (other.created_at = return_runs.created_at
+                              AND other.rowid <= return_runs.rowid)
+                   )"""
+            )
         schema_row = conn.execute("PRAGMA user_version").fetchone()
         current_schema_version = int(schema_row[0]) if schema_row else 0
         if current_schema_version < DB_SCHEMA_VERSION:
@@ -350,16 +368,19 @@ def save_return_run(run_data: dict) -> None:
         conn.execute("BEGIN IMMEDIATE")
         try:
             row = conn.execute(
-                "SELECT integrity_hash FROM return_runs ORDER BY created_at DESC, rowid DESC LIMIT 1"
+                "SELECT integrity_hash, chain_seq FROM return_runs "
+                "ORDER BY chain_seq DESC LIMIT 1"
             ).fetchone()
             previous_hash = row["integrity_hash"] if row else ""
+            next_seq = (row["chain_seq"] + 1) if row else 1
             conn.execute(
                 """INSERT INTO return_runs
                    (id, tax_year, filing_status, scenario_name,
                     rule_pack_version, rule_pack_checksum,
                     input_snapshot_json, output_json, trace_json, state_outputs_json,
-                    created_at, tags, notes, integrity_hash, previous_hash, hash_version)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    created_at, tags, notes, integrity_hash, previous_hash, hash_version,
+                    chain_seq)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     run_data["id"],
                     run_data["tax_year"],
@@ -377,6 +398,7 @@ def save_return_run(run_data: dict) -> None:
                     integrity_hash,
                     previous_hash,
                     _HASH_VERSION,
+                    next_seq,
                 ),
             )
             conn.execute("COMMIT")
@@ -477,7 +499,7 @@ def delete_return_run(run_id: str) -> None:
         conn.execute("BEGIN IMMEDIATE")
         try:
             row = conn.execute(
-                "SELECT integrity_hash, previous_hash, created_at, rowid "
+                "SELECT integrity_hash, previous_hash, chain_seq "
                 "FROM return_runs WHERE id = ?",
                 (run_id,),
             ).fetchone()
@@ -487,10 +509,9 @@ def delete_return_run(run_id: str) -> None:
                 return
 
             successor = conn.execute(
-                "SELECT id FROM return_runs "
-                "WHERE (created_at > ? OR (created_at = ? AND rowid > ?)) "
-                "ORDER BY created_at ASC, rowid ASC LIMIT 1",
-                (row["created_at"], row["created_at"], row["rowid"]),
+                "SELECT id FROM return_runs WHERE chain_seq > ? "
+                "ORDER BY chain_seq ASC LIMIT 1",
+                (row["chain_seq"],),
             ).fetchone()
             if successor is not None:
                 conn.execute(
@@ -529,7 +550,7 @@ def verify_chain() -> list[dict]:
             "SELECT id, integrity_hash, previous_hash, hash_version, created_at, tax_year, "
             "filing_status, scenario_name, rule_pack_version, rule_pack_checksum, "
             "input_snapshot_json, output_json, trace_json, state_outputs_json "
-            "FROM return_runs ORDER BY created_at ASC, rowid ASC"
+            "FROM return_runs ORDER BY chain_seq ASC, rowid ASC"
         ).fetchall()
 
     errors: list[dict] = []

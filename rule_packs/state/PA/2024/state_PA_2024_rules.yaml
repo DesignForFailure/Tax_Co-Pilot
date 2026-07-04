@@ -1,0 +1,115 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Tax_Co-Pilot - Local-first personal tax software system
+# Copyright (C) 2026  Tax_Co-Pilot Contributors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# Pennsylvania PA-40 (2024): flat 3.07% on eight separate income
+# classes with NO standard deduction and NO personal exemptions.
+# Modeled classes: compensation, interest, dividends, net gains, and
+# net profits. PA never taxes Social Security or retirement income
+# (excluded by construction - the base is built from PA classes, not
+# federal AGI), and a LOSS in one class cannot offset another class
+# (each class floors at zero; PA also has no loss carryovers).
+# Unmodeled (documented): Tax Forgiveness (Schedule SP) for low-income
+# filers, and PA/NJ-style reciprocity agreements.
+
+constants: {}
+
+rules:
+
+  - id: "pa.2024.agi"
+    description: "Pennsylvania total taxable income: compensation + interest + dividends + net gains + net profits, each class floored at zero (PA-40 Line 9)"
+    form_line: "PA-40 Line 9"
+    type: "formula"
+    expression: "wages + max(interest, 0) + max(dividends, 0) + max(gains, 0) + max(profits, 0)"
+    inputs:
+      wages: { ref: "input.w2.wages" }
+      interest: { ref: "fed.2024.gross_income.interest" }
+      dividends: { ref: "fed.2024.gross_income.dividends" }
+      gains: { ref: "input.1099b.net_gain" }
+      profits: { ref: "fed.2024.gross_income.self_employment" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "pa.2024.taxable_income"
+    description: "Pennsylvania taxable income (no deductions or exemptions)"
+    type: "formula"
+    expression: "agi"
+    inputs:
+      agi: { ref: "pa.2024.agi" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "pa.2024.tax.full"
+    description: "Pennsylvania income tax before apportionment (flat 3.07% since 2004)"
+    type: "formula"
+    expression: "taxable * rate"
+    inputs:
+      taxable: { ref: "pa.2024.taxable_income" }
+      rate: { literal: "0.0307" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "pa.2024.tax"
+    description: "PA tax after nonresident wage apportionment (ratio 1 for residents; nonresidents pay the as-if-resident tax times the PA-wage share)"
+    type: "formula"
+    expression: "full * ratio"
+    inputs:
+      full: { ref: "pa.2024.tax.full" }
+      ratio: { ref: "input.state.apportionment.PA" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "pa.2024.credits.other_state"
+    description: "Resident credit for taxes paid to other states: the smaller of their net tax or this state's tax on the doubly-taxed wage share (zero for nonresidents)"
+    type: "formula"
+    expression: "min(other_tax, full * dbl_ratio) * is_resident"
+    inputs:
+      other_tax: { ref: "input.state.other_state_tax" }
+      full: { ref: "pa.2024.tax.full" }
+      dbl_ratio: { ref: "input.state.other_state_ratio" }
+      is_resident: { ref: "input.state.is_resident.PA" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "pa.2024.credits.total"
+    description: "Total PA nonrefundable credits (other-state resident credit), capped at tax"
+    type: "formula"
+    expression: "min(other_state, tax)"
+    inputs:
+      other_state: { ref: "pa.2024.credits.other_state" }
+      tax: { ref: "pa.2024.tax" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0
+
+  - id: "pa.2024.withholding"
+    description: "Total PA tax withheld (W-2 Box 17)"
+    type: "sum"
+    inputs:
+      items: { ref: "input.withholding.state.PA" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 2
+
+  - id: "pa.2024.refund_or_owed"
+    description: "PA refund (positive) or amount owed (negative), after nonrefundable credits"
+    form_line: "PA-40 Line 30"
+    type: "formula"
+    expression: "withholding - tax + credits"
+    inputs:
+      withholding: { ref: "pa.2024.withholding" }
+      tax: { ref: "pa.2024.tax" }
+      credits: { ref: "pa.2024.credits.total" }
+    rounding: "ROUND_HALF_UP"
+    rounding_precision: 0

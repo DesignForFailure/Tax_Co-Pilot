@@ -30,7 +30,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 def new_id() -> str:
@@ -122,6 +122,13 @@ class AdjustmentsData(BaseModel):
     self_employment_tax_deduction: Decimal = Decimal("0")
 
 
+class EducationExpenseData(BaseModel):
+    """Qualified education expenses for one AOTC-eligible student (Form 8863 Part III)."""
+
+    student_name: str = ""
+    qualified_expenses: Decimal = Decimal("0")
+
+
 class ItemizedDeductionData(BaseModel):
     """Schedule A itemized deductions."""
 
@@ -143,6 +150,19 @@ class Taxpayer(BaseModel):
     last_name: str = ""
     is_active_duty_military: bool = False
     domicile_state: str = ""
+    # Age/blindness checkboxes (M25): the IRS tests "born before January 2
+    # of {year+1}" and legal blindness on the last day of the year; the
+    # flags keep birth dates out of the data model.
+    is_65_or_older: bool = False
+    is_blind: bool = False
+    # Military service (M24). Combat pay is W-2 Box 12 code Q — the employer
+    # already excludes it from Box 1 wages, so the engine must never
+    # re-subtract it; it feeds the EITC election and the officer-cap check.
+    nontaxable_combat_pay: Decimal = Decimal("0")
+    is_commissioned_officer: bool = False
+    combat_zone_months: int = Field(default=0, ge=0, le=12)
+    active_duty_moving_expenses: Decimal = Decimal("0")
+    reservist_travel_expenses: Decimal = Decimal("0")
     w2s: list[W2Data] = Field(default_factory=list)
     form_1099_ints: list[Form1099INTData] = Field(default_factory=list)
     form_1099_divs: list[Form1099DIVData] = Field(default_factory=list)
@@ -160,14 +180,62 @@ class TaxReturnInput(BaseModel):
     tax_year: int
     filing_status: FilingStatus
     taxpayers: list[Taxpayer] = Field(default_factory=list)
+    # Two-letter residence state. When set, W-2 states other than it run
+    # as nonresident (wage-apportioned) returns and the residence state
+    # grants a credit for taxes paid to them. Empty = every state runs
+    # as a full-year resident return (the pre-M31 behavior).
+    state_of_residence: str = ""
     other_income: Decimal = Decimal("0")
+    # Prior-year capital loss carryovers, entered as positive amounts
+    # (Schedule D lines 6 and 14).
+    short_term_loss_carryover: Decimal = Decimal("0")
+    long_term_loss_carryover: Decimal = Decimal("0")
     adjustments: AdjustmentsData = Field(default_factory=AdjustmentsData)
     estimated_tax_payments: Decimal = Decimal("0")
     itemized_deductions: ItemizedDeductionData = Field(default_factory=ItemizedDeductionData)
     qualifying_children: int = 0
+    other_dependents: int = 0
+    education_students: list[EducationExpenseData] = Field(default_factory=list)
+    llc_expenses: Decimal = Decimal("0")
+    dependent_care_expenses: Decimal = Decimal("0")
+    dependent_care_qualifying_persons: int = 0
+    nyc_full_year_resident: bool = False
+    yonkers_full_year_resident: bool = False
+    ca_renter: bool = False
+
+    @model_validator(mode="after")
+    def _exclusive_ny_city_residency(self) -> TaxReturnInput:
+        # NYC and Yonkers residency are modeled full-year only, so both
+        # city taxes applying at once would double-tax the filer.
+        if self.nyc_full_year_resident and self.yonkers_full_year_resident:
+            raise ValueError(
+                "Full-year residency in both New York City and Yonkers is not "
+                "possible; select at most one"
+            )
+        return self
 
     def total_wages(self) -> Decimal:
         return sum((w.wages for tp in self.taxpayers for w in tp.w2s), Decimal("0"))
+
+    def total_medicare_wages(self) -> Decimal:
+        """W-2 Box 5 total, falling back to Box 1 per W-2 when Box 5 is blank.
+
+        Box 5 is usually >= Box 1 (pre-tax retirement deferrals do not
+        reduce Medicare wages), so a blank Box 5 means "not entered",
+        not "zero Medicare wages".
+        """
+        return sum(
+            (
+                w.medicare_wages if w.medicare_wages > 0 else w.wages
+                for tp in self.taxpayers
+                for w in tp.w2s
+            ),
+            Decimal("0"),
+        )
+
+    def total_medicare_withheld(self) -> Decimal:
+        """W-2 Box 6 total (regular 1.45% plus any 0.9% surtax withheld)."""
+        return sum((w.medicare_tax for tp in self.taxpayers for w in tp.w2s), Decimal("0"))
 
     def total_interest(self) -> Decimal:
         return sum(
@@ -181,6 +249,18 @@ class TaxReturnInput(BaseModel):
 
     def total_capital_gains(self) -> Decimal:
         return sum((f.net_gain for tp in self.taxpayers for f in tp.form_1099_bs), Decimal("0"))
+
+    def total_long_term_capital_gains(self) -> Decimal:
+        return sum(
+            (f.net_gain for tp in self.taxpayers for f in tp.form_1099_bs if f.is_long_term),
+            Decimal("0"),
+        )
+
+    def total_short_term_capital_gains(self) -> Decimal:
+        return sum(
+            (f.net_gain for tp in self.taxpayers for f in tp.form_1099_bs if not f.is_long_term),
+            Decimal("0"),
+        )
 
     def total_federal_withholding(self) -> Decimal:
         total = Decimal("0")
@@ -219,6 +299,97 @@ class TaxReturnInput(BaseModel):
             + a.hsa_contributions
             + a.educator_expenses
             + a.self_employment_tax_deduction
+        )
+
+    def earned_income_primary(self) -> Decimal:
+        """Primary taxpayer's earned income: wages + 1099-NEC compensation.
+
+        Form 2441 technically also subtracts the half-SE-tax deduction; the
+        engine computes SE tax household-wide, so the per-person split uses
+        gross figures (documented simplification).
+        """
+        return self._earned_income_for_role(TaxpayerRole.PRIMARY)
+
+    def earned_income_spouse(self) -> Decimal:
+        """Spouse's earned income: wages + 1099-NEC compensation."""
+        return self._earned_income_for_role(TaxpayerRole.SPOUSE)
+
+    def _earned_income_for_role(self, role: TaxpayerRole) -> Decimal:
+        total = Decimal("0")
+        for tp in self.taxpayers:
+            if tp.role != role:
+                continue
+            total += sum((w.wages for w in tp.w2s), Decimal("0"))
+            total += sum(
+                (n.nonemployee_compensation for n in tp.form_1099_necs), Decimal("0")
+            )
+        return total
+
+    def age_blind_boxes(self) -> Decimal:
+        """Count of checked age-65+/blind conditions (1040 Standard Deduction chart).
+
+        MFS filers may also check boxes for a non-filing spouse with no
+        income; that exception is unmodeled — only taxpayers on the return
+        are counted.
+        """
+        return Decimal(
+            sum(int(tp.is_65_or_older) + int(tp.is_blind) for tp in self.taxpayers)
+        )
+
+    def seniors_count(self) -> Decimal:
+        """Taxpayers on the return who are 65 or older."""
+        return Decimal(sum(1 for tp in self.taxpayers if tp.is_65_or_older))
+
+    def blind_count(self) -> Decimal:
+        """Taxpayers on the return who are legally blind."""
+        return Decimal(sum(1 for tp in self.taxpayers if tp.is_blind))
+
+    def total_dependents(self) -> Decimal:
+        """CTC qualifying children plus other dependents (state exemptions)."""
+        return Decimal(self.qualifying_children + self.other_dependents)
+
+    def total_combat_pay(self) -> Decimal:
+        """Household W-2 Box 12 code Q total (already excluded from wages)."""
+        return sum((tp.nontaxable_combat_pay for tp in self.taxpayers), Decimal("0"))
+
+    def officer_combat_pay(self) -> Decimal:
+        """Combat pay reported by commissioned officers, whose exclusion is capped."""
+        return sum(
+            (tp.nontaxable_combat_pay for tp in self.taxpayers if tp.is_commissioned_officer),
+            Decimal("0"),
+        )
+
+    def officer_combat_months(self) -> Decimal:
+        """Qualifying combat-zone months across commissioned officers."""
+        return Decimal(
+            sum(tp.combat_zone_months for tp in self.taxpayers if tp.is_commissioned_officer)
+        )
+
+    def total_military_moving_expenses(self) -> Decimal:
+        """Unreimbursed PCS moving expenses (Form 3903, IRC 217(g))."""
+        return sum((tp.active_duty_moving_expenses for tp in self.taxpayers), Decimal("0"))
+
+    def total_reservist_travel_expenses(self) -> Decimal:
+        """Overnight reserve-duty travel over 100 miles (IRC 62(a)(2)(E))."""
+        return sum((tp.reservist_travel_expenses for tp in self.taxpayers), Decimal("0"))
+
+    def aotc_expenses_tier1(self) -> Decimal:
+        """Sum of per-student AOTC expenses capped at $2,000 (Form 8863 Part III line 28).
+
+        The $2,000/$4,000 per-student tiers are part of the Form 8863 line
+        structure (unchanged since 2009); the credit arithmetic itself stays
+        in the rule packs.
+        """
+        return sum(
+            (min(s.qualified_expenses, Decimal("2000")) for s in self.education_students),
+            Decimal("0"),
+        )
+
+    def aotc_expenses_tier2(self) -> Decimal:
+        """Sum of per-student AOTC expenses capped at $4,000 (Form 8863 Part III line 27)."""
+        return sum(
+            (min(s.qualified_expenses, Decimal("4000")) for s in self.education_students),
+            Decimal("0"),
         )
 
     def total_qualified_dividends(self) -> Decimal:
@@ -269,6 +440,14 @@ class ReturnOutput(BaseModel):
     child_tax_credit: Decimal = Decimal("0")
     total_credits: Decimal = Decimal("0")
     tax_before_credits: Decimal = Decimal("0")
+    self_employment_tax: Decimal = Decimal("0")
+    earned_income_credit: Decimal = Decimal("0")
+    education_credits: Decimal = Decimal("0")
+    dependent_care_credit: Decimal = Decimal("0")
+    net_investment_income_tax: Decimal = Decimal("0")
+    additional_child_tax_credit: Decimal = Decimal("0")
+    additional_medicare_tax: Decimal = Decimal("0")
+    capital_loss_carryover_next: Decimal = Decimal("0")
 
 
 class StateReturnOutput(BaseModel):
@@ -278,6 +457,8 @@ class StateReturnOutput(BaseModel):
     state_personal_exemption: Decimal = Decimal("0")
     state_taxable_income: Decimal = Decimal("0")
     state_tax: Decimal = Decimal("0")
+    state_credits: Decimal = Decimal("0")
+    state_city_tax: Decimal = Decimal("0")
     state_withholding: Decimal = Decimal("0")
     state_refund_or_owed: Decimal = Decimal("0")
 

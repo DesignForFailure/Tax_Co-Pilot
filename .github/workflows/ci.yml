@@ -7,6 +7,10 @@ on:
     branches:
       - main
 
+# Least privilege: the quality job only reads the checkout.
+permissions:
+  contents: read
+
 env:
   ENABLE_TEST_ARTIFACTS: "true"
   ENABLE_COVERAGE: "true"
@@ -45,6 +49,12 @@ jobs:
 
       - name: Mypy
         run: mypy .
+
+      - name: Validate rule packs
+        run: |
+          for dir in rule_packs/federal/*/ rule_packs/state/*/*/; do
+            python scripts/validate_rule_pack.py "$dir"
+          done
 
       - name: Pytest (with optional coverage)
         run: |
