@@ -15,14 +15,6 @@
       "Bash(mypy *)",
       "Bash(git fetch origin *)",
       "Bash(shellcheck *)",
-      "Bash(flatpak list *)",
-      "Bash(flatpak info *)",
-      "Bash(ollama ps)",
-      "Bash(ollama list)",
-      "Bash(ollama show *)",
-      "Bash(podman ps *)",
-      "Bash(podman images *)",
-      "Bash(systemctl --user status *)",
       "mcp__github__pull_request_read"
     ]
   }

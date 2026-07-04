@@ -103,8 +103,7 @@ def _pack_path(
     # confirm the resolved path stays inside the pack root before any caller
     # opens or writes it. Also satisfies static path-traversal analysis.
     resolved = pack_dir.resolve()
-    base_resolved = base.resolve()
-    if resolved != base_resolved and base_resolved not in resolved.parents:
+    if not resolved.is_relative_to(base.resolve()):
         raise ValueError(f"Resolved pack path escapes the pack root: {pack_dir}")
     return resolved
 
