@@ -71,7 +71,16 @@ Most consumer tax software hides its logic, can't reproduce historical results, 
   | **Debian / Ubuntu** | `sudo apt-get install build-essential python3-dev libsqlcipher-dev` |
   | **macOS (Homebrew)** | `brew install sqlcipher` |
 
+  > **Windows note:** These build dependencies are only required for the optional
+  > SQLCipher encryption extra. The default install needs no C compiler on Windows —
+  > `cryptography` ships prebuilt wheels and encryption falls back to Python Fernet
+  > (see [docs/ENCRYPTION.md](docs/ENCRYPTION.md)). Install a recent
+  > [Python for Windows](https://www.python.org/downloads/windows/) and make sure you
+  > check **"Add python.exe to PATH"** in the installer.
+
 ### Install
+
+**macOS / Linux / WSL**
 
 ```bash
 python -m pip install --upgrade pip
@@ -81,12 +90,37 @@ python -m pip install -r requirements.txt
 python -m pip install -r requirements-dev.txt
 ```
 
+**Windows (PowerShell or Command Prompt)**
+
+```bat
+py -m pip install --upgrade pip
+py -m pip install -r requirements.txt
+
+REM Optional: dev tooling (ruff, mypy, pip-audit)
+py -m pip install -r requirements-dev.txt
+```
+
+> Use the `py` launcher (bundled with the official Windows installer) or `python`,
+> whichever resolves on your `PATH`. If you prefer an isolated environment, create a
+> virtualenv first with `py -m venv .venv` and activate it via `.venv\Scripts\activate`.
+
 ### Run
+
+**macOS / Linux / WSL**
 
 ```bash
 ./run.sh
 # or: python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
+
+**Windows**
+
+```bat
+run.bat
+REM or: py -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+You can also double-click `run.bat` from File Explorer.
 
 Open **http://127.0.0.1:8000** in your browser to reach the landing page and dashboard workspace.
 
@@ -398,6 +432,7 @@ Tax_Co-Pilot/
 │           └── 2024/
 │               ├── state_WY_2024_manifest.yaml
 │               └── state_WY_2024_rules.yaml
+├── run.bat
 ├── run.sh
 ├── scripts/
 │   └── validate_rule_pack.py

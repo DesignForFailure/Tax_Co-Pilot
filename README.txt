@@ -7,7 +7,12 @@ Prerequisites
 -------------
 - Python 3.11+ (3.12 is also supported)
 - pip
-- macOS, Linux, or WSL
+- macOS, Linux, WSL, or Windows
+
+  On Windows, install Python from https://www.python.org/downloads/windows/
+  and check "Add python.exe to PATH" during setup. No C compiler is required for
+  the default install; the optional SQLCipher extra is the only piece that needs
+  build tools, and encryption otherwise falls back to Python Fernet.
 
 1) Install Dependencies
 -----------------------
@@ -19,6 +24,12 @@ From the repository root:
 (Optional for development tools/tests):
 
     python -m pip install -r requirements-dev.txt
+
+On Windows, use the "py" launcher if "python" is not on your PATH:
+
+    py -m pip install --upgrade pip
+    py -m pip install -r requirements.txt
+    py -m pip install -r requirements-dev.txt
 
 2) Setup
 --------
@@ -33,11 +44,17 @@ The app uses:
 
 3) Run the Web App (Canonical)
 ------------------------------
-Start the local server with the provided launcher script:
+Start the local server with the provided launcher script.
+
+macOS / Linux / WSL:
 
     ./run.sh
 
-`run.sh` starts Uvicorn with ASGI import target:
+Windows (Command Prompt or PowerShell, or double-click in File Explorer):
+
+    run.bat
+
+Both launchers start Uvicorn with ASGI import target:
 
     main:app
 
@@ -48,6 +65,10 @@ Expected local URL:
 (Direct alternative command, same ASGI target):
 
     python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+
+On Windows, substitute "py" for "python" if needed:
+
+    py -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 
 4) Run Tests
 ------------
