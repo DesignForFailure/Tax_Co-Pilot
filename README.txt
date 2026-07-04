@@ -10,9 +10,10 @@ Prerequisites
 - macOS, Linux, WSL, or Windows
 
   On Windows, install Python from https://www.python.org/downloads/windows/
-  and check "Add python.exe to PATH" during setup. No C compiler is required for
-  the default install; the optional SQLCipher extra is the only piece that needs
-  build tools, and encryption otherwise falls back to Python Fernet.
+  and check "Add python.exe to PATH" during setup. No C compiler is required: the
+  default install has encryption disabled, so SQLCipher is not needed to run the
+  app. If you enable encryption on Windows, the optional "sqlcipher" extra installs
+  a prebuilt pysqlcipher3 wheel (no compiler needed). See docs/ENCRYPTION.md.
 
 1) Install Dependencies
 -----------------------

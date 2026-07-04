@@ -71,10 +71,13 @@ Most consumer tax software hides its logic, can't reproduce historical results, 
   | **Debian / Ubuntu** | `sudo apt-get install build-essential python3-dev libsqlcipher-dev` |
   | **macOS (Homebrew)** | `brew install sqlcipher` |
 
-  > **Windows note:** These build dependencies are only required for the optional
-  > SQLCipher encryption extra. The default install needs no C compiler on Windows —
-  > `cryptography` ships prebuilt wheels and encryption falls back to Python Fernet
-  > (see [docs/ENCRYPTION.md](docs/ENCRYPTION.md)). Install a recent
+  > **Windows note:** These build dependencies exist to compile `pysqlcipher3`
+  > **from source** on Linux/macOS; they are not needed on Windows. The default
+  > install has encryption disabled (`TAX_COPILOT_ENCRYPTION_ENABLED=false`), so no
+  > SQLCipher is required to run the app. If you do enable encryption on Windows,
+  > install the optional `sqlcipher` extra — `pysqlcipher3` ships **prebuilt Windows
+  > wheels**, so no C compiler is needed there either (see
+  > [docs/ENCRYPTION.md](docs/ENCRYPTION.md)). Install a recent
   > [Python for Windows](https://www.python.org/downloads/windows/) and make sure you
   > check **"Add python.exe to PATH"** in the installer.
 
