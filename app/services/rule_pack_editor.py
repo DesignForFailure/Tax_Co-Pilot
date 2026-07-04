@@ -103,11 +103,13 @@ def _pack_path(
     # any ".." and confirm the path stays under the pack root before a
     # caller opens it. String-based (no filesystem access), which is also
     # the containment check static path-traversal analysis recognizes.
+    # The *normalized* path is what was validated, so it is what we return
+    # (identical to pack_dir for valid inputs, which contain no "..").
     base_root = os.path.normpath(base)
     normalized = os.path.normpath(pack_dir)
     if normalized != base_root and not normalized.startswith(base_root + os.sep):
         raise ValueError(f"Resolved pack path escapes the pack root: {pack_dir}")
-    return pack_dir
+    return Path(normalized)
 
 
 @dataclass
