@@ -105,6 +105,8 @@ def test_pack_path_stays_within_the_pack_root(tmp_packs: Path) -> None:
     for bad in ("..", "fed/eral", "fed\\eral"):
         with pytest.raises(ValueError):
             _pack_path(bad, 2024, "standard", base_dir=tmp_packs)
+    # The normpath containment guard leaves valid, in-root paths intact.
+    assert _pack_path("CA", 2024, "custom_v1", base_dir=tmp_packs).name == "custom_v1"
 
 
 def test_list_all_packs_discovers_standard(tmp_packs: Path) -> None:
