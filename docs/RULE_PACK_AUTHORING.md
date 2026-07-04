@@ -388,7 +388,9 @@ Every rule that produces a numeric result should declare a rounding mode and pre
 
 | Field                | Value             | Meaning                                      |
 |----------------------|-------------------|----------------------------------------------|
-| `rounding`           | `"ROUND_HALF_UP"` | Standard round-half-up (the only supported mode) |
+| `rounding`           | `"ROUND_HALF_UP"` | Standard round-half-up (the default and most common) |
+| `rounding`           | `"ROUND_UP"`      | Away from zero — for step counts like "per $1,000 or fraction thereof" (e.g. CTC phaseout units) |
+| `rounding`           | `"ROUND_DOWN"`    | Truncate toward zero — for floor semantics (e.g. 0/1 eligibility gates) |
 | `rounding_precision` | `0`               | Round to whole dollars                       |
 | `rounding_precision` | `2`               | Round to cents                               |
 
@@ -537,6 +539,59 @@ The validator runs the same `RulePack.load()` call the engine uses, so a pack th
 | `rule_packs/state/TX/2024/`       | No income tax                            | Minimal stub: zero tax, withholding sum, refund of over-withheld amounts |
 
 For adding a new state specifically, see `docs/STATE_AUTHORING_GUIDE.md`, which covers required rule IDs, the state template, and integration testing patterns.
+
+---
+
+## Authoring Without Writing YAML
+
+Two paths exist for authors who prefer not to hand-edit YAML:
+
+### The web editor
+
+**Rule Packs** in the web UI covers the full authoring surface:
+
+- **Constants editor** (pack detail page → Constants): create and edit the
+  filing-status amount tables lookup rules read, including grouped
+  sub-tables (`constants.name.group`). Deleting a constant that a lookup
+  rule still references is refused, because the loader would not catch the
+  dangling path until calculation time.
+- **Rule editor**: structured forms for all five rule types, including a
+  grid editor for two-dimensional `matrix_lookup` tables. Reference fields
+  autocomplete from the pack's own rule IDs, its `constants.*` paths, the
+  engine `input.*` namespace, and (for state packs) the federal rule IDs
+  for that year. Every save is validated with `RulePack.load()` before it
+  touches disk. Matrices with more than two dimensions remain
+  export-edit-reimport territory.
+
+### The AI Authoring Assistant
+
+**Rule Packs → AI Assistant** generates a complete authoring prompt from a
+plain-language description: it embeds this document's contract (rule
+types, expression allowlist, manifest fields), the live reference catalog
+for the chosen jurisdiction/year, and the required rule IDs. Paste the
+prompt into any AI assistant you already use; the app never contacts an AI
+service itself, keeping the local-first privacy posture intact.
+
+The AI is instructed to answer in the **combined document format**:
+
+```
+# === MANIFEST ===
+<manifest.yaml content>
+# === RULES ===
+<rules.yaml content>
+```
+
+Paste that answer into **Rule Packs → Import YAML → Paste combined YAML**
+(chat prose and Markdown code fences are stripped automatically). The
+import validates the pack with `RulePack.load()` and rolls back on any
+failure; if it is rejected, copy the error message back to the AI and
+paste its corrected answer. The Export button produces the same combined
+format, so existing packs round-trip through the paste box too.
+
+**Always verify AI-drafted logic against the official forms and
+instructions.** Validation proves the pack is well-formed and loadable —
+not that the rates and thresholds are correct. Review every number, run a
+test calculation, and read the audit trace before relying on it.
 
 ---
 

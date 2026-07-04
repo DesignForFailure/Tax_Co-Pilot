@@ -138,14 +138,36 @@ def test_add_rule_form_renders() -> None:
     assert "Add Rule" in r.text or "New Rule" in r.text
 
 
-def test_save_rule_via_post() -> None:
-    c = _client()
+def _clone(c: TestClient, custom_name: str) -> str:
+    """Clone federal/2024/standard and return the new variant name."""
     resp = c.post(
         "/rule-packs/federal/2024/standard/clone",
-        data={"csrf_token": CSRF, "custom_name": "for_save"},
+        data={"csrf_token": CSRF, "custom_name": custom_name},
         follow_redirects=False,
     )
-    variant = resp.headers["location"].rstrip("/").split("/")[-1]
+    return str(resp.headers["location"]).rstrip("/").split("/")[-1]
+
+
+def _read_rule(variant: str, rule_id: str) -> dict[str, object]:
+    """Read a rule back from the on-disk YAML the route wrote."""
+    rules_path = (
+        Path(__file__).resolve().parent.parent
+        / "rule_packs"
+        / "federal"
+        / "2024"
+        / variant
+        / "rules.yaml"
+    )
+    data = _yaml.safe_load(rules_path.read_text())
+    for rule in data["rules"]:
+        if rule["id"] == rule_id:
+            return dict(rule)
+    raise AssertionError(f"{rule_id} not found in {rules_path}")
+
+
+def test_save_rule_via_post() -> None:
+    c = _client()
+    variant = _clone(c, "for_save")
     r = c.post(
         f"/rule-packs/federal/2024/{variant}/rules/add",
         data={
@@ -160,7 +182,212 @@ def test_save_rule_via_post() -> None:
         },
         follow_redirects=False,
     )
-    assert r.status_code == 303 or r.status_code == 200
+    # A 200 here is the error re-render — only the redirect proves the save.
+    assert r.status_code == 303
+    saved = _read_rule(variant, "fed.2024.my_new_rule")
+    assert saved["expression"] == "x"
+    assert saved["inputs"] == {"x": {"ref": "input.w2.wages"}}
+
+
+def test_list_shaped_sum_rule_renders() -> None:
+    # gross_income.total's items is a LIST of refs; this view 500'd with
+    # jinja2 UndefinedError before the sum section grew item rows.
+    c = _client()
+    r = c.get("/rule-packs/federal/2024/standard/rules/fed.2024.gross_income.total")
+    assert r.status_code == 200
+    assert "fed.2024.gross_income.wages" in r.text  # first item row echoed
+
+
+def test_multi_item_sum_saves_as_list_and_round_trips() -> None:
+    c = _client()
+    variant = _clone(c, "for_list_sum")
+    r = c.post(
+        f"/rule-packs/federal/2024/{variant}/rules/add",
+        data={
+            "csrf_token": CSRF,
+            "rule_id": "fed.2024.my_total",
+            "rule_type": "sum",
+            "description": "Two-part total",
+            "sum_item_0": "fed.2024.gross_income.wages",
+            "sum_item_1": "fed.2024.gross_income.interest",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    saved = _read_rule(variant, "fed.2024.my_total")
+    assert saved["inputs"] == {
+        "items": [
+            {"ref": "fed.2024.gross_income.wages"},
+            {"ref": "fed.2024.gross_income.interest"},
+        ]
+    }
+    # A single item keeps the single-ref shape shipped packs use.
+    r = c.post(
+        f"/rule-packs/federal/2024/{variant}/rules/fed.2024.my_total",
+        data={
+            "csrf_token": CSRF,
+            "rule_id": "fed.2024.my_total",
+            "rule_type": "sum",
+            "description": "One-part total",
+            "sum_item_0": "input.w2.wages",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    saved = _read_rule(variant, "fed.2024.my_total")
+    assert saved["inputs"] == {"items": {"ref": "input.w2.wages"}}
+
+
+def test_save_formula_with_literal_input_via_post() -> None:
+    c = _client()
+    variant = _clone(c, "for_literal")
+    r = c.post(
+        f"/rule-packs/federal/2024/{variant}/rules/add",
+        data={
+            "csrf_token": CSRF,
+            "rule_id": "fed.2024.flat_fee",
+            "rule_type": "formula",
+            "description": "Wages times a literal rate",
+            "expression": "wages * rate",
+            "input_name_0": "wages",
+            "input_type_0": "ref",
+            "input_value_0": "input.w2.wages",
+            "input_name_1": "rate",
+            "input_type_1": "literal",
+            "input_value_1": "0.04",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    saved = _read_rule(variant, "fed.2024.flat_fee")
+    assert saved["inputs"] == {
+        "wages": {"ref": "input.w2.wages"},
+        "rate": {"literal": "0.04"},
+    }
+
+
+def test_save_lookup_rule_via_post_round_trips() -> None:
+    c = _client()
+    variant = _clone(c, "for_lookup")
+    r = c.post(
+        f"/rule-packs/federal/2024/{variant}/rules/add",
+        data={
+            "csrf_token": CSRF,
+            "rule_id": "fed.2024.my_lookup",
+            "rule_type": "lookup",
+            "description": "Standard deduction lookup",
+            "lookup_table": "constants.standard_deduction",
+            "lookup_key_ref": "input.filing_status",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    saved = _read_rule(variant, "fed.2024.my_lookup")
+    assert saved["table"] == "constants.standard_deduction"
+    assert saved["key"] == {"ref": "input.filing_status"}
+
+
+def test_save_bracket_table_rule_via_post_round_trips() -> None:
+    c = _client()
+    variant = _clone(c, "for_brackets")
+    data = {
+        "csrf_token": CSRF,
+        "rule_id": "fed.2024.my_brackets",
+        "rule_type": "bracket_table",
+        "description": "Two-bracket test schedule",
+        "bracket_input_ref": "fed.2024.taxable_income",
+        "bracket_key_ref": "input.filing_status",
+    }
+    for status in ("single", "mfj", "mfs", "hoh", "qss"):
+        data[f"bracket_{status}_0_lower"] = "0"
+        data[f"bracket_{status}_0_upper"] = "10000"
+        data[f"bracket_{status}_0_rate"] = "0.10"
+        data[f"bracket_{status}_1_lower"] = "10000"
+        data[f"bracket_{status}_1_upper"] = ""
+        data[f"bracket_{status}_1_rate"] = "0.20"
+    r = c.post(
+        f"/rule-packs/federal/2024/{variant}/rules/add",
+        data=data,
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    saved = _read_rule(variant, "fed.2024.my_brackets")
+    tables = saved["tables"]
+    assert isinstance(tables, dict) and set(tables) == {"single", "mfj", "mfs", "hoh", "qss"}
+    assert tables["single"] == [
+        {"lower": "0", "upper": "10000", "rate": "0.10"},
+        {"lower": "10000", "upper": None, "rate": "0.20"},
+    ]
+
+
+def test_save_matrix_lookup_rule_via_post_round_trips() -> None:
+    c = _client()
+    variant = _clone(c, "for_matrix")
+    data = {
+        "csrf_token": CSRF,
+        "rule_id": "fed.2024.my_matrix",
+        "rule_type": "matrix_lookup",
+        "description": "Status by children matrix",
+        "matrix_key_0": "input.filing_status",
+        "matrix_key_1": "fed.2024.credits.eic.num_children",
+        "matrix_col_0": "0",
+        "matrix_col_1": "1",
+    }
+    for i, status in enumerate(("single", "mfj", "mfs", "hoh", "qss")):
+        data[f"matrix_row_{i}_key"] = status
+        data[f"matrix_cell_{i}_0"] = "100"
+        data[f"matrix_cell_{i}_1"] = "200"
+    r = c.post(
+        f"/rule-packs/federal/2024/{variant}/rules/add",
+        data=data,
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    saved = _read_rule(variant, "fed.2024.my_matrix")
+    assert saved["keys"] == [
+        {"ref": "input.filing_status"},
+        {"ref": "fed.2024.credits.eic.num_children"},
+    ]
+    table = saved["table"]
+    assert isinstance(table, dict)
+    assert table["mfj"] == {"0": "100", "1": "200"}
+    # The saved rule renders back into the grid editor.
+    r = c.get(f"/rule-packs/federal/2024/{variant}/rules/fed.2024.my_matrix")
+    assert r.status_code == 200
+    assert "Matrix Lookup" in r.text and 'value="200"' in r.text
+
+
+def test_invalid_rule_form_rerenders_editor_with_error() -> None:
+    c = _client()
+    variant = _clone(c, "for_bad_rule")
+    r = c.post(
+        f"/rule-packs/federal/2024/{variant}/rules/add",
+        data={
+            "csrf_token": CSRF,
+            "rule_id": "fed.2024.broken",
+            "rule_type": "formula",
+            "description": "Uses an undeclared identifier",
+            "expression": "wages + mystery",
+            "input_name_0": "wages",
+            "input_type_0": "ref",
+            "input_value_0": "input.w2.wages",
+        },
+        follow_redirects=False,
+    )
+    # The editor re-renders with the engine's validation message instead
+    # of writing a broken pack.
+    assert r.status_code == 200
+    assert "Validation failed" in r.text and "mystery" in r.text
+    rules_path = (
+        Path(__file__).resolve().parent.parent
+        / "rule_packs"
+        / "federal"
+        / "2024"
+        / variant
+        / "rules.yaml"
+    )
+    data = _yaml.safe_load(rules_path.read_text())
+    assert all(rule["id"] != "fed.2024.broken" for rule in data["rules"])
 
 
 def test_save_existing_rule_via_post() -> None:

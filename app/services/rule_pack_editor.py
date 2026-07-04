@@ -28,6 +28,7 @@ import re
 import shutil
 import tempfile
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -44,8 +45,17 @@ _BASE_DIR = Path(__file__).resolve().parent.parent.parent / "rule_packs"
 _JURISDICTION_RE = re.compile(r"^[a-zA-Z]{2,10}$")
 _VARIANT_RE = re.compile(r"^(standard|custom_v\d+)$")
 _RULE_ID_RE = re.compile(r"^[a-z]{2,10}\.\d{4}\.[a-z0-9_.]+$")
+# Constant names and table keys must stay dot-free: the loader resolves
+# lookup `table:` paths by splitting on dots, so a dotted key would be
+# unreachable.
+_CONSTANT_KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 _FEDERAL_JURISDICTIONS = {"federal", "fed"}
 _DEFAULT_CUSTOM_PACK_VERSION = "1.0.0"
+
+# Sentinels used by the export route's single-file download; the paste-import
+# path accepts the same combined format so packs round-trip.
+_MANIFEST_SENTINEL = "# === MANIFEST ==="
+_RULES_SENTINEL = "# === RULES ==="
 
 
 def _validate_custom_name(name: str) -> None:
@@ -251,6 +261,7 @@ def load_pack_detail(
         "rule_count": len(rules_list),
         "rules": rules_list,
         "rule_order": pack.rule_order,
+        "constants": pack.constants,
     }
 
 
@@ -326,6 +337,31 @@ def _canonicalize_manifest_version(manifest: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(manifest)
     normalized["version"] = normalize_rule_pack_version(normalized.get("version", ""))
     return normalized
+
+
+def _validate_candidate_rules(pack_dir: Path, rules_yaml: dict[str, Any]) -> dict[str, Any]:
+    """Validate a candidate rules.yaml before it touches the real pack.
+
+    Copies the pack's manifest (version-canonicalized) plus the candidate
+    rules into a temp directory and runs RulePack.load() there, so the
+    on-disk pack is only rewritten once the edit is known to be loadable.
+    Returns the canonicalized manifest data; raises ValueError on failure.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+        manifest_src = pack_dir / "manifest.yaml"
+        if not manifest_src.exists():
+            candidates = list(pack_dir.glob("*_manifest*.yaml"))
+            manifest_src = candidates[0] if candidates else manifest_src
+        manifest_data = _canonicalize_manifest_version(_read_yaml(manifest_src))
+        _atomic_write_yaml(tmp / "manifest.yaml", manifest_data)
+        _atomic_write_yaml(tmp / "rules.yaml", rules_yaml)
+        try:
+            RulePack.load(tmp)
+        except Exception as exc:
+            logger.warning("Pack edit rejected: validation failed: %s", exc)
+            raise ValueError(f"Validation failed: {exc}") from exc
+    return manifest_data
 
 
 def clone_pack(
@@ -479,21 +515,7 @@ def save_rule(
 
     rules_yaml["rules"] = rule_list
 
-    # Validate before writing: copy manifest to a temp dir, write candidate rules, load
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmp = Path(tmpdir)
-        manifest_src = pack_dir / "manifest.yaml"
-        if not manifest_src.exists():
-            candidates = list(pack_dir.glob("*_manifest*.yaml"))
-            manifest_src = candidates[0] if candidates else manifest_src
-        manifest_data = _canonicalize_manifest_version(_read_yaml(manifest_src))
-        _atomic_write_yaml(tmp / "manifest.yaml", manifest_data)
-        _atomic_write_yaml(tmp / "rules.yaml", rules_yaml)
-        try:
-            RulePack.load(tmp)
-        except Exception as exc:
-            logger.warning("Rule save rejected: pack validation failed: %s", exc)
-            raise ValueError(f"Validation failed: {exc}") from exc
+    manifest_data = _validate_candidate_rules(pack_dir, rules_yaml)
 
     # Validation passed — write for real
     manifest_path = pack_dir / "manifest.yaml"
@@ -528,22 +550,178 @@ def delete_rule(
 
     # Validate before writing (mirrors save_rule): deleting a rule that
     # others reference would otherwise leave the pack unloadable on disk.
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmp = Path(tmpdir)
-        manifest_src = pack_dir / "manifest.yaml"
-        if not manifest_src.exists():
-            candidates = list(pack_dir.glob("*_manifest*.yaml"))
-            manifest_src = candidates[0] if candidates else manifest_src
-        manifest_data = _canonicalize_manifest_version(_read_yaml(manifest_src))
-        _atomic_write_yaml(tmp / "manifest.yaml", manifest_data)
-        _atomic_write_yaml(tmp / "rules.yaml", rules_yaml)
-        try:
-            RulePack.load(tmp)
-        except Exception as exc:
-            logger.warning("Rule deletion rejected: pack validation failed: %s", exc)
-            raise ValueError(f"Validation failed: {exc}") from exc
+    _validate_candidate_rules(pack_dir, rules_yaml)
 
     _atomic_write_yaml(rules_path, rules_yaml)
+
+
+def _validate_constant_value(name: str, value: Any, *, _depth: int = 0) -> None:
+    """Constants are mappings of dot-free keys to decimal strings.
+
+    At most two levels deep — the shapes lookup `table:` dotted paths can
+    address (`constants.name` or `constants.name.group`), and the only
+    shapes that exist across the shipped packs.
+    """
+    if not isinstance(value, dict) or not value:
+        raise ValueError(f"Constant {name!r} must be a non-empty mapping of keys to values")
+    for key, child in value.items():
+        if not isinstance(key, str) or not _CONSTANT_KEY_RE.fullmatch(key):
+            raise ValueError(
+                f"Constant {name!r} has invalid key {key!r}: keys must use lowercase "
+                "letters, digits, and underscores, starting with a letter"
+            )
+        if isinstance(child, dict):
+            if _depth >= 1:
+                raise ValueError(f"Constant {name!r} nests deeper than two levels")
+            _validate_constant_value(name, child, _depth=_depth + 1)
+        else:
+            try:
+                amount = Decimal(str(child))
+            except InvalidOperation as exc:
+                raise ValueError(
+                    f"Constant {name!r} value for key {key!r} must be a decimal "
+                    f"number, got {child!r}"
+                ) from exc
+            # NaN/Infinity construct fine but would silently corrupt every
+            # calculation that touches them (NaN comparisons are False).
+            if not amount.is_finite():
+                raise ValueError(
+                    f"Constant {name!r} value for key {key!r} must be a finite "
+                    f"number, got {child!r}"
+                )
+
+
+def save_constant(
+    jurisdiction: str,
+    year: int,
+    variant: str,
+    name: str,
+    value: dict[str, Any],
+    *,
+    base_dir: Path | None = None,
+) -> None:
+    """Add or update one entry in a custom pack's constants mapping.
+
+    Same validate-before-write discipline as save_rule: the candidate
+    rules.yaml must load cleanly before the real file is rewritten.
+    """
+    if variant == "standard":
+        raise ValueError("Cannot modify a standard pack — clone it as custom first")
+    if not _CONSTANT_KEY_RE.fullmatch(name):
+        raise ValueError(
+            "Constant name must use lowercase letters, digits, and underscores, "
+            "starting with a letter"
+        )
+    if name == "add":
+        # /constants/add is the create-form route; a constant named "add"
+        # would render an edit link that opens the blank add form instead.
+        raise ValueError("The constant name 'add' is reserved by the editor")
+    _validate_constant_value(name, value)
+
+    pack_dir = _pack_path(jurisdiction, year, variant, base_dir=base_dir)
+    rules_path = pack_dir / "rules.yaml"
+    rules_yaml = _read_yaml(rules_path)
+    constants = rules_yaml.get("constants") or {}
+    if not isinstance(constants, dict):
+        raise ValueError("rules.yaml 'constants' must be a mapping")
+    constants[name] = value
+    rules_yaml["constants"] = constants
+
+    _validate_candidate_rules(pack_dir, rules_yaml)
+    _atomic_write_yaml(rules_path, rules_yaml)
+
+
+def delete_constant(
+    jurisdiction: str,
+    year: int,
+    variant: str,
+    name: str,
+    *,
+    base_dir: Path | None = None,
+) -> None:
+    """Remove a constant from a custom pack.
+
+    The loader does not verify lookup `table:` paths at load time, so a
+    dangling constants reference would only surface as a calculation-time
+    failure — refuse the delete here instead when any rule still points at
+    the constant.
+    """
+    if variant == "standard":
+        raise ValueError("Cannot modify a standard pack — clone it as custom first")
+    if not _CONSTANT_KEY_RE.fullmatch(name):
+        raise ValueError(f"Invalid constant name: {name!r}")
+
+    pack_dir = _pack_path(jurisdiction, year, variant, base_dir=base_dir)
+    rules_path = pack_dir / "rules.yaml"
+    rules_yaml = _read_yaml(rules_path)
+    constants = rules_yaml.get("constants") or {}
+    if not isinstance(constants, dict) or name not in constants:
+        raise ValueError(f"Constant {name!r} not found in pack")
+
+    for rule in rules_yaml.get("rules", []) or []:
+        table = rule.get("table") if isinstance(rule, dict) else None
+        if not isinstance(table, str):
+            continue
+        # get_constant strips an optional "constants." head, so bare table
+        # paths reference constants too — normalize before comparing.
+        table_path = table.removeprefix("constants.")
+        if table_path == name or table_path.startswith(name + "."):
+            raise ValueError(
+                f"Constant {name!r} is referenced by rule {rule.get('id')!r} — "
+                "edit or delete that rule first"
+            )
+
+    del constants[name]
+    rules_yaml["constants"] = constants
+
+    _validate_candidate_rules(pack_dir, rules_yaml)
+    _atomic_write_yaml(rules_path, rules_yaml)
+
+
+def _strip_chat_wrapping(text: str) -> str:
+    """Reduce an AI chat answer to the pack document inside it.
+
+    Prefer the LAST fenced code block that contains both sentinels — AI
+    replies often quote the broken version before the corrected one, and
+    the fence drops surrounding prose entirely (including trailing "let me
+    know" lines that would otherwise corrupt the rules YAML). Fall back to
+    joining all fenced blocks (sentinels split across blocks), then to
+    just dropping stray fence lines from a paste with no usable fences.
+    """
+    segments = re.split(r"^[ \t]*```[^\n]*$", text, flags=re.MULTILINE)
+    fenced_blocks = segments[1::2]
+    for block in reversed(fenced_blocks):
+        if _MANIFEST_SENTINEL in block and _RULES_SENTINEL in block:
+            return block
+    if any(_MANIFEST_SENTINEL in block for block in fenced_blocks):
+        return "\n".join(fenced_blocks)
+    return "\n".join(
+        line for line in text.splitlines() if not line.lstrip().startswith("```")
+    )
+
+
+def split_combined_yaml(text: str) -> tuple[bytes, bytes]:
+    """Split the combined export format back into manifest and rules bytes.
+
+    Inverse of the export route's single-file download. Tolerates AI chat
+    wrapping — prose before/after the document and Markdown code fences —
+    so an assistant's answer pastes straight in.
+    """
+    cleaned = _strip_chat_wrapping(text)
+
+    manifest_idx = cleaned.find(_MANIFEST_SENTINEL)
+    rules_idx = cleaned.find(_RULES_SENTINEL)
+    if manifest_idx == -1 or rules_idx == -1 or rules_idx < manifest_idx:
+        raise ValueError(
+            f"Combined YAML must contain the marker '{_MANIFEST_SENTINEL}' followed "
+            f"by '{_RULES_SENTINEL}'"
+        )
+
+    manifest_str = cleaned[manifest_idx + len(_MANIFEST_SENTINEL) : rules_idx].strip()
+    rules_str = cleaned[rules_idx + len(_RULES_SENTINEL) :].strip()
+    if not manifest_str or not rules_str:
+        raise ValueError("Combined YAML has an empty manifest or rules section")
+    return manifest_str.encode("utf-8"), rules_str.encode("utf-8")
 
 
 def delete_pack(
@@ -644,6 +822,9 @@ __all__ = [
     "create_empty_pack",
     "save_rule",
     "delete_rule",
+    "save_constant",
+    "delete_constant",
+    "split_combined_yaml",
     "delete_pack",
     "import_yaml",
     "_pack_path",
