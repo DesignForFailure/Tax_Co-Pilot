@@ -194,8 +194,55 @@ brew install sqlcipher
 
 ### Windows
 
-Pre-built wheels for `pysqlcipher3` are available for Windows. Runtime encrypted
-operation requires SQLCipher support.
+Encryption is **optional and disabled by default** (`TAX_COPILOT_ENCRYPTION_ENABLED=false`),
+so Tax Co-Pilot runs on native Windows with no SQLCipher and no C compiler. The steps
+below are only needed if you want encryption at rest on Windows.
+
+> **There is no prebuilt SQLCipher wheel on PyPI for Windows.** `pysqlcipher3` is
+> distributed as a source tarball only (all platforms), and the maintained
+> `sqlcipher3-binary` fork publishes Linux wheels only. So on Windows you must either
+> build `pysqlcipher3` from source (below) or use one of the shortcuts.
+
+**Recommended shortcuts (no native build):**
+
+- **WSL** — run Tax Co-Pilot inside Windows Subsystem for Linux and follow the Linux
+  steps above. This is the simplest reliable path to encryption on Windows.
+- **conda / conda-forge** — if you use a conda environment, install SQLCipher from
+  conda-forge (`conda install -c conda-forge sqlcipher`) so the native library is
+  present before `pip install -e .[sqlcipher]`.
+
+**Building `pysqlcipher3` from source on native Windows**
+
+You need three things in place before `pip install -e .[sqlcipher]` will compile the
+extension:
+
+1. **A C/C++ compiler (MSVC).** Install the
+   [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+   and select the **"Desktop development with C++"** workload. Python 3.11/3.12 for
+   Windows are built with MSVC v143 (Visual Studio 2022), so use a matching toolchain.
+2. **OpenSSL development libraries.** SQLCipher's crypto backend links against OpenSSL's
+   `libcrypto`. Windows has no system package manager for this, so install OpenSSL dev
+   headers and libraries — e.g. via [vcpkg](https://vcpkg.io/)
+   (`vcpkg install openssl:x64-windows`) or a conda-forge `openssl` package — and note
+   the include/lib paths.
+3. **The SQLCipher amalgamation.** `pysqlcipher3`'s `setup.py` compiles a SQLCipher
+   `sqlite3.c` built with `SQLITE_HAS_CODEC`. Either let it build the amalgamation
+   (`python setup.py build_amalgamation`) or build against an installed `libsqlcipher`.
+
+Then, from a **"x64 Native Tools Command Prompt for VS 2022"** (so the compiler and
+env vars are on `PATH`), point the build at your OpenSSL install and compile:
+
+```bat
+REM Adjust these to your OpenSSL location (vcpkg example shown)
+set INCLUDE=%INCLUDE%;C:\vcpkg\installed\x64-windows\include
+set LIB=%LIB%;C:\vcpkg\installed\x64-windows\lib
+
+py -m pip install -e .[sqlcipher]
+```
+
+If compilation fails, it is almost always OpenSSL not being found — verify the
+`INCLUDE`/`LIB` paths above resolve to real `openssl/` headers and `libcrypto*.lib`.
+Given the fragility of this chain, **WSL or conda is recommended over a native build.**
 
 ## Security Considerations
 
@@ -280,8 +327,8 @@ If you need an unencrypted backup:
 **Cause**: SQLCipher library not installed
 
 **Solutions:**
-1. Install dependencies: `pip install -e .`
-2. Install system libraries (see System Requirements above)
+1. Install the SQLCipher extra: `pip install -e .[sqlcipher]`
+2. Install system libraries / build prerequisites (see System Requirements above)
 3. Configure SQLCipher support; runtime encrypted operation requires SQLCipher
 
 ### Performance Issues
