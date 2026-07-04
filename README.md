@@ -219,9 +219,10 @@ Tax_Co-Pilot/
 ├── .github/
 │   ├── ISSUE_TEMPLATE/
 │   │   ├── bug_report.md
-│   │   ├── custom.md
+│   │   ├── config.yml
 │   │   ├── feature_request.md
-│   │   └── new_state.md
+│   │   ├── new_state.md
+│   │   └── tax_calculation_error.yml
 │   ├── PULL_REQUEST_TEMPLATE.md
 │   └── workflows/
 │       └── ci.yml
@@ -293,6 +294,7 @@ Tax_Co-Pilot/
 │           ├── unlock.html
 │           └── whatif.html
 ├── CHANGELOG.md
+├── CITATION.cff
 ├── CLAUDE.md
 ├── CODE_OF_CONDUCT.md
 ├── CONTRIBUTING.md

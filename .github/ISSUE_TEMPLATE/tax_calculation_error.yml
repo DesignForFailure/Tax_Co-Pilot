@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: Tax calculation error
+description: A calculated value disagrees with an authoritative source
+title: "[Calc] "
+labels: ["tax-correctness"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every calculation carries a full audit trace (run detail page →
+        Audit Trace). Reports that cite the trace's rule ID and an
+        authoritative source are usually fixed fastest.
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: jurisdiction
+    attributes:
+      label: Jurisdiction
+      options: [Federal, GA, CA, NY, PA, IL, NC, Other/multi-state]
+    validations:
+      required: true
+  - type: input
+    id: tax_year
+    attributes:
+      label: Tax year
+      placeholder: "2024"
+    validations:
+      required: true
+  - type: dropdown
+    id: filing_status
+    attributes:
+      label: Filing status
+      options: [Single, MFJ, MFS, HoH, QSS]
+    validations:
+      required: true
+  - type: textarea
+    id: inputs
+    attributes:
+      label: Minimal inputs to reproduce
+      description: The smallest set of amounts that shows the problem (no real personal data, please).
+      placeholder: "Wages $52,000; 1 qualifying child; GA resident with NY W-2 of $10,000 ..."
+    validations:
+      required: true
+  - type: input
+    id: rule_id
+    attributes:
+      label: Rule ID from the audit trace (if known)
+      placeholder: "fed.2024.credits.eic.final"
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected value and authoritative source
+      description: Cite the IRS/state form line, instruction page, Rev. Proc., or statute you checked against.
+      placeholder: "Expected $4,213 per the 2024 EIC table for $25,000 AGI, 1 child (Pub 596) ..."
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual value produced
+    validations:
+      required: true

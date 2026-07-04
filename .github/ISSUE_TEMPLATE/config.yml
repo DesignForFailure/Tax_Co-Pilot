@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability (do NOT open a public issue)
+    url: https://github.com/DesignForFailure/Tax_Co-Pilot/blob/main/SECURITY.md
+    about: Report vulnerabilities privately per the security policy.
