@@ -143,8 +143,8 @@ def get_connection(password: str | None = None) -> sqlite3.Connection:
             )
 
         elif db_state == DatabaseState.UNENCRYPTED:
-            # Database exists but is unencrypted
-            # For now, allow unencrypted connections (migration happens in main.py)
+            # Database exists but is unencrypted. startup() migrates it to
+            # encrypted when a password is available, or defers to /unlock.
             DB_PATH.parent.mkdir(parents=True, exist_ok=True)
             conn = sqlite3.connect(str(DB_PATH), timeout=5.0, isolation_level=None)
             conn.row_factory = hybrid_factory

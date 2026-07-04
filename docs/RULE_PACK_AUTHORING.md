@@ -531,7 +531,7 @@ The validator runs the same `RulePack.load()` call the engine uses, so a pack th
 
 | Pack                              | Tax structure                            | Notable features                           |
 |-----------------------------------|------------------------------------------|--------------------------------------------|
-| `rule_packs/federal/2024/`        | Full 1040-style federal return           | All four rule types, SS taxability worksheet, CTC phaseout |
+| `rule_packs/federal/2024/`        | Full 1040-style federal return           | All five rule types, SS taxability worksheet, CTC phaseout, QDCGT worksheet, Schedule 8812 |
 | `rule_packs/state/GA/2024/`       | Flat rate (5.39%) with deductions        | Simplest state pack with constants         |
 | `rule_packs/state/CA/2024/`       | Progressive brackets + surtax            | `bracket_table` + supplemental `formula` for the 1% MHS surtax |
 | `rule_packs/state/TX/2024/`       | No income tax                            | Minimal stub: zero tax, withholding sum, refund of over-withheld amounts |
