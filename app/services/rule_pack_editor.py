@@ -98,6 +98,15 @@ def _pack_path(
 
     if variant != "standard":
         pack_dir = pack_dir / variant
+
+    # Defense in depth behind the segment validators above: normalize away
+    # any ".." and confirm the path stays under the pack root before a
+    # caller opens it. String-based (no filesystem access), which is also
+    # the containment check static path-traversal analysis recognizes.
+    base_root = os.path.normpath(base)
+    normalized = os.path.normpath(pack_dir)
+    if normalized != base_root and not normalized.startswith(base_root + os.sep):
+        raise ValueError(f"Resolved pack path escapes the pack root: {pack_dir}")
     return pack_dir
 
 
