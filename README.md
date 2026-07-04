@@ -20,7 +20,7 @@ $$$$$$$$╱______   __    __       ╱$$$$$$  │  ______          $$$$$$$  │$
 [![CI](https://github.com/DesignForFailure/Tax_Co-Pilot/actions/workflows/ci.yml/badge.svg)](https://github.com/DesignForFailure/Tax_Co-Pilot/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB.svg)](https://python.org)
-[![Status: Beta](https://img.shields.io/badge/Status-Beta-blue.svg)](#project-status)
+[![Status: Stable](https://img.shields.io/badge/Status-Stable-brightgreen.svg)](#project-status)
 
 An engineering-focused system for modeling tax rules, storing tax-relevant data, and deterministically calculating outcomes using transparent, verifiable logic.
 
@@ -153,7 +153,7 @@ pytest -q
 
 ## Project Status
 
-Tax Co-Pilot is currently **beta** (0.9.x).
+Tax Co-Pilot is **stable** (1.0.x). The application compatibility promise described under Versioning is in effect.
 
 ### Current Scope
 

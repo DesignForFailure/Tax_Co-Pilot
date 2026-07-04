@@ -10,6 +10,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-04
+
+The first stable release. Tax Co-Pilot 1.0.0 covers federal 1040-style returns for tax years 2023-2025 (preferential rates, SE tax, EITC, education/care credits, NIIT, Additional Medicare Tax with full Form 8959, Schedule 8812, capital-loss carryover, military provisions), six income-tax state packs plus nine no-tax stubs, multi-state W-2 apportionment with the resident credit, encrypted-at-rest storage, full audit traces with an integrity chain, and a local web UI — verified by 695 tests with every tax parameter source-checked and every simplification documented. The stable application compatibility promise begins with this release.
+
 ### Changed
 - **Pre-1.0 housekeeping sweep.** Documentation, tooling, and templates reviewed end to end: `CLAUDE.md`'s project overview and architecture notes updated from the alpha-era text ("tax year 2024 with a Georgia state stub", the pre-M12 `main.py` monolith description) to the current beta reality; the SPDX identifiers in `.agent_tools/` corrected from `GPL-3.0-or-later` to the repository's actual `AGPL-3.0-or-later`; the README status badge, Current Scope list, and versioning note brought up to date (beta, three tax years, six income-tax states, multi-state, full credit/surtax coverage); `pyproject.toml` repository URLs fixed to the real GitHub org; `docs/ENCRYPTION.md` rewritten to describe the startup/`/unlock` migration flows actually implemented in the 0.9.0 deep review (and a stale `database.py` comment fixed to match); `docs/RULE_PACK_AUTHORING.md`'s rule-type count corrected to five; **`docs/STATE_AUTHORING_GUIDE.md` and the `_template` state pack now document and include the M31 multi-state requirements** (the `tax.full`/`tax` split, the other-state credit tail, and the engine-provided apportionment inputs), so new state packs compose with multi-state returns by construction; and CI gains a **rule-pack validation step** covering every pack, including ones no test loads.
 

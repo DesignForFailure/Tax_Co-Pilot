@@ -9,8 +9,8 @@ This roadmap covers the next phase of development: structural hardening, correct
 
 ## Current Stage
 
-**Status:** Beta — milestones 1–28 plus the 0.9.0 hardening arc (deep review, NY recapture, edge-case battery) complete. Next: the `1.0` readiness gaps — M29 Box 5/6 W-2 inputs (done 2026-07-03), M30 capital-loss carryover (done 2026-07-03), M31 multi-state apportionment (done 2026-07-04), then M32 additional state packs — PA/IL/NC (done 2026-07-04). All 1.0 readiness gaps are closed.
-**SemVer line:** `0.9.x`.
+**Status:** Stable — milestones 1–32, the 0.9.0 hardening arc, and the pre-1.0 housekeeping sweep are complete; released as `1.0.0` on 2026-07-04. Future work (more states, new tax years, part-year residency, pension/retirement inputs) proceeds under the 1.x compatibility promise.
+**SemVer line:** `1.0.x`.
 **Test suite:** 695 passing, 4 skipped, 0 failures.
 **Quality gates:** ruff clean, mypy clean, CI green (Python 3.11 + 3.12).
 
