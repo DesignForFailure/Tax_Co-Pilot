@@ -12,8 +12,9 @@ Prerequisites
   On Windows, install Python from https://www.python.org/downloads/windows/
   and check "Add python.exe to PATH" during setup. No C compiler is required: the
   default install has encryption disabled, so SQLCipher is not needed to run the
-  app. If you enable encryption on Windows, the optional "sqlcipher" extra installs
-  a prebuilt pysqlcipher3 wheel (no compiler needed). See docs/ENCRYPTION.md.
+  app. There is no prebuilt SQLCipher wheel on PyPI for Windows, so if you want
+  encryption at rest on Windows, use WSL or conda, or build pysqlcipher3 from
+  source. See docs/ENCRYPTION.md (Windows section) for full instructions.
 
 1) Install Dependencies
 -----------------------
