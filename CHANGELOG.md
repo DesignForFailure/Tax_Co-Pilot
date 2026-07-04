@@ -10,6 +10,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- **Public-repo community files.** `CITATION.cff` (citable software metadata for the 1.0.0 release) and a `tax_calculation_error.yml` issue form — the project's signature issue type, asking for the audit-trace rule ID, minimal inputs, and the authoritative source (form line/Rev. Proc./statute) the expected value came from. The issue-template chooser (`config.yml`) now routes vulnerability reports to the private channel in `SECURITY.md`, replacing the old public "Vulnerability Report" template (`custom.md`), which contradicted the responsible-disclosure policy.
+
 ## [1.0.0] - 2026-07-04
 
 The first stable release. Tax Co-Pilot 1.0.0 covers federal 1040-style returns for tax years 2023-2025 (preferential rates, SE tax, EITC, education/care credits, NIIT, Additional Medicare Tax with full Form 8959, Schedule 8812, capital-loss carryover, military provisions), six income-tax state packs plus nine no-tax stubs, multi-state W-2 apportionment with the resident credit, encrypted-at-rest storage, full audit traces with an integrity chain, and a local web UI — verified by 695 tests with every tax parameter source-checked and every simplification documented. The stable application compatibility promise begins with this release.

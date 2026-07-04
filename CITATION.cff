@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "Tax Co-Pilot"
+abstract: >-
+  Local-first, privacy-preserving personal tax software with a
+  rules-as-data architecture: tax logic lives in versioned, checksummed
+  YAML rule packs, and every calculation produces a full audit trace.
+authors:
+  - name: "Tax Co-Pilot Contributors"
+license: AGPL-3.0-or-later
+repository-code: "https://github.com/DesignForFailure/Tax_Co-Pilot"
+version: 1.0.0
+date-released: "2026-07-04"
