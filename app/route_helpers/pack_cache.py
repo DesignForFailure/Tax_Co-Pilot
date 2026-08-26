@@ -36,12 +36,21 @@ def refresh_available_years() -> None:
 
 
 def discover_available_years() -> list[int]:
-    """Scan rule_packs/federal for available tax years."""
+    """Scan rule_packs/federal for available tax years.
+
+    A year directory only counts if it holds a manifest; a stray empty
+    directory would otherwise crash ``warm_caches()`` at startup.
+    """
     years: list[int] = []
     if not FEDERAL_PACKS_DIR.exists():
         return years
     for year_dir in sorted(FEDERAL_PACKS_DIR.iterdir()):
-        if year_dir.is_dir() and year_dir.name.isdigit():
+        if not (year_dir.is_dir() and year_dir.name.isdigit()):
+            continue
+        has_manifest = (year_dir / "manifest.yaml").exists() or any(
+            year_dir.glob("*_manifest.yaml")
+        )
+        if has_manifest:
             years.append(int(year_dir.name))
     return years
 
