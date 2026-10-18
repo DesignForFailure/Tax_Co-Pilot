@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+Claude also follows the repo's agent entry point (`.agent_tools/` routing and the session-log rule):
+
+@AGENTS.md
+
 ## Project Overview
 
 Tax Co-Pilot is a local-first, privacy-preserving personal tax software system. It uses a **rules-as-data** architecture where tax logic lives in versioned YAML rule packs, not in application code. Every calculation produces a full audit trace (rule ID, inputs, intermediates, rounding, explanation). Currently beta (0.9.x): federal 1040-style calculations for tax years 2023-2025 (LTCG rates, SE tax, EITC, education/care credits, NIIT, Additional Medicare Tax, Schedule 8812, capital-loss carryover), six income-tax state packs (GA, CA, NY, PA, IL, NC) plus nine no-tax stubs, and multi-state apportionment with the resident credit.
